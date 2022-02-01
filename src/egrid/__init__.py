@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Interface of egrid
-Copyright (C) 2022  pyprg
+Copyright (C) 2022 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ Created on Mon Jan 31 08:00:31 2022
 
 @author: pyprg
 """
-from builder.modelbuilding import (
+from egrid.builder import (
     get_model,
     Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue, Branchtaps,
     Defk, Link, KBranchlink)
