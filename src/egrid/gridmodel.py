@@ -140,6 +140,7 @@ def _add_bg(branches):
             * .id_of_node_B
             * .index_of_node_A
             * .index_of_node_B
+            * .y_tot
             * .g_tot
             * .b_tot
             * .g_mn
