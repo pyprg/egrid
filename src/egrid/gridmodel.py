@@ -22,11 +22,11 @@ Created on Sun Aug  19 08:36:10 2021
 
 @author: pyprg
 """
-import pandas as pd
-import numpy as np
 from collections import namedtuple
 from functools import partial
- 
+import pandas as pd
+import numpy as np
+
 Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
@@ -62,10 +62,10 @@ branchterminals: pandas.DataFrame
     * .index_of_branch, int, index of branch
     * .id_of_branch, str, unique idendifier of branch
     * .id_of_node, str, unique identifier of connected node
-    * .id_of_other_node, str, unique identifier of node connected 
+    * .id_of_other_node, str, unique identifier of node connected
         at other side of the branch
     * .index_of_node, int, index of connected node
-    * .index_of_other_node, int, index of node connected at other side 
+    * .index_of_other_node, int, index of node connected at other side
         of the branch
     * .g_tot, float, conductance, g_mn + g_mm_half
     * .b_tot, float, susceptande, b_mn + b_mm_half
@@ -81,7 +81,7 @@ branchoutputs: pandas.DataFrame
     * .index_of_node, int, index of node connected to branch terminal
     * .index_of_branch, int, index of branch
 injectionoutputs: pandas.DataFrame
-    * .id_of_batch, str, unique identifier of measurement point 
+    * .id_of_batch, str, unique identifier of measurement point
     * .id_of_injection, str, unique identifier of injection
     * .index_of_injection, str, index of injection
 pqvalues: pandas.DataFrame
@@ -110,16 +110,53 @@ shape_of_Y: tuple (int, int)
 slack_indexer: pandas.Series, bool
     True if index is index of slack node, false otherwise"""
 
-def _join_index_of_node(nodes, df):
-    return  (
-        df
+_EMPTY_TUPLE = ()
+_BRANCHES = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id', 'id_of_node_A', 'id_of_node_B', 'y_mn', 'y_mm_half'])
+_SLACKNODES = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id_of_node', 'V'])
+_INJECTIONS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id', 'id_of_node', 'P10', 'Q10', 'Exp_v_p', 'Exp_v_q'])
+_OUTPUTS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id_of_batch', 'id_of_device', 'id_of_node'])
+_PQVALUES = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id_of_batch', 'P', 'Q', 'direction'])
+_IVALUES = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id_of_batch', 'I'])
+_VVALUES = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['id_of_node', 'V'])
+_BRANCHTAPS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=[
+        'id', 'id_of_node', 'id_of_branch', 'Vstep', 'positionmin', 
+        'positionneutral', 'positionmax', 'position'])
+_LOADFACTORS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['step', 'id', 'type', 'id_of_source', 'value', 'min', 'max'])
+_KINJLINKS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['step', 'injid', 'part', 'id'])
+_KBRANCHLINKS = pd.DataFrame(
+    _EMPTY_TUPLE, 
+    columns=['step', 'branchid', 'part', 'id'])
+
+def _join_index_of_node(nodes, dataframe):
+    return (
+        dataframe
         .join(nodes, on='id_of_node')
         .rename(columns={'idx': 'index_of_node'}))
 
 def _add_bg(branches):
-    """Prepares data of branches for power flow calculation with seperate real 
+    """Prepares data of branches for power flow calculation with seperate real
     and imaginary parts of admittances.
-    
+
     Parameters
     ----------
     branches: pandas.DataFrame
@@ -130,7 +167,7 @@ def _add_bg(branches):
         * .index_of_node_B
         * .y_mn
         * .y_mm_half
-    
+
     Returns
     -------
     pandas.DataFrame
@@ -155,24 +192,24 @@ def _add_bg(branches):
     _branches['g_mn'] = np.real(branches.y_mn)
     _branches['b_mn'] = np.imag(branches.y_mn)
     return _branches.reindex(
-        ['id', 
+        ['id',
          # added for complex calculation
          'y_mm_half', 'y_mn', 'y_tot',
          # end of complex values
-         'index_of_node_A', 'index_of_node_B', 
+         'index_of_node_A', 'index_of_node_B',
          'index_of_term_A', 'index_of_term_B',
-         'g_tot', 'b_tot', 'g_mn', 'b_mn', 'g_mm_half', 'b_mm_half', 
+         'g_tot', 'b_tot', 'g_mn', 'b_mn', 'g_mm_half', 'b_mm_half',
          'index_of_taps_A', 'index_of_taps_B'],
         axis=1)
 
 def _get_branch_terminals(branches):
     """Prepares data of branch terminals from data of branches.
-    Each branch has two terminals. Each branch terminal is connected 
-    to a node and a branch. The prepared data for a branch terminal provide: 
+    Each branch has two terminals. Each branch terminal is connected
+    to a node and a branch. The prepared data for a branch terminal provide:
         * data of the connected node, ID and index
-        * data of the other node connected to the same branch, ID and index 
+        * data of the other node connected to the same branch, ID and index
         * ID of branch
-    
+
     Parameters
     ----------
     branches: pandas.DataFrame (index of branch)
@@ -181,7 +218,7 @@ def _get_branch_terminals(branches):
         * .id_of_node_B
         * .index_of_node_A
         * .index_of_node_B
-    
+
     Returns
     -------
     pandas.DataFrame (index of terminal)
@@ -190,40 +227,40 @@ def _get_branch_terminals(branches):
         * .index_of_node
         * .id_of_other_node
         * .index_of_other_node"""
-    br = branches.reset_index().rename(columns={'index': 'index_of_branch'})
-    termsA = (
-        br.rename(
+    bras = branches.reset_index().rename(columns={'index': 'index_of_branch'})
+    terms_a = (
+        bras.rename(
             columns={
-                'id'             : 'id_of_branch', 
-                'id_of_node_A'   : 'id_of_node', 
+                'id'             : 'id_of_branch',
+                'id_of_node_A'   : 'id_of_node',
                 'index_of_node_A': 'index_of_node',
                 'index_of_term_A': 'index_of_term',
                 'index_of_term_B': 'index_of_other_term',
-                'id_of_node_B'   : 'id_of_other_node', 
+                'id_of_node_B'   : 'id_of_other_node',
                 'index_of_node_B': 'index_of_other_node',
                 'index_of_taps_A': 'index_of_taps',
                 'index_of_taps_B': 'index_of_other_taps'})
         .set_index('index_of_term'))
-    termsA['side'] = 'A'
-    termsB = (
-        br.rename(
+    terms_a['side'] = 'A'
+    terms_b = (
+        bras.rename(
             columns={
-                'id'             : 'id_of_branch', 
-                'id_of_node_B'   : 'id_of_node', 
-                'index_of_node_B': 'index_of_node', 
+                'id'             : 'id_of_branch',
+                'id_of_node_B'   : 'id_of_node',
+                'index_of_node_B': 'index_of_node',
                 'index_of_term_B': 'index_of_term',
                 'index_of_term_A': 'index_of_other_term',
-                'id_of_node_A'   : 'id_of_other_node', 
+                'id_of_node_A'   : 'id_of_other_node',
                 'index_of_node_A': 'index_of_other_node',
                 'index_of_taps_B': 'index_of_taps',
                 'index_of_taps_A': 'index_of_other_taps'})
         .set_index('index_of_term'))
-    termsB['side'] = 'B'
-    return pd.concat([termsA, termsB])
+    terms_b['side'] = 'B'
+    return pd.concat([terms_a, terms_b])
 
 def _get_branch_taps_data(branchterminals, tapsframe):
     """Arranges data of taps.
-    
+
     Parameters
     ----------
     branchterminals: pandas.DataFrame
@@ -248,7 +285,7 @@ def _get_branch_taps_data(branchterminals, tapsframe):
         * .positionneutral: int
         * .positionmax: int
         * .index_of_node: int
-    
+
     Returns
     -------
     pandas.DataFrame
@@ -270,39 +307,40 @@ def _get_branch_taps_data(branchterminals, tapsframe):
         .rename(columns={'index': 'index_of_terminal'}))
     _branchtaps = (
         tapsframe.join(terminal_indices, on=['id_of_node', 'id_of_branch']))
-    is_A = _branchtaps.side == 'A'
-    _branchtaps_A = _branchtaps[is_A]
-    _branchtaps_B = _branchtaps[~is_A]
-    branchtaps_A = (
-        _branchtaps_A
+    is_a = _branchtaps.side == 'A'
+    _branchtaps_a = _branchtaps[is_a]
+    _branchtaps_b = _branchtaps[~is_a]
+    branchtaps_a = (
+        _branchtaps_a
         .join(
-            _branchtaps_B['id_of_branch']
+            _branchtaps_b['id_of_branch']
             .reset_index()
             .rename(columns={'index':'index_of_other_taps'})
             .set_index('id_of_branch'),
             on='id_of_branch'))
-    branchtaps_B = (
-        _branchtaps_B
+    branchtaps_b = (
+        _branchtaps_b
         .join(
-            _branchtaps_A['id_of_branch']
+            _branchtaps_a['id_of_branch']
             .reset_index()
             .rename(columns={'index':'index_of_other_taps'})
             .set_index('id_of_branch'),
             on='id_of_branch'))
-    return pd.concat([branchtaps_A, branchtaps_B])
+    return pd.concat([branchtaps_a, branchtaps_b])
 
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
-        dataframes.get('Branch')[['id_of_node_A', 'id_of_node_B']]
+        dataframes.get('Branch', _BRANCHES)[['id_of_node_A', 'id_of_node_B']]
         .to_numpy()
         .reshape(-1))
     node_id_index = pd.Index(node_ids, dtype=str)
     return pd.DataFrame(
-        data={'idx': range(len(node_id_index))}, 
+        data={'idx': range(len(node_id_index))},
         index=node_id_index)
 
 def _prepare_branch_taps(add_idx_of_node, dataframes):
-    branchtaps = add_idx_of_node(dataframes.get('Branchtaps'))
+    branchtaps = add_idx_of_node(
+        dataframes.get('Branchtaps', _BRANCHTAPS))
     branchtaps.reset_index(inplace=True)
     branchtaps.rename(columns={'index':'index_of_taps'}, inplace=True)
     return branchtaps
@@ -311,7 +349,7 @@ def _prepare_branches(branchtaps, dataframes, nodes):
     branchtaps_view = (
         branchtaps[['id_of_branch', 'id_of_node', 'index_of_taps']]
         .set_index(['id_of_branch', 'id_of_node']))
-    brs = dataframes.get('Branch')
+    brs = dataframes.get('Branch', _BRANCHES)
     if not brs['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -339,8 +377,8 @@ def _prepare_branch_outputs(add_idx_of_node, branches, branchoutputs):
         branchoutputs.rename(columns={'id_of_device':'id_of_branch'}))
     # measured branch terminals
     branch_idxs = pd.Series(
-        data=branches.index, 
-        index=branches.id, 
+        data=branches.index,
+        index=branches.id,
         name='index_of_branch')
     return (
         add_idx_of_node(_branchoutputs)
@@ -351,16 +389,16 @@ def _prepare_injection_outputs(injections, injectionoutputs):
         injectionoutputs.rename(columns={'id_of_device':'id_of_injection'}))
     # measured injection terminals
     injection_idxs = pd.Series(
-        data=injections.index, 
-        index=injections.id, 
+        data=injections.index,
+        index=injections.id,
         name='index_of_injection')
     return (
         _injectionoutputs
         .join(injection_idxs, on='id_of_injection', how='inner'))
 
-def make_model(dataframes):
+def make_model(dataframes={}):
     """Creates a network model for power flow calculation.
-    
+
     Parameters
     ----------
     dataframes: dict, str:pandas.DataFrame
@@ -417,7 +455,7 @@ def make_model(dataframes):
             * .step, int, index of estimation step
             * .id, str, ID of load factor
             * .type, 'var'|'const', decision variable / constant
-            * .id_of_source, str, ID of ini load factor of previous step 
+            * .id_of_source, str, ID of ini load factor of previous step
             * .value, float, value if no valid initial load factor
             * .min, float, lower limit
             * .max, float, upper limit
@@ -433,7 +471,7 @@ def make_model(dataframes):
             * .branchid, str, ID of branch
             * .part, 'g'|'b', conductance/susceptance
             * .id, str, ID of branch
-    
+
     Returns
     -------
     Model
@@ -455,36 +493,40 @@ def make_model(dataframes):
     add_idx_of_node = partial(_join_index_of_node, nodes)
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps, dataframes, nodes)
-    slacks = add_idx_of_node(dataframes.get('Slacknode'))
+    slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
     branchterminals=_get_branch_terminals(_add_bg(branches))
     # injections
-    injections = add_idx_of_node(dataframes.get('Injection'))
+    injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
     if not injections['id'].is_unique:
         msg = "Error IDs of injections must be unique but are not."
         raise ValueError(msg)
     # measured terminals
-    outputs = dataframes.get('Output')
+    outputs = dataframes.get('Output', _OUTPUTS)
     is_branch_output = outputs.id_of_device.isin(branches.id)
     is_injection_output = ~is_branch_output
     branchoutputs = _prepare_branch_outputs(
         add_idx_of_node, branches, outputs[is_branch_output])
     injectionoutputs = _prepare_injection_outputs(
-        injections, 
+        injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     size = len(nodes)
     slack_indexer = nodes.idx.isin(slacks.index_of_node)
-    load_scaling_factors=dataframes.get('Loadfactor').set_index(['step', 'id'])
-    assoc = dataframes.get('KInjlink').set_index(['step', 'injid', 'part'])
+    load_scaling_factors=(
+        dataframes.get('Loadfactor', _LOADFACTORS).set_index(['step', 'id']))
+    assoc = (
+        dataframes
+        .get('KInjlink', _KINJLINKS)
+        .set_index(['step', 'injid', 'part']))
     return Model(
         nodes=nodes,
-        slacks=slacks, 
+        slacks=slacks,
         injections=injections,
         branchterminals=branchterminals,
-        branchoutputs=branchoutputs,      
+        branchoutputs=branchoutputs,
         injectionoutputs=injectionoutputs,
-        pqvalues=dataframes.get('PQValue'),
-        ivalues=dataframes.get('IValue'),
-        vvalues=add_idx_of_node(dataframes.get('Vvalue')),
+        pqvalues=dataframes.get('PQValue', _PQVALUES),
+        ivalues=dataframes.get('IValue', _IVALUES),
+        vvalues=add_idx_of_node(dataframes.get('Vvalue', _VVALUES)),
         branchtaps=branchtaps,
         shape_of_Y=(size, size),
         slack_indexer=slack_indexer,

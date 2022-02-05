@@ -335,10 +335,12 @@ def _link(steps, objid, part, id, cls):
 
 Link = namedtuple('Link', 'step objid part id cls', defaults=(KInjlink,))
 
-model_types = (
+MODEL_TYPES = (
     Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue, Branchtaps)
+MODEL_TYPES.__doc__ = """all device types of gridmodel.Model with analog
+taps and analog values with helper."""
 
-source_types = model_types + (Defk, Link)
+SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
 
 def _create_slack(e_id, attributes):
     """Creates a new instance of proto.gridmodel.Slacknode
@@ -622,14 +624,14 @@ def make_data_frames(devices):
     ------
     AssertionError"""
     # collect objects per type
-    _slack_and_devs = {src_type.__name__: [] for src_type in source_types}
+    _slack_and_devs = {src_type.__name__: [] for src_type in SOURCE_TYPES}
     for dev in devices:
         _slack_and_devs[type(dev).__name__].append(dev)
     dataframes = {
         dev_type.__name__: pd.DataFrame(
             _slack_and_devs[dev_type.__name__], 
             columns=dev_type._fields)
-        for dev_type in model_types}
+        for dev_type in MODEL_TYPES}
     _factor_frame = pd.DataFrame(
         chain.from_iterable(map(_expand_defk, _slack_and_devs[Defk.__name__])),
         columns=Loadfactor._fields)
@@ -648,7 +650,7 @@ def make_data_frames(devices):
     dataframes[KBranchlink.__name__] = _branchlink_frame
     return dataframes
 
-_arg_types = source_types + (str,)
+_arg_types = SOURCE_TYPES + (str,)
 
 def _flatten(args):
     if isinstance(args, _arg_types):
