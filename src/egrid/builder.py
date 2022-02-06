@@ -234,11 +234,13 @@ def defk(step, id_, type_='var', id_of_source=None, value=1.0,
         iter_steps = iter(step)
     except TypeError:
         iter_steps = iter([step])
-    ids = id_ if isinstance(id_, (list, tuple)) else [id]
+    ids = id_ if isinstance(id_, (list, tuple)) else [id_]
     return [
-        Loadfactor(step_, id_, type_,
-            (id_ if id_of_source is None else id_of_source), value, min_, max_)
-        for id_, step_ in product(ids, iter_steps)]
+        Loadfactor(
+            step_, myid_, type_,
+            (myid_ if id_of_source is None else id_of_source), 
+            value, min_, max_)
+        for myid_, step_ in product(ids, iter_steps)]
 
 Defk = namedtuple(
     'Defk',
@@ -333,7 +335,7 @@ def _link(steps, objid, part, id_, cls):
         class of link"""
     try:
         iter_steps = iter(steps)
-    except ValueError:
+    except TypeError:
         iter_steps = iter([steps])
     objids = objid if isinstance(objid, (list, tuple)) else [objid]
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
