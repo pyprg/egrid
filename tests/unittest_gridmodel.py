@@ -28,9 +28,5 @@ class Model(unittest.TestCase):
     def test_make_model_empty(self):
         make_model()
 
-
-model = make_model("n0 load0")
-
-
-# if __name__ == '__main__':
-#     unittest.main()
+if __name__ == '__main__':
+    unittest.main()
