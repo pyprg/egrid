@@ -20,7 +20,24 @@ Created on Mon Jan 31 08:00:31 2022
 
 @author: pyprg
 """
-from egrid.builder import (
-    get_model,
+from .model import model_from_frames
+from .builder import (
+    make_data_frames, create_objects, 
     Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue, Branchtaps,
     Defk, Link, KBranchlink)
+
+def make_model(*args):
+    """Creates an instance of gridmodel.Model.
+
+    Parameters
+    ----------
+    args: iterable
+        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
+        Branchtaps, Defk, Link, str
+        strings in args are processed with graphparser.parse
+
+    Returns
+    -------
+    model.Model"""
+    frames = make_data_frames(create_objects(args))
+    return model_from_frames(frames)
