@@ -383,7 +383,7 @@ def _create_slack(e_id, attributes):
     try:
         voltage = complex(attributes['V'])
         return Slacknode(id_of_node=e_id, V=voltage)
-    except ValueError:
+    except KeyError:
         return Slacknode(id_of_node=e_id)
 
 def _create_branch(e_id, neighbours, attributes):
