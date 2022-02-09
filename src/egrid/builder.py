@@ -29,7 +29,8 @@ import numpy as np
 
 Branch = namedtuple(
     'Branch',
-    'id id_of_node_A id_of_node_B y_mn y_mm_half')
+    'id id_of_node_A id_of_node_B y_mn y_mm_half',
+    defaults=(0.0j,))
 Branch.__doc__ == """Model of an electrical device having two terminals
 e.g. transformer, windings of multi-winding transformers, lines.
 
@@ -43,7 +44,7 @@ id_of_node_B: str
     id of node at side B
 y_mn: complex
     longitudinal admittance
-y_mm_half: complex
+y_mm_half: complex (default value 0j)
     transversal admittance devided by 2"""
 
 Slacknode = namedtuple(
