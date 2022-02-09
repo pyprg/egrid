@@ -21,12 +21,40 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 from src.egrid import make_model
+from src.egrid.builder import Slacknode
+from src.egrid.model import Model
 
-#%%
-class Model(unittest.TestCase):
+class Make_model(unittest.TestCase):
     
     def test_make_model_empty(self):
-        make_model()
+        self.assertIsNotNone(
+            make_model(), 
+            msg='make_model shall return an object')
+    
+    def test_make_model_empty2(self):
+        self.assertIsInstance(
+            make_model(),
+            Model,
+            msg='make_model shall return an instance of egrid.model.Model')
+        
+    def test_make_model_slack(self):
+        model = make_model(Slacknode('n0'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no errors')
+        self.assertEqual(len(model.slacks), 1, 'one slack node')
+        self.assertEqual(model.slacks.id_of_node[0], 'n0', 'slack at node n0')
+        
+    def test_make_model_slack2(self):
+        model = make_model([[[Slacknode('n0')]]])
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no errors')
+        self.assertEqual(len(model.slacks), 1, 'one slack node')
+        self.assertEqual(model.slacks.id_of_node[0], 'n0', 'slack at node n0')
+        
+    def test_make_model_slack3(self):
+        model = make_model('n0\nslack=True')
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 1, 'one error')
 
 if __name__ == '__main__':
     unittest.main()

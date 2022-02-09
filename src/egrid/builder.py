@@ -406,12 +406,19 @@ def _create_branch(e_id, neighbours, attributes):
             id_of_node_A=neighbours[0],
             id_of_node_B=neighbours[1],
             y_mn=complex(attributes['y_mn']),
-            y_mm_half=complex(attributes['y_mm_half']))
+            y_mm_half=complex(attributes.get('y_mm_half', 0.0)))
+    except KeyError:
+        return (
+            f"Error in data of branch '{e_id}', "
+             "for a branch two neighbour nodes "
+             "and property 'y_mn' with a complex value are required, "
+            f"following neighbours are provided: {str(neighbours)} - "
+            f"following attributes are provided: {str(attributes)}")
     except ValueError:
         return (
             f"Error in data of branch '{e_id}', "
-             "for a branch two neighbour nodes and two "
-             "complex values ('y_mn', 'y_mm_half') are required, "
+             "for a branch two neighbour nodes are required, "
+             "'y_mn' and 'y_mm_half' must be complex values , "
             f"following neighbours are provided: {str(neighbours)} - "
             f"following attributes are provided: {str(attributes)}")
 
@@ -450,7 +457,7 @@ def _create_injection(e_id, neighbours, attributes):
         atts['id'] = e_id
         atts['id_of_node'] = neighbours[0]
         return Injection(**atts)
-    except ValueError:
+    except (ValueError, KeyError):
         return (
             f"Error in data of injection, "
              "attributes 'id' and 'id_of_node' are required, "
@@ -669,11 +676,7 @@ def make_data_frames(devices):
             * .step, int, index of estimation step
             * .branchid, str, ID of branch
             * .part, 'g'|'b', conductance/susceptance
-            * .id, str, ID of branch
-
-    Raises
-    ------
-    AssertionError"""
+            * .id, str, ID of branch"""
     # collect objects per type
     _slack_and_devs = {src_type.__name__: [] for src_type in _ARG_TYPES}
     for dev in devices:
