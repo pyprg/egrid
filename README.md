@@ -1,11 +1,13 @@
 # egrid
 
+## Purpose
+
 Model of an electric distribution network for experimental power flow 
 calculation and state estimation. Model shall provide the data in a structure
 supporting e.g. admittance matrix creation and result processing. Model is a 
 namedtuple. Most of the fields provide pandas.DataFrames. Electric values are 
 stored per unit.
-The main function is get_model(*args). The arguments are of type 
+The main function is make_model(*args). The arguments are of type 
 
     - Branch (line, series capacitor, transformer winding, transformer)
     - Slacknode
@@ -20,14 +22,19 @@ The main function is get_model(*args). The arguments are of type
     
 including tuples, lists and iterables thereof (for a power-flow-calculation
 just Branch ... Branchtaps are necessary).
-Additionally, __get_model__ can consume network descriptions as multiline 
-strings if package 'graphparser' is installed.
+Additionally, __make_model__ can consume network descriptions as multiline 
+strings if package 'graphparser' is installed. This method is intended to
+input very small electric networks using a text editor. However, this method
+is suitable for power flow calculations and needs additional objects
+if taps and measurements/setpoints shall be applied for further processing.
     
 Branch models are PI-equivalent circuits. Active and reactive power of
 injections have a dedicated voltage exponent.
 
-Fields
-------
+## Details of egrid.model.Model
+
+Fields of egrid.model.Model
+---------------------------
 nodes: pandas.DataFrame (id of node)
 
     * .idx, int index of node
@@ -126,6 +133,17 @@ slack_indexer: pandas.Series, bool
 
     True if index is index of slack node, false otherwise
 
+## Making a Model
+
+Function **model.model_from_frames** consumes an dictionary of 
+pandas.DataFrames. **model_from_frames** creates indices, arranges data
+per branch-terminal from branch-data, calculates values of branches from
+admittances. The function is useful if data are given in a similar structure.
+
+Function make_model generates a model from network device objects defined
+in **egrid.builder** (see purpose.)
+
+
 Example (pseudo graphic) - 3 nodes, 2 lines, 1 consumer:
 ```
 node: 0               1               2
@@ -136,11 +154,15 @@ node: 0               1               2
                                      \|/ consumer
 ```
 
-Python code for example 
+Python code for example, suitable input for function **egrid.make_model**
 (Branchtap is for demo only, it is used with transformers, 
 however, transformers/transformerwindings are modeled using class Branch too.):
 ```
-example = ([
+from egrid.builder import (
+    Slacknode, PQValue, IValue, Output, Branch, Branchtaps, Injection,
+    Defk, Link)
+
+example = [
     Slacknode(id_of_node='n_0', V=1.+0.j),
     PQValue(
         id_of_batch='pq_line_0', 
@@ -192,5 +214,25 @@ example = ([
         Exp_v_p=2.0, 
         Exp_v_q=2.0),
     Defk(step=(0, 1, 2), id=('kp', 'kq')),
-    Link(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))])
+    Link(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
+```
+Valid input to **make_model** is a multiline pseudo graphic string e.g. 
+this one:
+
+```
+               y_mm_half=1e-6+1e-6j            y_mm_half=1e-6+1e-6j
+               y_mn=1e3-1e3j                   y_mn=1e3-1e3j
+slack(------- line_0 ----------)n1(---------- line_1 ----------)n2
+                                |                               |
+                                n1->> load0_1_        _load1 <<-n2->> load1_1_
+                                |      P10=30.0         P10=20.7       P10=4.3
+                                |      Q10=5            Q10=5.7        Q10=2
+                                |
+                                |              y_mn=1e3-1e3j       
+                                |              y_mm_half=1e-6+1e-6j
+                                n1(---------- line_2 ----------)n3
+                                                                |
+                                                      _load2 <<-n3->> load2_1_
+                                                        P10=20.7       P10=20
+                                                        Q10=5.7        Q10=5.7  
 ```

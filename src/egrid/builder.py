@@ -26,6 +26,7 @@ from collections import namedtuple
 from functools import singledispatch
 import pandas as pd
 import numpy as np
+import re
 
 Branch = namedtuple(
     'Branch',
@@ -363,6 +364,44 @@ cls: KInjlink|KBranchlink (default value KInjlink)
     KInjlink - links a injection
     KBranchlink - links a branch"""
 
+_e3_pattern = re.compile(r'[nuµmkMG]')
+
+_replacement = {
+    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 
+    'k':'e3', 'M':'e6', 'G': 'e9'}
+
+def _replace_e3(match):
+    """Returns a replacement string for given match.
+    
+    Parameters
+    ----------
+    match: re.match
+    
+    Returns
+    -------
+    str"""
+    what = match.group(0)
+    return _replacement.get(what, what)
+
+def e3(string):
+    """Replaces some letters by e[+|-]n*3.
+    'n' -> 'e-9'
+    'u' -> 'e-6'
+    'µ' -> 'e-6'
+    'm' -> 'e-3'
+    'k' -> 'e3'
+    'M' -> 'e6'
+    'G' -> 'e9'
+    
+    Parameters
+    ----------
+    string: str
+    
+    Returns
+    -------
+    str"""
+    return re.sub(_e3_pattern, _replace_e3, string)
+
 # all device types of gridmodel.Model and taps and analog values with helper
 MODEL_TYPES = (
     Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue, Branchtaps)
@@ -386,6 +425,11 @@ def _create_slack(e_id, attributes):
         return Slacknode(id_of_node=e_id, V=voltage)
     except KeyError:
         return Slacknode(id_of_node=e_id)
+    except ValueError as e:
+        return (
+            f"Error in data of slacknode '{e_id}', "
+            f"following attributes are given: {str(attributes)} "
+            f"(error: {str(e)})")
 
 def _create_branch(e_id, neighbours, attributes):
     """Creates a new instance of proto.gridmodel.Branch
@@ -408,20 +452,22 @@ def _create_branch(e_id, neighbours, attributes):
             id_of_node_B=neighbours[1],
             y_mn=complex(attributes['y_mn']),
             y_mm_half=complex(attributes.get('y_mm_half', 0.0)))
-    except KeyError:
+    except KeyError as e:
         return (
             f"Error in data of branch '{e_id}', "
              "for a branch two neighbour nodes "
              "and property 'y_mn' with a complex value are required, "
             f"following neighbours are provided: {str(neighbours)} - "
-            f"following attributes are provided: {str(attributes)}")
-    except ValueError:
+            f"following attributes are provided: {str(attributes)} "
+            f"(error: {str(e)})")
+    except ValueError as e:
         return (
             f"Error in data of branch '{e_id}', "
              "for a branch two neighbour nodes are required, "
              "'y_mn' and 'y_mm_half' must be complex values , "
             f"following neighbours are provided: {str(neighbours)} - "
-            f"following attributes are provided: {str(attributes)}")
+            f"following attributes are provided: {str(attributes)} "
+            f"(error: {str(e)})")
 
 def _create_injection(e_id, neighbours, attributes):
     """Creates a new instance of proto.gridmodel.Injection. Returns an
@@ -448,21 +494,23 @@ def _create_injection(e_id, neighbours, attributes):
     for key in ('P10', 'Q10', 'Exp_v_p', 'Exp_v_q'):
         if key in attributes:
             try:
-                atts[key] = float(attributes[key])
-            except ValueError:
+                atts[key] = float(e3(attributes[key]))
+            except ValueError as e:
                 return (
                     f"Error in data of injection '{e_id}', the value of "
                     f"attribute '{key}' must be of type float if given, "
-                    f"following attributes are provided: {str(attributes)}")
+                    f"following attributes are provided: {str(attributes)} "
+                    f"(error: {str(e)})")
     try:
         atts['id'] = e_id
         atts['id_of_node'] = neighbours[0]
         return Injection(**atts)
-    except (ValueError, KeyError):
+    except (ValueError, KeyError) as e:
         return (
             f"Error in data of injection, "
              "attributes 'id' and 'id_of_node' are required, "
-            f"following attributes are provided: {str(attributes)}")
+            f"following attributes are provided: {str(attributes)} "
+            f"(error: {str(e)})")
 
 def _is_connectivity_node(string):
     """Checks if node is a connectivity node.
@@ -474,7 +522,7 @@ def _is_connectivity_node(string):
     Returns
     -------
     bool"""
-    return string.startswith('n')
+    return string.startswith('n') or string.startswith('slack')
 
 def _make_edge_objects(data):
     """Creates data objects which are associated to an edge.
@@ -505,13 +553,14 @@ def _make_edge_objects(data):
         try:
             yield PQValue(
                 id_of_batch=id_of_batch,
-                P=float(attributes['P']),
-                Q=float(attributes['Q']))
-        except ValueError:
+                P=float(e3(attributes['P'])),
+                Q=float(e3(attributes['Q'])))
+        except ValueError as e:
             yield (
                 f"Error in data of edge '{id_of_node}-{id_of_device}', "
                  "values of attributes 'P' and 'Q' must be of type float, "
-                f"following attributes are provided: {attributes}")
+                f"following attributes are provided: {attributes} "
+                f"(error: {str(e)})")
             return
         yield Output(
             id_of_batch=id_of_batch,
@@ -522,12 +571,13 @@ def _make_edge_objects(data):
         try:
             yield IValue(
                 id_of_batch=id_of_batch,
-                I=float(attributes['I']))
-        except ValueError:
+                I=float(e3(attributes['I'])))
+        except ValueError as e:
             yield (
                 f"Error in data of edge '{id_of_node}-{id_of_device}', "
                  "value of attribute 'I' must be of type float, "
-                f"following attributes are provided: {attributes}")
+                f"following attributes are provided: {attributes} "
+                f"(error: {str(e)})")
             return
         yield Output(
             id_of_batch=id_of_batch,
@@ -538,16 +588,17 @@ def _make_node_objects(data):
     _, e_id, neighbours, attributes = data
     count_of_neighbours = len(neighbours)
     if _is_connectivity_node(e_id) and count_of_neighbours:
-        if attributes.get('slack')=='True':
+        if attributes.get('slack')=='True' or e_id.startswith('slack'):
             yield _create_slack(e_id, attributes)
         elif 'V' in attributes:
             try:
-                yield Vvalue(id_of_node=e_id, V=float(attributes['V']))
-            except ValueError:
+                yield Vvalue(id_of_node=e_id, V=float(e3(attributes['V'])))
+            except ValueError as e:
                 yield(
                     f"Error in data of node '{e_id}', "
                      "value of attribute 'V' must be of type float, "
-                    f"following attributes are provided: {attributes}")
+                    f"following attributes are provided: {attributes} "
+                    f"(error: {str(e)})")
                 return
     elif count_of_neighbours == 2:
         yield _create_branch(e_id, neighbours, attributes)
@@ -724,8 +775,9 @@ def _(arg):
     return make_model_objects(parse(arg))
 
 def create_objects(args):
-    """Creates an instances of Branch, Slacknode, Injection, Output, PQValue, 
-    IValue, Vvalue.
+    """Creates instances of network objects from strings. Supports
+    engineering notation for floats and complex (see function e3).
+    Flattens nested structures. Simply passes network objects to output.
 
     Parameters
     ----------
