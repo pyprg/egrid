@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Model of an electric distribution network for experimental power flow 
+Model of a balanced electric distribution network for experimental power flow 
 calculation and state estimation. Model shall provide the data in a structure
 supporting e.g. admittance matrix creation and result processing. Model is a 
 namedtuple. Most of the fields provide pandas.DataFrames. Electric values are 
@@ -25,8 +25,9 @@ just Branch ... Branchtaps are necessary).
 Additionally, __make_model__ can consume network descriptions as multiline 
 strings if package 'graphparser' is installed. This method is intended to
 input very small electric networks using a text editor. However, this method
-is suitable for power flow calculations and needs additional objects
-if taps and measurements/setpoints shall be applied for further processing.
+is suitable for power flow calculation and must be extended with 
+additional objects if taps and measurements/setpoints shall be included
+for further processing.
     
 Branch models are PI-equivalent circuits. Active and reactive power of
 injections have a dedicated voltage exponent.
@@ -144,7 +145,7 @@ Function make_model generates a model from network device objects defined
 in **egrid.builder** (see purpose.)
 
 
-Example (pseudo graphic) - 3 nodes, 2 lines, 1 consumer:
+Example - 3 nodes, 2 lines, 1 consumer:
 ```
 node: 0               1               2
 		 
@@ -216,13 +217,13 @@ example = [
     Defk(step=(0, 1, 2), id=('kp', 'kq')),
     Link(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
 ```
+
 Valid input to **make_model** is a multiline pseudo graphic string e.g. 
 this one:
-
 ```
                y_mm_half=1e-6+1e-6j            y_mm_half=1e-6+1e-6j
-               y_mn=1e3-1e3j                   y_mn=1e3-1e3j
-slack(------- line_0 ----------)n1(---------- line_1 ----------)n2
+slack=True     y_mn=1e3-1e3j                   y_mn=1e3-1e3j
+n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |                               |
                                 n1->> load0_1_        _load1 <<-n2->> load1_1_
                                 |      P10=30.0         P10=20.7       P10=4.3

@@ -450,8 +450,8 @@ def _create_branch(e_id, neighbours, attributes):
             id=e_id,
             id_of_node_A=neighbours[0],
             id_of_node_B=neighbours[1],
-            y_mn=complex(attributes['y_mn']),
-            y_mm_half=complex(attributes.get('y_mm_half', 0.0)))
+            y_mn=complex(e3(attributes['y_mn'])),
+            y_mm_half=complex(e3(attributes.get('y_mm_half', '0.0'))))
     except KeyError as e:
         return (
             f"Error in data of branch '{e_id}', "
@@ -545,7 +545,8 @@ def _make_edge_objects(data):
         yield (
             f"Error in data of edge '{neighbours[0]}-{neighbours[1]}', "
              "one node needs to be a connectivity node and one a device node "
-             "(the IDs of connectivity nodes start with character 'n')")
+             "(IDs of connectivity nodes start with letter 'n', "
+             "slack-nodes with prefix 'slack')")
         return
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
     if 'P' in attributes and 'Q' in attributes:
