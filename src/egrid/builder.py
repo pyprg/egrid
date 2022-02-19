@@ -104,7 +104,7 @@ id_of_node: str (default value None)
     id of the connected node, 'None' if injection"""
 
 PValue = namedtuple(
-    'PQValue',
+    'PValue',
     'id_of_batch P direction',
     defaults=(1.,))
 PValue.__doc__ = """Values of (measured) active power. The
@@ -125,7 +125,7 @@ direction: float (default value 1)
     -1 or 1"""
 
 QValue = namedtuple(
-    'PQValue',
+    'QValue',
     'id_of_batch Q direction',
     defaults=(1.,))
 QValue.__doc__ = """Values of (measured) reactive power. The
@@ -446,7 +446,9 @@ def e3(string):
 
 # all device types of gridmodel.Model and taps and analog values with helper
 MODEL_TYPES = (
-    Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue, Branchtaps)
+    Branch, Slacknode, Injection, 
+    Output, PValue, QValue, PQValue, IValue, Vvalue, 
+    Branchtaps)
 SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
@@ -566,6 +568,55 @@ def _is_connectivity_node(string):
     bool"""
     return string.startswith('n') or string.startswith('slack')
 
+def _create_pvalue(id_of_node, id_of_device, attributes):
+    try:
+        return True, PValue(
+            id_of_batch=f'{id_of_node}_{id_of_device}',
+            P=float(e3(attributes['P'])))
+    except ValueError as e:
+        return False, (
+            f"Error in data of edge '{id_of_node}-{id_of_device}', "
+             "value of attribute 'P' must be of type float, "
+            f"following attributes are provided: {attributes} "
+            f"(error: {str(e)})")
+
+def _create_qvalue(id_of_node, id_of_device, attributes):
+    try:
+        return True, QValue(
+            id_of_batch=f'{id_of_node}_{id_of_device}',
+            Q=float(e3(attributes['Q'])))
+    except ValueError as e:
+        return False, (
+            f"Error in data of edge '{id_of_node}-{id_of_device}', "
+             "value of attribute 'Q' must be of type float, "
+            f"following attributes are provided: {attributes} "
+            f"(error: {str(e)})")
+
+def _create_ivalue(id_of_node, id_of_device, attributes):
+    try:
+        return True, IValue(
+            id_of_batch=f'{id_of_node}_{id_of_device}',
+            I=float(e3(attributes['I'])))
+    except ValueError as e:
+        return False, (
+            f"Error in data of edge '{id_of_node}-{id_of_device}', "
+             "value of attribute 'I' must be of type float, "
+            f"following attributes are provided: {attributes} "
+            f"(error: {str(e)})")
+
+def _create_pqvalue(id_of_node, id_of_device, attributes):
+    try:
+        return True, PQValue(
+            id_of_batch=f'{id_of_node}_{id_of_device}',
+            P=float(e3(attributes['P'])),
+            Q=float(e3(attributes['Q'])))
+    except ValueError as e:
+        return False, (
+            f"Error in data of edge '{id_of_node}-{id_of_device}', "
+             "values of attributes 'P' and 'Q' must be of type float, "
+            f"following attributes are provided: {attributes} "
+            f"(error: {str(e)})")
+
 def _make_edge_objects(data):
     """Creates data objects which are associated to an edge.
 
@@ -594,77 +645,25 @@ def _make_edge_objects(data):
     create_output = False
     has_p, has_q = (key in attributes for key in ('P', 'Q'))
     if has_p and has_q:
-        id_of_batch = f'{id_of_node}_{id_of_device}'
-        try:
-            yield PQValue(
-                id_of_batch=id_of_batch,
-                P=float(e3(attributes['P'])),
-                Q=float(e3(attributes['Q'])))
-        except ValueError as e:
-            yield (
-                f"Error in data of edge '{id_of_node}-{id_of_device}', "
-                 "values of attributes 'P' and 'Q' must be of type float, "
-                f"following attributes are provided: {attributes} "
-                f"(error: {str(e)})")
-            return
-        create_output = True
-        yield Output(
-            id_of_batch=id_of_batch,
-            id_of_node=id_of_node,
-            id_of_device=id_of_device)
+        success, val = _create_pqvalue(id_of_node, id_of_device, attributes)
+        yield val
+        create_output |= success
     else:
         if has_p:
-            id_of_batch = f'{id_of_node}_{id_of_device}'
-            try:
-                yield PValue(
-                    id_of_batch=id_of_batch,
-                    P=float(e3(attributes['P'])))
-            except ValueError as e:
-                yield (
-                    f"Error in data of edge '{id_of_node}-{id_of_device}', "
-                     "value of attributes 'P' must be of type float, "
-                    f"following attributes are provided: {attributes} "
-                    f"(error: {str(e)})")
-                return
-            create_output = True
-            yield Output(
-                id_of_batch=id_of_batch,
-                id_of_node=id_of_node,
-                id_of_device=id_of_device)
+            success, val = _create_pvalue(id_of_node, id_of_device, attributes)
+            yield val
+            create_output |= success
         elif has_q:
-            id_of_batch = f'{id_of_node}_{id_of_device}'
-            try:
-                yield QValue(
-                    id_of_batch=id_of_batch,
-                    Q=float(e3(attributes['Q'])))
-            except ValueError as e:
-                yield (
-                    f"Error in data of edge '{id_of_node}-{id_of_device}', "
-                     "values of attribute 'Q' must be of type float, "
-                    f"following attributes are provided: {attributes} "
-                    f"(error: {str(e)})")
-                return
-            create_output = True
-            yield Output(
-                id_of_batch=id_of_batch,
-                id_of_node=id_of_node,
-                id_of_device=id_of_device)
+            success, val = _create_qvalue(id_of_node, id_of_device, attributes)
+            yield val
+            create_output |= success
     if 'I' in attributes:
-        id_of_batch = f'{id_of_node}_{id_of_device}'
-        try:
-            yield IValue(
-                id_of_batch=id_of_batch,
-                I=float(e3(attributes['I'])))
-        except ValueError as e:
-            yield (
-                f"Error in data of edge '{id_of_node}-{id_of_device}', "
-                 "value of attribute 'I' must be of type float, "
-                f"following attributes are provided: {attributes} "
-                f"(error: {str(e)})")
-            return
-        create_output = True
+        success, val = _create_ivalue(id_of_node, id_of_device, attributes)
+        yield val
+        create_output |= success
+    if create_output:
         yield Output(
-            id_of_batch=id_of_batch,
+            id_of_batch=f'{id_of_node}_{id_of_device}',
             id_of_node=id_of_node,
             id_of_device=id_of_device)
 
