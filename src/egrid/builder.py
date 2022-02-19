@@ -31,9 +31,10 @@ import re
 Branch = namedtuple(
     'Branch',
     'id id_of_node_A id_of_node_B y_mn y_mm_half',
-    defaults=(0.0j,))
+    defaults=(complex(np.inf, np.inf), 0.0j))
 Branch.__doc__ == """Model of an electrical device having two terminals
-e.g. transformer, windings of multi-winding transformers, lines.
+e.g. transformers, windings of multi-winding transformers, lines, 
+closed switch.
 
 Parameters
 ----------
@@ -43,7 +44,7 @@ id_of_node_A: str
     id of node at side A
 id_of_node_B: str
     id of node at side B
-y_mn: complex
+y_mn: complex (default value is complex(numpy.inf, numpy.inf))
     longitudinal admittance
 y_mm_half: complex (default value 0j)
     transversal admittance devided by 2"""
@@ -475,6 +476,8 @@ def _create_slack(e_id, attributes):
             f"following attributes are given: {str(attributes)} "
             f"(error: {str(e)})")
 
+_COMPLEX_INF = complex(np.inf, np.inf)
+
 def _create_branch(e_id, neighbours, attributes):
     """Creates a new instance of proto.gridmodel.Branch
 
@@ -490,17 +493,19 @@ def _create_branch(e_id, neighbours, attributes):
     -------
     proto.gridmodel.Branch"""
     try:
+        y_mn = (
+            complex(e3(attributes['y_mn'])) 
+            if 'y_mn' in attributes else _COMPLEX_INF)
         return Branch(
             id=e_id,
             id_of_node_A=neighbours[0],
             id_of_node_B=neighbours[1],
-            y_mn=complex(e3(attributes['y_mn'])),
-            y_mm_half=complex(e3(attributes.get('y_mm_half', '0.0'))))
+            y_mn=y_mn,
+            y_mm_half=complex(e3(attributes.get('y_mm_half', '0.0j'))))
     except KeyError as e:
         return (
             f"Error in data of branch '{e_id}', "
-             "for a branch two neighbour nodes "
-             "and property 'y_mn' with a complex value are required, "
+             "for a branch two neighbour nodes are required, "
             f"following neighbours are provided: {str(neighbours)} - "
             f"following attributes are provided: {str(attributes)} "
             f"(error: {str(e)})")
