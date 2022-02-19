@@ -9,10 +9,12 @@ namedtuple. Most of the fields provide pandas.DataFrames. Electric values are
 stored per unit.
 The main function is make_model(*args). The arguments are of type 
 
-    - Branch (line, series capacitor, transformer winding, transformer)
+    - Branch (line, series capacitor, transformer winding, transformer, closed switch)
     - Slacknode
     - Injection (consumer, shunt capacitor, PQ/PV-generator, battery)
     - Output (indicates that measured flow (I or PQ) or a part thereof flows through the referenced terminal (device or node+device))
+    - PValue (measured active power)
+    - QValue (measured reactive power)
     - PQValue (measured active and reactive power)
     - IValue (measured electric current)
     - Vvalue (measured voltage or setpoint)
@@ -97,6 +99,18 @@ injectionoutputs: pandas.DataFrame
     * .id_of_injection, str, unique identifier of injection
     * .index_of_injection, str, index of injection
     
+pvalues: pandas.DataFrame
+
+    * .id_of_batch, unique identifier of measurement batch
+    * .P, float, active power
+    * .direction, float, -1: from device into node, 1: from node into device
+    
+qvalues: pandas.DataFrame
+
+    * .id_of_batch, unique identifier of measurement batch
+    * .Q, float, reactive power
+    * .direction, float, -1: from device into node, 1: from node into device
+    
 pqvalues: pandas.DataFrame
 
     * .id_of_batch, unique identifier of measurement batch
@@ -134,6 +148,13 @@ slack_indexer: pandas.Series, bool
 
     True if index is index of slack node, false otherwise
 
+load_scaling_factors: pandas.DataFrame
+
+injection_factor_associations: pandas.DataFrame
+
+messages: pandas.DataFrame
+    * .errormessage, str, message on reason of error
+    
 ## Making a Model
 
 Function **model.model_from_frames** consumes an dictionary of 
@@ -142,7 +163,7 @@ per branch-terminal from branch-data, calculates values of branches from
 admittances. The function is useful if data are given in a similar structure.
 
 Function make_model generates a model from network device objects defined
-in **egrid.builder** (see purpose.)
+in **egrid.builder** (see paragraph 'Purpose').
 
 
 Example - 3 nodes, 2 lines, 1 consumer:

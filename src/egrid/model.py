@@ -32,7 +32,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues pqvalues ivalues vvalues '
     'branchtaps shape_of_Y slack_indexer '
-    'load_scaling_factors injection_factor_association '
+    'load_scaling_factors injection_factor_associations '
     'errormessages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
@@ -520,7 +520,7 @@ def model_from_frames(dataframes=None):
         * .shape_of_Y, tuple of int, shape of admittance matrix
         * .slack_indexer, pandas.Series
         * .load_scaling_factors
-        * .injection_factor_association
+        * .injection_factor_associations
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
@@ -568,5 +568,5 @@ def model_from_frames(dataframes=None):
         shape_of_Y=(size, size),
         slack_indexer=slack_indexer,
         load_scaling_factors=load_scaling_factors,
-        injection_factor_association=assoc,
+        injection_factor_associations=assoc,
         errormessages=dataframes.get('errormessages', _ERRORMESSAGES))
