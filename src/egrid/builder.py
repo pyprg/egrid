@@ -101,7 +101,49 @@ id_of_batch: str
 id_of_device: str
     id referencing a branch or an injection
 id_of_node: str (default value None)
-    id of the connected node, 'None' if branch"""
+    id of the connected node, 'None' if injection"""
+
+PValue = namedtuple(
+    'PQValue',
+    'id_of_batch P direction',
+    defaults=(1.,))
+PValue.__doc__ = """Values of (measured) active power. The
+optimization (estimation) target is to meet those (and other given) values.
+When the measurement is placed at a terminal of a branch or injection a
+corresponding Output instance(s) having the identical 'id_of_batch' value must 
+exist. Placement of multiple measurements in switch fields combined with 
+several branches or injections are modeled by PValue and Output instances 
+sharing the same 'id_of_batch'-value.
+
+Parameters
+----------
+id_of_batch: str
+    unique identifier of the point
+P: float
+    active power
+direction: float (default value 1)
+    -1 or 1"""
+
+QValue = namedtuple(
+    'PQValue',
+    'id_of_batch Q direction',
+    defaults=(1.,))
+QValue.__doc__ = """Values of (measured) reactive power. The
+optimization (estimation) target is to meet those (and other given) values.
+When the measurement is placed at a terminal of a branch or injection a
+corresponding Output instance(s) having the identical 'id_of_batch' value 
+must exist. Placement of multiple measurements in switch fields combined with 
+several branches or injections are modeled by QValue and Output instances 
+sharing the same 'id_of_batch'-value.
+
+Parameters
+----------
+id_of_batch: str
+    unique identifier of the point
+Q: float
+    reactive power
+direction: float (default value 1)
+    -1 or 1"""
 
 PQValue = namedtuple(
     'PQValue',
@@ -535,7 +577,7 @@ def _make_edge_objects(data):
 
     Yields
     ------
-    PQValue | IValue | Output | str"""
+    PValue | QValue | PQValue | IValue | Output | str"""
     _, neighbours, attributes = data
     if len(neighbours) != 2:
         yield f"edge {neighbours} shall have two nodes"
@@ -549,8 +591,10 @@ def _make_edge_objects(data):
              "slack-nodes with prefix 'slack')")
         return
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
-    if 'P' in attributes and 'Q' in attributes:
-        id_of_batch = f'PQ_{id_of_node}_{id_of_device}'
+    create_output = False
+    has_p, has_q = (key in attributes for key in ('P', 'Q'))
+    if has_p and has_q:
+        id_of_batch = f'{id_of_node}_{id_of_device}'
         try:
             yield PQValue(
                 id_of_batch=id_of_batch,
@@ -563,12 +607,50 @@ def _make_edge_objects(data):
                 f"following attributes are provided: {attributes} "
                 f"(error: {str(e)})")
             return
+        create_output = True
         yield Output(
             id_of_batch=id_of_batch,
             id_of_node=id_of_node,
             id_of_device=id_of_device)
+    else:
+        if has_p:
+            id_of_batch = f'{id_of_node}_{id_of_device}'
+            try:
+                yield PValue(
+                    id_of_batch=id_of_batch,
+                    P=float(e3(attributes['P'])))
+            except ValueError as e:
+                yield (
+                    f"Error in data of edge '{id_of_node}-{id_of_device}', "
+                     "value of attributes 'P' must be of type float, "
+                    f"following attributes are provided: {attributes} "
+                    f"(error: {str(e)})")
+                return
+            create_output = True
+            yield Output(
+                id_of_batch=id_of_batch,
+                id_of_node=id_of_node,
+                id_of_device=id_of_device)
+        elif has_q:
+            id_of_batch = f'{id_of_node}_{id_of_device}'
+            try:
+                yield QValue(
+                    id_of_batch=id_of_batch,
+                    Q=float(e3(attributes['Q'])))
+            except ValueError as e:
+                yield (
+                    f"Error in data of edge '{id_of_node}-{id_of_device}', "
+                     "values of attribute 'Q' must be of type float, "
+                    f"following attributes are provided: {attributes} "
+                    f"(error: {str(e)})")
+                return
+            create_output = True
+            yield Output(
+                id_of_batch=id_of_batch,
+                id_of_node=id_of_node,
+                id_of_device=id_of_device)
     if 'I' in attributes:
-        id_of_batch = f'I_{id_of_node}_{id_of_device}'
+        id_of_batch = f'{id_of_node}_{id_of_device}'
         try:
             yield IValue(
                 id_of_batch=id_of_batch,
@@ -580,6 +662,7 @@ def _make_edge_objects(data):
                 f"following attributes are provided: {attributes} "
                 f"(error: {str(e)})")
             return
+        create_output = True
         yield Output(
             id_of_batch=id_of_batch,
             id_of_node=id_of_node,
