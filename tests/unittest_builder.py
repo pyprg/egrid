@@ -293,5 +293,6 @@ class Make_objects(unittest.TestCase):
         self.assertIsInstance(
             obj, str, "make_objects shall return an instance of str")
 
+
 if __name__ == '__main__':
     unittest.main()

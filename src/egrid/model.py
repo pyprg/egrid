@@ -22,10 +22,12 @@ Created on Sun Aug  19 08:36:10 2021
 
 @author: pyprg
 """
-from collections import namedtuple
-from functools import partial
 import pandas as pd
 import numpy as np
+import networkx as nx
+from collections import namedtuple
+from functools import partial
+from itertools import chain
 
 Model = namedtuple(
     'Model',
@@ -166,10 +168,7 @@ _ERRORMESSAGES = pd.DataFrame(
     columns=['errormessage'])
 
 def _join_index_of_node(nodes, dataframe):
-    return (
-        dataframe
-        .join(nodes, on='id_of_node')
-        .rename(columns={'idx': 'index_of_node'}))
+    return dataframe.join(nodes, on='id_of_node')
 
 def _add_bg(branches):
     """Prepares data of branches for power flow calculation with seperate real
@@ -216,8 +215,10 @@ def _add_bg(branches):
          # end of complex values
          'index_of_node_A', 'index_of_node_B',
          'index_of_term_A', 'index_of_term_B',
+         'switch_flow_idx_A', 'switch_flow_idx_B',
          'g_tot', 'b_tot', 'g_mn', 'b_mn', 'g_mm_half', 'b_mm_half',
-         'index_of_taps_A', 'index_of_taps_B'],
+         'index_of_taps_A', 'index_of_taps_B',
+         'is_bridge'],
         axis=1)
 
 def _get_branch_terminals(branches):
@@ -249,30 +250,34 @@ def _get_branch_terminals(branches):
     terms_a = (
         bras.rename(
             columns={
-                'id'             : 'id_of_branch',
-                'id_of_node_A'   : 'id_of_node',
-                'index_of_node_A': 'index_of_node',
-                'index_of_term_A': 'index_of_term',
-                'index_of_term_B': 'index_of_other_term',
-                'id_of_node_B'   : 'id_of_other_node',
-                'index_of_node_B': 'index_of_other_node',
-                'index_of_taps_A': 'index_of_taps',
-                'index_of_taps_B': 'index_of_other_taps'})
-        .set_index('index_of_term'))
+                'id'               : 'id_of_branch',
+                'id_of_node_A'     : 'id_of_node',
+                'index_of_node_A'  : 'index_of_node',
+                'index_of_term_A'  : 'index_of_term',
+                'switch_flow_idx_A': 'switch_flow_index',
+                'index_of_term_B'  : 'index_of_other_term',
+                'id_of_node_B'     : 'id_of_other_node',
+                'index_of_node_B'  : 'index_of_other_node',
+                'index_of_taps_A'  : 'index_of_taps',
+                'index_of_taps_B'  : 'index_of_other_taps'})
+        .set_index('index_of_term')
+        .drop('switch_flow_idx_B', axis=1))
     terms_a['side'] = 'A'
     terms_b = (
         bras.rename(
             columns={
-                'id'             : 'id_of_branch',
-                'id_of_node_B'   : 'id_of_node',
-                'index_of_node_B': 'index_of_node',
-                'index_of_term_B': 'index_of_term',
-                'index_of_term_A': 'index_of_other_term',
-                'id_of_node_A'   : 'id_of_other_node',
-                'index_of_node_A': 'index_of_other_node',
-                'index_of_taps_B': 'index_of_taps',
-                'index_of_taps_A': 'index_of_other_taps'})
-        .set_index('index_of_term'))
+                'id'               : 'id_of_branch',
+                'id_of_node_B'     : 'id_of_node',
+                'index_of_node_B'  : 'index_of_node',
+                'index_of_term_B'  : 'index_of_term',
+                'switch_flow_idx_B': 'switch_flow_index',
+                'index_of_term_A'  : 'index_of_other_term',
+                'id_of_node_A'     : 'id_of_other_node',
+                'index_of_node_A'  : 'index_of_other_node',
+                'index_of_taps_B'  : 'index_of_taps',
+                'index_of_taps_A'  : 'index_of_other_taps'})
+        .set_index('index_of_term')
+        .drop('switch_flow_idx_A', axis=1))
     terms_b['side'] = 'B'
     return pd.concat([terms_a, terms_b])
 
@@ -346,6 +351,11 @@ def _get_branch_taps_data(branchterminals, tapsframe):
             on='id_of_branch'))
     return pd.concat([branchtaps_a, branchtaps_b])
 
+_Y_MN_ABS_MAX = 1e5
+
+def _is_short_circuit(y_mn):
+    return _Y_MN_ABS_MAX < y_mn.abs
+
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
         dataframes.get('Branch', _BRANCHES)[['id_of_node_A', 'id_of_node_B']]
@@ -371,12 +381,11 @@ def _prepare_branches(branchtaps, dataframes, nodes):
     if not brs['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
+    nodes_ = nodes[['index_of_node', 'switch_flow_idx']]
     _branches = (
         brs
-        .join(nodes, on='id_of_node_A')
-        .rename(columns={'idx': 'index_of_node_A'})
-        .join(nodes, on='id_of_node_B')
-        .rename(columns={'idx': 'index_of_node_B'}))
+        .join(nodes_, on='id_of_node_A')
+        .join(nodes_, on='id_of_node_B', lsuffix='_A', rsuffix='_B'))
     _branches.reset_index(inplace=True)
     _branches.rename(columns={'index':'index_of_branch'}, inplace=True)
     branchcount = len(_branches)
@@ -414,9 +423,61 @@ def _prepare_injection_outputs(injections, injectionoutputs):
         _injectionoutputs
         .join(injection_idxs, on='id_of_injection', how='inner'))
 
+def get_pfc_nodes(branch_frame):
+    """Collapses nodes connected to impedanceless branches.
+    Creates indices for power flow calculation and
+    for 'switch flow calculation'.
+
+    Parameters
+    ----------
+    branch_frame: pandas.DataFrame
+
+    Returns
+    -------
+    tuple
+        * int, number of power flow calculation nodes
+        * pandas.DataFrame (id of node)
+            * .index_of_node
+            * .switch_flow_idx"""
+    # graph connecting all nodes connected to switches and lines having small
+    #   impedances
+    bridge_graph = nx.from_pandas_edgelist(
+        branch_frame[branch_frame.is_bridge],
+        source='id_of_node_A',
+        target='id_of_node_B',
+        edge_attr='id',
+        create_using=None,
+        edge_key='id')
+    connected_components = [*nx.connected_components(bridge_graph)]
+    ccc = len(connected_components)
+    cc_nodes = set(bridge_graph.nodes)
+    # add rest of nodes
+    branch_nodes = set(
+        branch_frame
+        .loc[~branch_frame.is_bridge,['id_of_node_A', 'id_of_node_B']]
+        .to_numpy()
+        .reshape(-1))
+    # 'connected_components' finds groups of nodes connected by switches,
+    #   each group will be collapsed to one power flow calculation node
+    # all nodes relevant for power flow calculation with indices added
+    #   which are usable for matrix building including additional indices
+    #   for matrices of switch flow calculation
+    return (
+        ccc + len(branch_nodes - cc_nodes),
+        pd.DataFrame(
+            chain.from_iterable([
+                ((id_, idx, switch_flow_idx, True)
+                 for idx, ids in enumerate(connected_components)
+                 for switch_flow_idx, id_ in enumerate(ids)),
+                ((id_, idx, 0, False)
+                 for idx, id_ in enumerate(branch_nodes - cc_nodes, ccc))]),
+            columns=['node_id', 'index_of_node', 'switch_flow_idx',
+                     'in_super_node'])
+        .set_index('node_id'))
+
 _EMPTY_DICT = {}
 
-def model_from_frames(dataframes=None):
+def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     """Creates a network model for power flow calculation.
 
     Parameters
@@ -501,6 +562,11 @@ def model_from_frames(dataframes=None):
             * .branchid, str, ID of branch
             * .part, 'g'|'b', conductance/susceptance
             * .id, str, ID of branch
+    y_mn_abs_max: float (default value _Y_MN_ABS_MAX)
+        * maximum value of branch longitudinal admittance,
+          if the absolute value of the branch admittance is greater
+          than y_mn_abs_max it is classified being a bridge
+          (connection without impedance)
 
     Returns
     -------
@@ -524,16 +590,18 @@ def model_from_frames(dataframes=None):
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
-    nodes = _prepare_nodes(dataframes)
-    add_idx_of_node = partial(_join_index_of_node, nodes)
+    branches_ = dataframes.get('Branch', _BRANCHES)
+    branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
+    size, pfc_nodes = get_pfc_nodes(branches_)
+    add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
-    branches = _prepare_branches(branchtaps, dataframes, nodes)
+    branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
     slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
     branchterminals=_get_branch_terminals(_add_bg(branches))
     # injections
     injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
     if not injections['id'].is_unique:
-        msg = "Error IDs of injections must be unique but are not."
+        msg = "Error: IDs of injections must be unique but are not."
         raise ValueError(msg)
     # measured terminals
     outputs = dataframes.get('Output', _OUTPUTS)
@@ -544,8 +612,7 @@ def model_from_frames(dataframes=None):
     injectionoutputs = _prepare_injection_outputs(
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
-    size = len(nodes)
-    slack_indexer = nodes.idx.isin(slacks.index_of_node)
+    slack_indexer = pfc_nodes.index_of_node.isin(slacks.index_of_node)
     load_scaling_factors=(
         dataframes.get('Loadfactor', _LOADFACTORS).set_index(['step', 'id']))
     assoc = (
@@ -553,7 +620,7 @@ def model_from_frames(dataframes=None):
         .get('KInjlink', _KINJLINKS)
         .set_index(['step', 'injid', 'part']))
     return Model(
-        nodes=nodes,
+        nodes=pfc_nodes,
         slacks=slacks,
         injections=injections,
         branchterminals=branchterminals,
