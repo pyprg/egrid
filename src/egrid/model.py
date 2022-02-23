@@ -33,7 +33,7 @@ Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues pqvalues ivalues vvalues '
-    'branchtaps shape_of_Y slack_indexer '
+    'branchtaps shape_of_Y '
     'load_scaling_factors injection_factor_associations '
     'errormessages')
 Model.__doc__ = """Data of an electric distribution network for
@@ -117,9 +117,7 @@ branchtaps: pandas.DataFrame
     * .positionmax, int, position of greates tap
     * .position, int, actual position
 shape_of_Y: tuple (int, int)
-    shape of admittance matrix for power flow calculation
-slack_indexer: pandas.Series, bool
-    True if index is index of slack node, false otherwise"""
+    shape of admittance matrix for power flow calculation"""
 
 _EMPTY_TUPLE = ()
 _BRANCHES = pd.DataFrame(
@@ -584,7 +582,6 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         * .vvalues, pandas.DataFrame
         * .branchtaps, pandas.DataFrame
         * .shape_of_Y, tuple of int, shape of admittance matrix
-        * .slack_indexer, pandas.Series
         * .load_scaling_factors
         * .injection_factor_associations
         * .messages"""
@@ -594,9 +591,10 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
     size, pfc_nodes = get_pfc_nodes(branches_)
     add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
+    slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
+    pfc_nodes['is_slack'] = pfc_nodes.index_of_node.isin(slacks.index_of_node)
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
-    slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
     branchterminals=_get_branch_terminals(_add_bg(branches))
     # injections
     injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
@@ -612,7 +610,6 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     injectionoutputs = _prepare_injection_outputs(
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
-    slack_indexer = pfc_nodes.index_of_node.isin(slacks.index_of_node)
     load_scaling_factors=(
         dataframes.get('Loadfactor', _LOADFACTORS).set_index(['step', 'id']))
     assoc = (
@@ -633,7 +630,6 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         vvalues=add_idx_of_node(dataframes.get('Vvalue', _VVALUES)),
         branchtaps=branchtaps,
         shape_of_Y=(size, size),
-        slack_indexer=slack_indexer,
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         errormessages=dataframes.get('errormessages', _ERRORMESSAGES))
