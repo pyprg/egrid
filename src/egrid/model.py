@@ -421,7 +421,7 @@ def _prepare_injection_outputs(injections, injectionoutputs):
         _injectionoutputs
         .join(injection_idxs, on='id_of_injection', how='inner'))
 
-def get_pfc_nodes(branch_frame):
+def _get_pfc_nodes(branch_frame):
     """Collapses nodes connected to impedanceless branches.
     Creates indices for power flow calculation and
     for 'switch flow calculation'.
@@ -589,7 +589,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         dataframes = _EMPTY_DICT
     branches_ = dataframes.get('Branch', _BRANCHES)
     branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
-    size, pfc_nodes = get_pfc_nodes(branches_)
+    size, pfc_nodes = _get_pfc_nodes(branches_)
     add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
     slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
     pfc_nodes['is_slack'] = pfc_nodes.index_of_node.isin(slacks.index_of_node)
@@ -633,3 +633,27 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         errormessages=dataframes.get('errormessages', _ERRORMESSAGES))
+
+def get_pfc_nodes(nodes):
+    """Aggregates nodes of same power-flow-calculation node.
+    
+    Parameters
+    ----------
+    nodes: pandas.DataFrame (node_id, str)
+        * .index_of_node, int
+        * .in_super_node, bool
+        * .is_slack, bool
+    
+    Returns
+    -------
+    pandas.DataFrame (node_id, str)
+        * .index_of_node, int
+        * .is_super_node, bool
+        * .is_slack, bool"""
+    pfc_nodes_group = nodes.reset_index().groupby('index_of_node')
+    pfc_nodes = pfc_nodes_group[['node_id']].first()
+    pfc_nodes['is_super_node'] = pfc_nodes_group.in_super_node.any()
+    pfc_nodes['is_slack'] = pfc_nodes_group.is_slack.any()
+    pfc_nodes.reset_index(inplace=True)
+    pfc_nodes.set_index('node_id', inplace=True)
+    return pfc_nodes
