@@ -32,7 +32,7 @@ from itertools import chain
 Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
-    'branchoutputs injectionoutputs pvalues qvalues pqvalues ivalues vvalues '
+    'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y '
     'load_scaling_factors injection_factor_associations '
     'errormessages')
@@ -95,11 +95,6 @@ qvalues: pandas.DataFrame
     * .id_of_batch, unique identifier of measurement point
     * .Q, float, reactive power
     * .direction, float, -1: from device into node, 1: from node into device
-pqvalues: pandas.DataFrame
-    * .id_of_batch, unique identifier of measurement point
-    * .P, float, active power
-    * .Q, float, reactive power
-    * .direction, float, -1: from device into node, 1: from node into device
 ivalues: pandas.DataFrame
     * .id_of_batch, unique identifier of measurement point
     * .I, float, electric current
@@ -138,9 +133,6 @@ _PVALUES = pd.DataFrame(
 _QVALUES = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['id_of_batch', 'Q', 'direction'])
-_PQVALUES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_batch', 'P', 'Q', 'direction'])
 _IVALUES = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['id_of_batch', 'I'])
@@ -625,7 +617,6 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         injectionoutputs=injectionoutputs,
         pvalues=dataframes.get('PValue', _PVALUES),
         qvalues=dataframes.get('QValue', _QVALUES),
-        pqvalues=dataframes.get('PQValue', _PQVALUES),
         ivalues=dataframes.get('IValue', _IVALUES),
         vvalues=add_idx_of_node(dataframes.get('Vvalue', _VVALUES)),
         branchtaps=branchtaps,

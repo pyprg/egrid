@@ -146,30 +146,6 @@ Q: float
 direction: float (default value 1)
     -1 or 1"""
 
-PQValue = namedtuple(
-    'PQValue',
-    'id_of_batch P Q direction',
-    defaults=(1.,))
-PQValue.__doc__ = """Values of (measured) active and reactive power. The
-optimization (estimation) target is to meet those (and other given) values.
-When the measurement is placed at a terminal of a branch or injection a
-corresponding Branchoutput or Injectionoutput instance having the
-identical 'id_of_batch' value must exist. Placement of multiple measurements
-in switch fields combined with several branches or injections are modeled
-by PQValue and Branchoutput/Injectionoutput instances sharing
-the same 'id_of_batch'-value.
-
-Parameters
-----------
-id_of_batch: str
-    unique identifier of the point
-P: float
-    active power
-Q:float
-    reactive power
-direction: float (default value 1)
-    -1 or 1"""
-
 IValue = namedtuple(
     'IValue',
     'id_of_batch I')
@@ -448,7 +424,7 @@ def e3(string):
 # all device types of gridmodel.Model and taps and analog values with helper
 MODEL_TYPES = (
     Branch, Slacknode, Injection, 
-    Output, PValue, QValue, PQValue, IValue, Vvalue, 
+    Output, PValue, QValue, IValue, Vvalue, 
     Branchtaps)
 SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
 _ARG_TYPES = SOURCE_TYPES + (str,)
@@ -609,19 +585,6 @@ def _create_ivalue(id_of_node, id_of_device, attributes):
             f"following attributes are provided: {attributes} "
             f"(error: {str(e)})")
 
-def _create_pqvalue(id_of_node, id_of_device, attributes):
-    try:
-        return True, PQValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}',
-            P=float(e3(attributes['P'])),
-            Q=float(e3(attributes['Q'])))
-    except ValueError as e:
-        return False, (
-            f"Error in data of edge '{id_of_node}-{id_of_device}', "
-             "values of attributes 'P' and 'Q' must be of type float, "
-            f"following attributes are provided: {attributes} "
-            f"(error: {str(e)})")
-
 def _make_edge_objects(data):
     """Creates data objects which are associated to an edge.
 
@@ -648,21 +611,16 @@ def _make_edge_objects(data):
         return
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
     create_output = False
-    has_p, has_q = (key in attributes for key in ('P', 'Q'))
-    if has_p and has_q:
-        success, val = _create_pqvalue(id_of_node, id_of_device, attributes)
+    has_p, has_q, has_I = (key in attributes for key in ('P', 'Q', 'I'))
+    if has_p:
+        success, val = _create_pvalue(id_of_node, id_of_device, attributes)
         yield val
         create_output |= success
-    else:
-        if has_p:
-            success, val = _create_pvalue(id_of_node, id_of_device, attributes)
-            yield val
-            create_output |= success
-        elif has_q:
-            success, val = _create_qvalue(id_of_node, id_of_device, attributes)
-            yield val
-            create_output |= success
-    if 'I' in attributes:
+    if has_q:
+        success, val = _create_qvalue(id_of_node, id_of_device, attributes)
+        yield val
+        create_output |= success
+    if has_I:
         success, val = _create_ivalue(id_of_node, id_of_device, attributes)
         yield val
         create_output |= success

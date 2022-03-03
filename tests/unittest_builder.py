@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 from src.egrid.builder import (
-    make_objects, Slacknode, PQValue, Output, IValue, PValue, QValue,
+    make_objects, Slacknode, PValue, QValue, Output, IValue,
     Branch, Injection)
 
 _EMPTY_DICT = {}
@@ -90,15 +90,19 @@ class Make_objects(unittest.TestCase):
         res = [*make_objects(
             ('edge', ('n0', 'line0'), {'P': '4.6', 'Q': '2.4'}))]
         self.assertEqual(
-            len(res), 2, "make_objects shall return two object")
+            len(res), 3, "make_objects shall return two object")
         self.assertIsInstance(
             res[0], 
-            (PQValue, Output), 
-            "make_objects shall return instances of PQValue and Output")
+            (PValue, QValue, Output), 
+            "make_objects shall return instances of P/QValue and Output")
         self.assertIsInstance(
             res[1], 
-            (PQValue, Output), 
-            "make_objects shall return instances of PQValue and Output")
+            (PValue, QValue, Output), 
+            "make_objects shall return instances of P/QValue and Output")
+        self.assertIsInstance(
+            res[2], 
+            (PValue, QValue, Output), 
+            "make_objects shall return instances of P/QValue and Output")
     
     def test_make_edge_objects_P(self):
         res = [*make_objects(
@@ -139,7 +143,7 @@ class Make_objects(unittest.TestCase):
             "make_objects shall return instances of IValue and Output")
         self.assertIsInstance(
             res[1], 
-            (PQValue, Output), 
+            (IValue, Output), 
             "make_objects shall return instances of IValue and Output")
         
     def test_make_edge_objects_branch(self):
@@ -292,7 +296,6 @@ class Make_objects(unittest.TestCase):
         obj = res[0]
         self.assertIsInstance(
             obj, str, "make_objects shall return an instance of str")
-
 
 if __name__ == '__main__':
     unittest.main()
