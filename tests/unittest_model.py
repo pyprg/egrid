@@ -21,7 +21,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 from src.egrid import make_model
-from src.egrid.builder import Slacknode, make_data_frames, create_objects
+from src.egrid.builder import (
+    Slacknode, Branch, make_data_frames, create_objects)
 from src.egrid.model import Model, model_from_frames
 
 class Make_model(unittest.TestCase):
@@ -38,14 +39,14 @@ class Make_model(unittest.TestCase):
             msg='make_model shall return an instance of egrid.model.Model')
 
     def test_make_model_slack(self):
-        model = make_model(Slacknode('n0'))
+        model = make_model(Slacknode('n0'), Branch('b0', 'n0', 'n1'))
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.errormessages), 0, 'no errors')
         self.assertEqual(len(model.slacks), 1, 'one slack node')
         self.assertEqual(model.slacks.id_of_node[0], 'n0', 'slack at node n0')
 
     def test_make_model_slack2(self):
-        model = make_model([[[Slacknode('n0')]]])
+        model = make_model([[[Slacknode('n0'), Branch('b0', 'n0', 'n1')]]])
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.errormessages), 0, 'no errors')
         self.assertEqual(len(model.slacks), 1, 'one slack node')

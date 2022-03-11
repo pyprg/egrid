@@ -160,6 +160,9 @@ _ERRORMESSAGES = pd.DataFrame(
 def _join_index_of_node(nodes, dataframe):
     return dataframe.join(nodes, on='id_of_node')
 
+def _join_index_of_node_inner(nodes, dataframe):
+    return dataframe.join(nodes, on='id_of_node', how='inner')
+
 def _add_bg(branches):
     """Prepares data of branches for power flow calculation with seperate real
     and imaginary parts of admittances.
@@ -582,8 +585,36 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     branches_ = dataframes.get('Branch', _BRANCHES)
     branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
     size, pfc_nodes = _get_pfc_nodes(branches_)
+    if pfc_nodes.empty:
+        # create one pfc-node for all injections
+        inj = dataframes.get('Injection', _INJECTIONS)
+        in_super_node = 2 < inj.shape[0]
+        pfc_nodes = pd.DataFrame(
+            {'index_of_node':0,
+             'switch_flow_idx':0,
+             'in_super_node':in_super_node},
+            index=inj.id_of_node)
     add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
-    slacks = add_idx_of_node(dataframes.get('Slacknode', _SLACKNODES))
+    #  processing of slack nodes especially if multiple slack-nodes are
+    #   placed in the same pfc-node
+    slacks = _join_index_of_node_inner(
+    pfc_nodes, dataframes.get('Slacknode', _SLACKNODES))
+    slack_groups = slacks.groupby('index_of_node')
+    slack_groups_size = slack_groups.size()
+    slack_groups_first = (
+        slack_groups[['id_of_node', 'switch_flow_idx', 'in_super_node']]
+        .first())
+    slack_groups_first['V'] = slack_groups.V.sum() / slack_groups_size
+    pfc_slacks = slack_groups_first.reset_index()
+    # identifies slacks connected without impedance to other slacks
+    # currently not used for substitution
+    super_slacks = 1 < slack_groups_size
+    super_slack_idxs = super_slacks[super_slacks].index
+    head_tail = lambda col: (col[0], col[1:].to_list())
+    slackid_groups = [
+        head_tail(slack_groups.id_of_node.get_group(group_name)) 
+        for group_name in super_slack_idxs]
+    #    
     pfc_nodes['is_slack'] = pfc_nodes.index_of_node.isin(slacks.index_of_node)
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
@@ -610,7 +641,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         .set_index(['step', 'injid', 'part']))
     return Model(
         nodes=pfc_nodes,
-        slacks=slacks,
+        slacks=pfc_slacks,
         injections=injections,
         branchterminals=branchterminals,
         branchoutputs=branchoutputs,
