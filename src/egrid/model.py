@@ -360,8 +360,11 @@ def _prepare_nodes(dataframes):
         index=node_id_index)
 
 def _prepare_branch_taps(add_idx_of_node, dataframes):
-    branchtaps = add_idx_of_node(
+    branch = dataframes.get('Branch', _BRANCHES)
+    branchtaps_ = add_idx_of_node(
         dataframes.get('Branchtaps', _BRANCHTAPS))
+    valid = branchtaps_.id_of_branch.isin(branch[~branch.is_bridge].id)
+    branchtaps = branchtaps_[valid].reset_index(drop=True)
     branchtaps.reset_index(inplace=True)
     branchtaps.rename(columns={'index':'index_of_taps'}, inplace=True)
     return branchtaps
