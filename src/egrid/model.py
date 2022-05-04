@@ -601,7 +601,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     #  processing of slack nodes especially if multiple slack-nodes are
     #   placed in the same pfc-node
     slacks = _join_index_of_node_inner(
-    pfc_nodes, dataframes.get('Slacknode', _SLACKNODES))
+        pfc_nodes, dataframes.get('Slacknode', _SLACKNODES))
     slack_groups = slacks.groupby('index_of_node')
     slack_groups_size = slack_groups.size()
     slack_groups_first = (
@@ -622,6 +622,8 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
     branchterminals=_get_branch_terminals(_add_bg(branches))
+    branchterminals['at_slack'] = (
+        branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
     # injections
     injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
     if not injections['id'].is_unique:
