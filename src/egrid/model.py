@@ -33,7 +33,7 @@ Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
-    'branchtaps shape_of_Y '
+    'branchtaps shape_of_Y count_of_slacks '
     'load_scaling_factors injection_factor_associations '
     'errormessages')
 Model.__doc__ = """Data of an electric distribution network for
@@ -112,7 +112,9 @@ branchtaps: pandas.DataFrame
     * .positionmax, int, position of greates tap
     * .position, int, actual position
 shape_of_Y: tuple (int, int)
-    shape of admittance matrix for power flow calculation"""
+    shape of admittance matrix for power flow calculation
+count_of_slacks: int
+    number of slack-nodes for power flow calculation"""
 
 _EMPTY_TUPLE = ()
 _BRANCHES = pd.DataFrame(
@@ -419,22 +421,28 @@ def _prepare_injection_outputs(injections, injectionoutputs):
         _injectionoutputs
         .join(injection_idxs, on='id_of_injection', how='inner'))
 
-def _get_pfc_nodes(branch_frame):
+def _get_pfc_nodes(slackids, branch_frame):
     """Collapses nodes connected to impedanceless branches.
     Creates indices for power flow calculation and
-    for 'switch flow calculation'.
+    for 'switch flow calculation'. Slack-nodes are returned first.
 
     Parameters
     ----------
+    slackids: pandas.Series
+        str, unique identifiers of slack nodes
     branch_frame: pandas.DataFrame
 
     Returns
     -------
     tuple
+        * int, number of power flow slack nodes
         * int, number of power flow calculation nodes
         * pandas.DataFrame (id of node)
             * .index_of_node
             * .switch_flow_idx"""
+    set_of_slackids = set(slackids)
+    get_of_slackids = set_of_slackids.intersection
+    is_slack = lambda myset: bool(get_of_slackids(myset))
     # graph connecting all nodes connected to switches and lines having small
     #   impedances
     bridge_graph = nx.from_pandas_edgelist(
@@ -444,31 +452,75 @@ def _get_pfc_nodes(branch_frame):
         edge_attr='id',
         create_using=None,
         edge_key='id')
-    connected_components = [*nx.connected_components(bridge_graph)]
-    ccc = len(connected_components)
+    # connected_components = [*nx.connected_components(bridge_graph)]
+    connected_components_ = pd.Series(
+        nx.connected_components(bridge_graph),
+        dtype=object)
+    connected_components = pd.DataFrame(
+        data={'connected_components': connected_components_, 
+              'is_slack': connected_components_.apply(is_slack)},
+        columns=['connected_components', 'is_slack'])
+    cc_count = len(connected_components)
+    cc_slacks = (
+        connected_components[connected_components.is_slack]
+        if cc_count else
+        pd.DataFrame([], columns=['connected_components', 'is_slack']))
+    cc_slack_count = len(cc_slacks)
+    cc_nonslacks = (
+        connected_components[~connected_components.is_slack]
+        if cc_count else
+        pd.DataFrame([], columns=['connected_components', 'is_slack']))
+    cc_nonslacks.columns = connected_components.columns
     cc_nodes = set(bridge_graph.nodes)
     # add rest of nodes
-    branch_nodes = set(
-        branch_frame
-        .loc[~branch_frame.is_bridge,['id_of_node_A', 'id_of_node_B']]
-        .to_numpy()
-        .reshape(-1))
+    ids_of_branch_nodes = pd.Series(list(
+        set(branch_frame
+            .loc[~branch_frame.is_bridge,['id_of_node_A', 'id_of_node_B']]
+            .to_numpy()
+            .reshape(-1))
+        - cc_nodes),
+        dtype=object)
+    branch_nodes = pd.DataFrame(
+        data={'id_of_node': ids_of_branch_nodes,
+              'is_slack': ids_of_branch_nodes.apply(
+                  lambda id_: id_ in set_of_slackids)},
+        columns=['id_of_node', 'is_slack'])
+    branch_nodes_slacks = (
+        branch_nodes[branch_nodes.is_slack]
+        if len(branch_nodes) else
+        branch_nodes)
+    count_of_slacks = cc_slack_count + len(branch_nodes_slacks)
+    branch_nodes_nonslacks = (
+        branch_nodes[~branch_nodes.is_slack]
+        if len(branch_nodes) else
+        branch_nodes)
     # 'connected_components' finds groups of nodes connected by switches,
     #   each group will be collapsed to one power flow calculation node
     # all nodes relevant for power flow calculation with indices added
     #   which are usable for matrix building including additional indices
     #   for matrices of switch flow calculation
     return (
-        ccc + len(branch_nodes - cc_nodes),
+        count_of_slacks, 
+        len(connected_components) + len(branch_nodes),
         pd.DataFrame(
             chain.from_iterable([
-                ((id_, idx, switch_flow_idx, True)
-                 for idx, ids in enumerate(connected_components)
-                 for switch_flow_idx, id_ in enumerate(ids)),
-                ((id_, idx, 0, False)
-                 for idx, id_ in enumerate(branch_nodes - cc_nodes, ccc))]),
+                ((id_, idx, switch_flow_idx, True, True)
+                  for idx, ids in enumerate(cc_slacks.connected_components)
+                  for switch_flow_idx, id_ in enumerate(ids)),
+                ((id_, idx, 0, False, True)
+                  for idx, id_ in enumerate(
+                    branch_nodes_slacks.id_of_node, cc_slack_count)),
+                ((id_, idx, switch_flow_idx, True, False)
+                  for idx, ids in enumerate(
+                    cc_nonslacks.connected_components, count_of_slacks)
+                  for switch_flow_idx, id_ in enumerate(ids)),
+                ((id_, idx, 0, False, False)
+                  for idx, id_ in enumerate(
+                    branch_nodes_nonslacks.id_of_node, 
+                    count_of_slacks + len(cc_nonslacks)))
+                ]),
             columns=['node_id', 'index_of_node', 'switch_flow_idx',
-                     'in_super_node'])
+                     'in_super_node', 'is_slack'])
         .set_index('node_id'))
 
 _EMPTY_DICT = {}
@@ -567,7 +619,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     Returns
     -------
     Model
-        * .nodes, pandas.DataFrame
+        * .nodes, pandas.DataFrame, slack nodes are first
         * .slacks, pandas.DataFrame
         * .injections, pandas.DataFrame
         * .branchterminals, pandas.DataFrame
@@ -580,14 +632,17 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         * .vvalues, pandas.DataFrame
         * .branchtaps, pandas.DataFrame
         * .shape_of_Y, tuple of int, shape of admittance matrix
+        * .count_of_slacks, int, number of slacks for power flow calculation
         * .load_scaling_factors
         * .injection_factor_associations
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
+    slacks = dataframes.get('Slacknode', _SLACKNODES)
     branches_ = dataframes.get('Branch', _BRANCHES)
     branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
-    size, pfc_nodes = _get_pfc_nodes(branches_)
+    pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
+        slacks.id_of_node, branches_)
     if pfc_nodes.empty:
         # create one pfc-node for all injections
         inj = dataframes.get('Injection', _INJECTIONS)
@@ -600,8 +655,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
     add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
     #  processing of slack nodes especially if multiple slack-nodes are
     #   placed in the same pfc-node
-    slacks = _join_index_of_node_inner(
-        pfc_nodes, dataframes.get('Slacknode', _SLACKNODES))
+    slacks = _join_index_of_node_inner(pfc_nodes, slacks)
     slack_groups = slacks.groupby('index_of_node')
     slack_groups_size = slack_groups.size()
     slack_groups_first = (
@@ -618,7 +672,6 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         head_tail(slack_groups.id_of_node.get_group(group_name)) 
         for group_name in super_slack_idxs]
     #    
-    pfc_nodes['is_slack'] = pfc_nodes.index_of_node.isin(slacks.index_of_node)
     branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
     branchterminals=_get_branch_terminals(_add_bg(branches))
@@ -656,7 +709,8 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         ivalues=dataframes.get('IValue', _IVALUES),
         vvalues=add_idx_of_node(dataframes.get('Vvalue', _VVALUES)),
         branchtaps=branchtaps,
-        shape_of_Y=(size, size),
+        shape_of_Y=(node_count, node_count),
+        count_of_slacks = pfc_slack_count,
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         errormessages=dataframes.get('errormessages', _ERRORMESSAGES))

@@ -61,7 +61,7 @@ class Model_from_frames(unittest.TestCase):
 
     def test_model_from_frames(self):
         string = """
-                           y_mm_half=1e-6+1e-6j            y_mm_half=1e-6+1e-6j
+                            y_mm_half=1e-6+1e-6j            y_mm_half=1e-6+1e-6j
             slack=True     y_mn=1e3-1e3j                   y_mn=1e3-1e3j
             n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                             |                               |
