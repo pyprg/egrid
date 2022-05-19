@@ -731,6 +731,25 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         dataframes
         .get('KInjlink', _KINJLINKS)
         .set_index(['step', 'injid', 'part']))
+    errormessages=dataframes.get('errormessages', _ERRORMESSAGES.copy())
+    if node_count < 1:
+        errormessages = pd.concat([
+            errormessages, 
+            pd.DataFrame(
+                ['no node in grid-model'], 
+                columns=['errormessage'])])
+    if len(injections) < 1:
+        errormessages = pd.concat([
+            errormessages, 
+            pd.DataFrame(
+                ['no injection in grid-model'], 
+                columns=['errormessage'])])
+    if len(pfc_slacks) < 1:
+        errormessages = pd.concat([
+            errormessages, 
+            pd.DataFrame(
+                ['no slack-node in grid-model'], 
+                columns=['errormessage'])])
     return Model(
         nodes=pfc_nodes,
         slacks=pfc_slacks,
@@ -748,7 +767,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         mnodeinj=get_node_inj_matrix(node_count, injections),
-        errormessages=dataframes.get('errormessages', _ERRORMESSAGES))
+        errormessages=errormessages.reset_index(drop=True))
 
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.
