@@ -25,6 +25,7 @@ Created on Sun Aug  19 08:36:10 2021
 import pandas as pd
 import numpy as np
 import networkx as nx
+from scipy.sparse import coo_matrix
 from collections import namedtuple
 from functools import partial
 from itertools import chain
@@ -34,7 +35,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks '
-    'load_scaling_factors injection_factor_associations '
+    'load_scaling_factors injection_factor_associations mnodeinj '
     'errormessages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
@@ -114,7 +115,16 @@ branchtaps: pandas.DataFrame
 shape_of_Y: tuple (int, int)
     shape of admittance matrix for power flow calculation
 count_of_slacks: int
-    number of slack-nodes for power flow calculation"""
+    number of slack-nodes for power flow calculation
+load_scaling_factors
+
+injection_factor_associations 
+
+mnodeinj: scipy.sparse.csc_matrix
+    converts a vector ordered according to injection indices to a vector 
+    ordered according to power flow calculation nodes (adding entries of 
+    injections for each node) by calculating 'mnodeinj @ vector'
+errormessages: pandas.DataFrame """
 
 _EMPTY_TUPLE = ()
 _BRANCHES = pd.DataFrame(
@@ -523,6 +533,30 @@ def _get_pfc_nodes(slackids, branch_frame):
                      'in_super_node', 'is_slack'])
         .set_index('node_id'))
 
+def get_node_inj_matrix(count_of_nodes, injections):
+    """Creates a sparse matrix which converting a vector which is ordered
+    according to injections to a vector ordered according to power flow 
+    calculation nodes (adding entries of injections for each node) by
+    calculating 'M @ vector'. Transposed M is usable for mapping e.g.
+    the vector of node voltage to the vector of injection voltages.
+    
+    Parameters
+    ----------
+    count_of_nodes: int
+        number of power flow calculation nodes
+    injections: pandas.DataFrame (index of injection)
+        * .index_of_node, int
+    
+    Returns
+    -------
+    scipy.sparse.csc_matrix"""
+    count_of_injections = len(injections)
+    return coo_matrix(
+        ([1] * count_of_injections, 
+         (injections.index_of_node, injections.index)),
+        shape=(count_of_nodes, count_of_injections),
+        dtype=np.int8).tocsc()
+
 _EMPTY_DICT = {}
 
 def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
@@ -713,6 +747,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         count_of_slacks = pfc_slack_count,
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
+        mnodeinj=get_node_inj_matrix(node_count, injections),
         errormessages=dataframes.get('errormessages', _ERRORMESSAGES))
 
 def get_pfc_nodes(nodes):
