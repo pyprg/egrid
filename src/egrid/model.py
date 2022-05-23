@@ -71,12 +71,10 @@ branchterminals: pandas.DataFrame
     * .index_of_node, int, index of connected node
     * .index_of_other_node, int, index of node connected at other side
         of the branch
-    * .g_tot, float, conductance, g_mn + g_mm_half
-    * .b_tot, float, susceptande, b_mn + b_mm_half
-    * .g_mn, float, longitudinal conductance
-    * .b_mn, float, longitudinal susceptance
-    * .g_mm_half, float, transversal conductance devided by 2
-    * .b_mm_half, float, transversal susceptance devided by 2
+    * .g_lo, float, longitudinal conductance
+    * .b_lo, float, longitudinal susceptance
+    * .g_tr_half, float, transversal conductance of branch devided by 2
+    * .b_tr_half, float, transversal susceptance pf branch devided by 2
     * .side, str, 'A' | 'B', side of branch, first or second
 branchoutputs: pandas.DataFrame
     * .id_of_batch, str, unique identifier of measurement point
@@ -129,7 +127,7 @@ errormessages: pandas.DataFrame """
 _EMPTY_TUPLE = ()
 _BRANCHES = pd.DataFrame(
     _EMPTY_TUPLE,
-    columns=['id', 'id_of_node_A', 'id_of_node_B', 'y_mn', 'y_mm_half'])
+    columns=['id', 'id_of_node_A', 'id_of_node_B', 'y_lo', 'y_tr'])
 _SLACKNODES = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['id_of_node', 'V'])
@@ -187,8 +185,8 @@ def _add_bg(branches):
         * .id_of_node_B
         * .index_of_node_A
         * .index_of_node_B
-        * .y_mn
-        * .y_mm_half
+        * .y_lo
+        * .y_tr
 
     Returns
     -------
@@ -199,29 +197,24 @@ def _add_bg(branches):
             * .id_of_node_B
             * .index_of_node_A
             * .index_of_node_B
-            * .y_tot
-            * .g_tot
-            * .b_tot
-            * .g_mn
-            * .b_mn"""
+            * .g_lo
+            * .b_lo"""
     _branches = branches.copy()
-    y_tot = branches.y_mn + branches.y_mm_half
-    _branches['y_tot'] = y_tot # added for complex calculation
-    _branches['g_mm_half'] = np.real(branches.y_mm_half)
-    _branches['b_mm_half'] = np.imag(branches.y_mm_half)
-    _branches['g_tot'] = np.real(y_tot)
-    _branches['b_tot'] = np.imag(y_tot)
-    _branches['g_mn'] = np.real(branches.y_mn)
-    _branches['b_mn'] = np.imag(branches.y_mn)
+    y_tr_half = branches.y_tr / 2
+    _branches['y_tr_half'] = y_tr_half
+    _branches['g_tr_half'] = np.real(y_tr_half)
+    _branches['b_tr_half'] = np.imag(y_tr_half)
+    _branches['g_lo'] = np.real(branches.y_lo)
+    _branches['b_lo'] = np.imag(branches.y_lo)
     return _branches.reindex(
         ['id',
          # added for complex calculation
-         'y_mm_half', 'y_mn', 'y_tot',
+         'y_tr', 'y_tr_half', 'y_lo',
          # end of complex values
          'index_of_node_A', 'index_of_node_B',
          'index_of_term_A', 'index_of_term_B',
          'switch_flow_idx_A', 'switch_flow_idx_B',
-         'g_tot', 'b_tot', 'g_mn', 'b_mn', 'g_mm_half', 'b_mm_half',
+         'g_lo', 'b_lo', 'g_tr_half', 'b_tr_half',
          'index_of_taps_A', 'index_of_taps_B',
          'is_bridge'],
         axis=1)
@@ -298,12 +291,10 @@ def _get_branch_taps_data(branchterminals, tapsframe):
         * .id_of_other_node: str
         * .index_of_node: int
         * .index_of_other_node: int
-        * .g_tot: float
-        * .b_tot: float
-        * .g_mn: float
-        * .b_mn: float
-        * .g_mm_half: float
-        * .b_mm_half: float
+        * .g_lo: float
+        * .b_lo: float
+        * .g_tr: float
+        * .b_tr: float
         * .side: str
     tapsframe: pandas.DataFrame
         * .id_of_node: str
@@ -356,10 +347,10 @@ def _get_branch_taps_data(branchterminals, tapsframe):
             on='id_of_branch'))
     return pd.concat([branchtaps_a, branchtaps_b])
 
-_Y_MN_ABS_MAX = 1e5
+_Y_LO_ABS_MAX = 1e5
 
-def _is_short_circuit(y_mn):
-    return _Y_MN_ABS_MAX < y_mn.abs
+def _is_short_circuit(y_lo):
+    return _Y_LO_ABS_MAX < y_lo.abs
 
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
@@ -559,7 +550,7 @@ def get_node_inj_matrix(count_of_nodes, injections):
 
 _EMPTY_DICT = {}
 
-def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
+def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     """Creates a network model for power flow calculation.
 
     Parameters
@@ -570,8 +561,8 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
             * .id, str, ID of branch
             * .id_of_node_A, str, ID of node at terminal A
             * .id_of_node_B, str, ID of node at terminal B
-            * .y_mn, complex, longitudinal admittance, pu
-            * .y_mm_half, complex, half of transversal admittance, pu
+            * .y_lo, complex, longitudinal admittance, pu
+            * .y_tr, complex, transversal admittance, pu
         * 'Slacknode':
             pandas.DataFrame
             * .id_of_node, str, ID of slack node
@@ -644,10 +635,10 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
             * .branchid, str, ID of branch
             * .part, 'g'|'b', conductance/susceptance
             * .id, str, ID of branch
-    y_mn_abs_max: float (default value _Y_MN_ABS_MAX)
+    y_lo_abs_max: float (default value _Y_LO_ABS_MAX)
         * maximum value of branch longitudinal admittance,
           if the absolute value of the branch admittance is greater
-          than y_mn_abs_max it is classified being a bridge
+          than y_lo_abs_max it is classified being a bridge
           (connection without impedance)
 
     Returns
@@ -674,7 +665,7 @@ def model_from_frames(dataframes=None, y_mn_abs_max=_Y_MN_ABS_MAX):
         dataframes = _EMPTY_DICT
     slacks = dataframes.get('Slacknode', _SLACKNODES)
     branches_ = dataframes.get('Branch', _BRANCHES)
-    branches_['is_bridge'] = y_mn_abs_max < branches_.y_mn.abs()
+    branches_['is_bridge'] = y_lo_abs_max < branches_.y_lo.abs()
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
         slacks.id_of_node, branches_)
     if pfc_nodes.empty:

@@ -161,20 +161,20 @@ class Make_objects(unittest.TestCase):
             'mybranch', 
             "id of branch shall be 'mybranch'")
         self.assertEqual(
-            branch.y_mn, 
-            Branch._field_defaults['y_mn'], 
-            "y_mn of branch shall have default value")
+            branch.y_lo, 
+            Branch._field_defaults['y_lo'], 
+            "y_lo of branch shall have default value")
         self.assertEqual(
-            branch.y_mm_half, 
-            Branch._field_defaults['y_mm_half'], 
-            "y_mm_half of branch shall have default value")
+            branch.y_tr, 
+            Branch._field_defaults['y_tr'], 
+            "y_tr of branch shall have default value")
         
     def test_make_edge_objects_branch2(self):
         res = [*make_objects(
             ('node', 
              'mybranch', 
              ('n0', 'n1'), 
-             {'y_mn':'1+2j', 'y_mm_half': '3+7j'}))]
+             {'y_lo':'1+2j', 'y_tr': '3+7j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         branch = res[0]
@@ -183,13 +183,13 @@ class Make_objects(unittest.TestCase):
             'mybranch', 
             "id of branch shall be 'mybranch'")
         self.assertEqual(
-            branch.y_mn, 
+            branch.y_lo, 
             1+2j, 
-            "value of y_mn shall be 1+2j")
+            "value of y_lo shall be 1+2j")
         self.assertEqual(
-            branch.y_mm_half, 
+            branch.y_tr, 
             3+7j, 
-            "value of y_mm_half shall be 3+7j")
+            "value of y_tr shall be 3+7j")
         
     def test_make_edge_objects_injection(self):
         res = [*make_objects(

@@ -30,7 +30,7 @@ import re
 
 Branch = namedtuple(
     'Branch',
-    'id id_of_node_A id_of_node_B y_mn y_mm_half',
+    'id id_of_node_A id_of_node_B y_lo y_tr',
     defaults=(complex(np.inf, np.inf), 0.0j))
 Branch.__doc__ == """Model of an electrical device having two terminals
 e.g. transformers, windings of multi-winding transformers, lines, 
@@ -44,10 +44,10 @@ id_of_node_A: str
     id of node at side A
 id_of_node_B: str
     id of node at side B
-y_mn: complex (default value is complex(numpy.inf, numpy.inf))
+y_lo: complex (default value is complex(numpy.inf, numpy.inf))
     longitudinal admittance
-y_mm_half: complex (default value 0j)
-    transversal admittance devided by 2"""
+y_tr: complex (default value 0j)
+    transversal admittance"""
 
 Slacknode = namedtuple(
     'Slacknode',
@@ -376,7 +376,7 @@ objiid: str
     identifier of injection/branch
 part: 'p'|'q'|'g'|'b'|str
     identifies the attribute of the injection/branch to multipy with factor
-    ('p'/'q'- injected active/reactive power, 'g'/'b'- g_mn/b_mn of branch)
+    ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
 id: str
     identifier of object to connect
 cls: KInjlink|KBranchlink (default value KInjlink)
@@ -469,15 +469,15 @@ def _create_branch(e_id, neighbours, attributes):
     -------
     proto.gridmodel.Branch"""
     try:
-        y_mn = (
-            complex(e3(attributes['y_mn'])) 
-            if 'y_mn' in attributes else _COMPLEX_INF)
+        y_lo = (
+            complex(e3(attributes['y_lo'])) 
+            if 'y_lo' in attributes else _COMPLEX_INF)
         return Branch(
             id=e_id,
             id_of_node_A=neighbours[0],
             id_of_node_B=neighbours[1],
-            y_mn=y_mn,
-            y_mm_half=complex(e3(attributes.get('y_mm_half', '0.0j'))))
+            y_lo=y_lo,
+            y_tr=complex(e3(attributes.get('y_tr', '0.0j'))))
     except KeyError as e:
         return (
             f"Error in data of branch '{e_id}', "
@@ -489,7 +489,7 @@ def _create_branch(e_id, neighbours, attributes):
         return (
             f"Error in data of branch '{e_id}', "
              "for a branch two neighbour nodes are required, "
-             "'y_mn' and 'y_mm_half' must be complex values , "
+             "'y_lo' and 'y_tr' must be complex values , "
             f"following neighbours are provided: {str(neighbours)} - "
             f"following attributes are provided: {str(attributes)} "
             f"(error: {str(e)})")
@@ -705,8 +705,8 @@ def make_data_frames(devices):
             * .id, str, ID of branch
             * .id_of_node_A, str, ID of node at terminal A
             * .id_of_node_B, str, ID of node at terminal B
-            * .y_mn, complex, longitudinal admittance, pu
-            * .y_mm_half, complex, half of transversal admittance, pu
+            * .y_lo, complex, longitudinal admittance, pu
+            * .y_tr, complex, half of transversal admittance, pu
         * 'Slacknode':
             pandas.DataFrame
             * .id_of_node, str, ID of slack node

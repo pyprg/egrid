@@ -74,15 +74,12 @@ branchterminals: pandas.DataFrame
     * .index_of_node, int, index of connected node
     * .index_of_other_node, int, index of node connected at other side 
         of the branch
-    * .y_mn, complex, longitudinal branch admittance
-    * .y_mm_half, complex, half of transversal branch admittance
-    * .y_tot, complex, y_mn + y_mm_half
-    * .g_tot, float, conductance, g_mn + g_mm_half
-    * .b_tot, float, susceptande, b_mn + b_mm_half
-    * .g_mn, float, longitudinal conductance
-    * .b_mn, float, longitudinal susceptance
-    * .g_mm_half, float, transversal conductance of branch devided by 2
-    * .b_mm_half, float, transversal susceptance of branch devided by 2
+    * .y_lo, complex, longitudinal branch admittance
+    * .y_tr_half, complex, half of transversal branch admittance
+    * .g_lo, float, longitudinal conductance
+    * .b_lo, float, longitudinal susceptance
+    * .g_tr_half, float, transversal conductance of branch devided by 2
+    * .b_tr_half, float, transversal susceptance of branch devided by 2
     * .side, str, 'A' | 'B', side of branch, first or second
     
 branchoutputs: pandas.DataFrame
@@ -206,8 +203,8 @@ example = [
         id='line_0',
         id_of_node_A='n_0', 
         id_of_node_B='n_1',
-        y_mn=1e3-1e3j,
-        y_mm_half=1e-6+1e-6j),
+        y_lo=1e3-1e3j,
+        y_tr_half=1e-6+1e-6j),
     Branchtaps(
         id='taps_0',
         id_of_node='n_0', 
@@ -221,8 +218,8 @@ example = [
         id='line_1',
         id_of_node_A='n_1', 
         id_of_node_B='n_2',
-        y_mn=1e3-1e3j,
-        y_mm_half=1e-6+1e-6j),
+        y_lo=1e3-1e3j,
+        y_tr_half=1e-6+1e-6j),
     Output(
         id_of_batch='pq_consumer_0', 
         id_of_device='consumer_0'),
@@ -243,15 +240,15 @@ example = [
 Valid input to **make_model** is a multiline pseudo graphic string e.g. 
 this one:
 ```
-               y_mm_half=1e-6+1e-6j            y_mm_half=1e-6+1e-6j
-slack=True     y_mn=1e3-1e3j                   y_mn=1e3-1e3j
+               y_tr_half=1e-6+1e-6j            y_tr_half=1e-6+1e-6j
+slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |                               |
                                 n1->> load0_1_        _load1 <<-n2->> load1_1_
                                 |      P10=30.0         P10=20.7       P10=4.3
                                 |      Q10=5            Q10=5.7        Q10=2
                                 |
-                                |              y_mn=1e3-1e3j       
+                                |              y_lo=1e3-1e3j       
                                 |              y_mm_half=1e-6+1e-6j
                                 n1(---------- line_2 ----------)n3
                                                                 |
