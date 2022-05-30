@@ -30,6 +30,8 @@ from collections import namedtuple
 from functools import partial
 from itertools import chain
 
+_Y_LO_ABS_MAX = 1e5
+
 Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
@@ -347,10 +349,8 @@ def _get_branch_taps_data(branchterminals, tapsframe):
             on='id_of_branch'))
     return pd.concat([branchtaps_a, branchtaps_b])
 
-_Y_LO_ABS_MAX = 1e5
-
-def _is_short_circuit(y_lo):
-    return _Y_LO_ABS_MAX < y_lo.abs
+# def _is_short_circuit(y_lo):
+#     return _Y_LO_ABS_MAX < y_lo.abs
 
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
@@ -588,12 +588,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * 'QValue':
             pandas.DataFrame
             * .id_of_batch, str
-            * .Q, float, value of reactive power, pu
-            * .direction, float, -1.0 / 1.0 (out of device / into device)
-        * 'PQValue':
-            pandas.DataFrame
-            * .id_of_batch, str
-            * .P, float, value of active power, pu
             * .Q, float, value of reactive power, pu
             * .direction, float, -1.0 / 1.0 (out of device / into device)
         * 'IValue':

@@ -667,8 +667,8 @@ def make_objects(data):
 
     Returns
     -------
-    Branch | Slacknode | Injection | Output | PQValue | IValue | Vvalue |
-    None"""
+    Branch | Slacknode | Injection | Output | PValue | QValue | IValue | 
+    Vvalue | None"""
     return _FACTORY_FNS.get(data[0], _FACTORY_NONE)(data)
 
 def make_model_objects(entities):
@@ -682,19 +682,19 @@ def make_model_objects(entities):
     Returns
     -------
     iterator
-        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue"""
+        Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue"""
     return filter(
         lambda x:x, (chain.from_iterable(make_objects(e) for e in entities)))
 
 def make_data_frames(devices):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
-    of devices (Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
-    Branchtaps, Defk, Link)
+    of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue, 
+    Vvalue, Branchtaps, Defk, Link)
 
     Parameters
     ----------
     devices: iterable
-        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
+        Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Branchtaps, Defk, Link
 
     Returns
@@ -724,10 +724,14 @@ def make_data_frames(devices):
             * .id_of_batch, str
             * .id_of_device, str
             * .id_of_node, str
-        * 'PQValue':
+        * 'PValue':
             pandas.DataFrame
             * .id_of_batch, str
             * .P, float, value of active power, pu
+            * .direction, float, -1.0 / 1.0 (out of device / into device)
+        * 'QValue':
+            pandas.DataFrame
+            * .id_of_batch, str
             * .Q, float, value of reactive power, pu
             * .direction, float, -1.0 / 1.0 (out of device / into device)
         * 'IValue':
