@@ -207,16 +207,16 @@ DEFAULT_FACTOR_ID = '_default_'
 
 Loadfactor = namedtuple(
     'Loadfactor',
-    'step id type id_of_source value min max',
-    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf))
+    'id step type id_of_source value min max',
+    defaults=(0, 'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf))
 Loadfactor.__doc__ = """Data of a load scaling factor.
 
 Parameters
 ----------
-step: int
-    index optimization step
 id_: str
     unique idendifier of factor
+step: int
+    index optimization step
 type: 'var'|'const' (default value 'var')
     decision variable or parameter
 id_of_source: str (default value DEFAULT_FACTOR_ID)
@@ -229,16 +229,16 @@ min: float (default value numpy.inf)
 max: float, (default value numpy.inf)
     greatest possible value"""
 
-def defk(step, id_, type_='var', id_of_source=None, value=1.0,
+def defk(id_, step, type_='var', id_of_source=None, value=1.0,
           min_=-np.inf, max_=np.inf):
     """Creates a factor definition for each step.
 
     Parameters
     ----------
-    step: iterable
-        int
     id_: str
         unique identifier
+    step: iterable
+        int
     type_: 'var'|'const' (default value 'var')
         type of factor decision variable/constant value
     value: float (default value 1)
@@ -265,16 +265,16 @@ def defk(step, id_, type_='var', id_of_source=None, value=1.0,
 
 Defk = namedtuple(
     'Defk',
-    'step id type id_of_source value min max',
-    defaults=('var', None, 1.0, -np.inf, np.inf))
+    'id step type id_of_source value min max',
+    defaults=(0, 'var', None, 1.0, -np.inf, np.inf))
 Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
 ----------
-step: int
-    index of optimization step
 id: str
     identifier of scaling factor, unique among factors with same step
+step: int
+    index of optimization step
 type: 'var'|'const' (default value 'var')
     'var' - factor is a decision variable
     'const' - factor is a parameter
@@ -311,35 +311,35 @@ def _expand_defk(defk_):
             defk_.value, defk_.min, defk_.max)
         for id_, step_ in product(ids, iter_steps))
 
-KBranchlink = namedtuple('KBranchlink', 'step branchid part id')
+KBranchlink = namedtuple('KBranchlink', 'branchid step part id')
 KBranchlink.__doc__ = """Links branch with scaling factor.
 
 Parameters
 ----------
-step: int
-    optimization step
 branchid: str
     ID of branch
+step: int
+    optimization step
 part: 'g'|'b'
     marker for conductance or susceptance
 id: str
     unique identifier (for one step) of linked factor"""
 
-KInjlink = namedtuple('KInjlink', 'step injid part id')
+KInjlink = namedtuple('KInjlink', 'injid step part id')
 KInjlink.__doc__ = """Links injection with scaling factor.
 
 Parameters
 ----------
-step: int
-    optimization step
 injid: str
     ID of injection
+step: int
+    optimization step
 part: 'p'|'q'
     marker for active or reactive power to be scaled
 id: str
     unique identifier (for one step) of linked factor"""
 
-def _link(steps, objid, part, id_, cls):
+def _link(steps, objid, part, id_, cls_):
     """Creates an instance of class cls.
 
     Parameters
@@ -352,7 +352,7 @@ def _link(steps, objid, part, id_, cls):
         active power or reactive power
     id_: str, or list<str>, or tuple<str>
         id of linked factor
-    cls: KInjlink
+    cls_: KInjlink
         class of link"""
     try:
         iter_steps = iter(steps)
@@ -360,20 +360,20 @@ def _link(steps, objid, part, id_, cls):
         iter_steps = iter([steps])
     objids = objid if isinstance(objid, (list, tuple)) else [objid]
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
-    return [cls(step_, objid_, t[0], t[1])
+    return [cls_(objid_, step_, t[0], t[1])
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
-Link = namedtuple('Link', 'step objid part id cls', defaults=(KInjlink,))
+Link = namedtuple('Link', 'objid step part id cls', defaults=(KInjlink,))
 Link.__doc__ = """Logical connection between injection/branch and a scaling
 factor.
 
 Parameters
 ----------
-step: int
-    addresses the optimization step, first optimization step has index 0
 objiid: str
     identifier of injection/branch
+step: int
+    addresses the optimization step, first optimization step has index 0
 part: 'p'|'q'|'g'|'b'|str
     identifies the attribute of the injection/branch to multipy with factor
     ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
