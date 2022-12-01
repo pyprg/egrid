@@ -116,9 +116,9 @@ shape_of_Y: tuple (int, int)
     shape of admittance matrix for power flow calculation
 count_of_slacks: int
     number of slack-nodes for power flow calculation
-load_scaling_factors
+load_scaling_factors: pandas.DataFrame
 
-injection_factor_associations 
+injection_factor_associations: pandas.DataFrame
 
 mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector 
@@ -169,8 +169,22 @@ _ERRORMESSAGES = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['errormessage'])
 
-def _join_index_of_node(nodes, dataframe):
-    return dataframe.join(nodes, on='id_of_node')
+def _join_on(to_join, on_field, dataframe):
+    """Joins dataframe with to_join on on_field. Returns a new pandas.DataFrame.
+    
+    Parameters
+    ----------
+    to_join: pandas.DataFrame
+        * ...
+    on_field: str
+        name of field to join on
+    dataframe: pandas.DataFrame
+        * .'on_field'
+    
+    Result
+    ------
+    pandas.DataFrame"""
+    return dataframe.join(to_join, on=on_field)
 
 def _join_index_of_node_inner(nodes, dataframe):
     return dataframe.join(nodes, on='id_of_node', how='inner')
@@ -213,6 +227,7 @@ def _add_bg(branches):
          # added for complex calculation
          'y_tr', 'y_tr_half', 'y_lo',
          # end of complex values
+         'id_of_node_A', 'id_of_node_B',
          'index_of_node_A', 'index_of_node_B',
          'index_of_term_A', 'index_of_term_B',
          'switch_flow_idx_A', 'switch_flow_idx_B',
@@ -370,7 +385,12 @@ def _prepare_branch_taps(add_idx_of_node, dataframes):
     branchtaps = branchtaps_[valid].reset_index(drop=True)
     branchtaps.reset_index(inplace=True)
     branchtaps.rename(columns={'index':'index_of_taps'}, inplace=True)
-    return branchtaps
+    branchindex = (
+        branch['id']
+        .reset_index()
+        .rename(columns={'index':'index_of_branch'})
+        .set_index('id'))
+    return branchtaps.join(branchindex, on='id_of_branch')
 
 def _prepare_branches(branchtaps, dataframes, nodes):
     branchtaps_view = (
@@ -525,7 +545,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         .set_index('node_id'))
 
 def get_node_inj_matrix(count_of_nodes, injections):
-    """Creates a sparse matrix which converting a vector which is ordered
+    """Creates a sparse matrix converting a vector which is ordered
     according to injections to a vector ordered according to power flow 
     calculation nodes (adding entries of injections for each node) by
     calculating 'M @ vector'. Transposed M is usable for mapping e.g.
@@ -608,6 +628,11 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             * .positionneutral, int, tap with ratio 1:1
             * .positionmax, int, position of greates tap
             * .position, int, actual position
+            * .index_of_node
+            * ...
+            * .index_of_branch
+            * .index_of_term
+            * .index_of_other_term
         * 'Loadfactor':
             pandas.DataFrame
             * .step, int, index of estimation step
@@ -671,7 +696,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
              'switch_flow_idx':0,
              'in_super_node':in_super_node},
             index=inj.id_of_node)
-    add_idx_of_node = partial(_join_index_of_node, pfc_nodes)
+    add_idx_of_node = partial(_join_on, pfc_nodes, 'id_of_node')
     #  processing of slack nodes especially if multiple slack-nodes are
     #   placed in the same pfc-node
     slacks = _join_index_of_node_inner(pfc_nodes, slacks)
@@ -691,11 +716,18 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         head_tail(slack_groups.id_of_node.get_group(group_name)) 
         for group_name in super_slack_idxs]
     #    
-    branchtaps = _prepare_branch_taps(add_idx_of_node, dataframes)
-    branches = _prepare_branches(branchtaps, dataframes, pfc_nodes)
-    branchterminals=_get_branch_terminals(_add_bg(branches))
+    branchtaps_ = _prepare_branch_taps(add_idx_of_node, dataframes)
+    branches = _prepare_branches(branchtaps_, dataframes, pfc_nodes)
+    branchterminals = _get_branch_terminals(_add_bg(branches))
     branchterminals['at_slack'] = (
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
+    termindex = pd.DataFrame(
+        {'index_of_term': branchterminals.index,
+         'index_of_other_term': branchterminals.index_of_other_term.array},
+        index=pd.MultiIndex.from_frame(
+            branchterminals[['id_of_node', 'id_of_branch']]))
+    branchtaps = branchtaps_.join(
+        termindex, on=['id_of_node', 'id_of_branch'], how='inner')
     # injections
     injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
     if not injections['id'].is_unique:
@@ -705,8 +737,13 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     outputs = dataframes.get('Output', _OUTPUTS)
     is_branch_output = outputs.id_of_device.isin(branches.id)
     is_injection_output = ~is_branch_output
-    branchoutputs = _prepare_branch_outputs(
-        add_idx_of_node, branches, outputs[is_branch_output])
+    branchoutputs = (
+        _prepare_branch_outputs(
+            add_idx_of_node, branches, outputs[is_branch_output])
+        .join(
+            termindex['index_of_term'], 
+            on=['id_of_node', 'id_of_branch'],
+            how='inner'))
     injectionoutputs = _prepare_injection_outputs(
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])

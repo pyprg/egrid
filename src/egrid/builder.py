@@ -167,19 +167,19 @@ I: float
 
 Vvalue = namedtuple(
     'Vvalue',
-    'id_of_node V')
+    'id_of_node V', defaults=(1.,))
 Vvalue.__doc__ = """Values of (measured) electric voltage. The
 optimization (estimation) target is to meet those (and other given) values.
 
 Parameters
 ----------
-Vvalue: float
-    electric voltage
 id_of_node: str
     unique identifier of node the voltage was measured at or the
-    setpoint is for"""
+    setpoint is for
+Vvalue: float (default value 1.0)
+    electric voltage"""
 
-Branchtaps= namedtuple(
+Branchtaps = namedtuple(
     'Branchtaps',
     'id id_of_node id_of_branch Vstep '
     'positionmin positionneutral positionmax position',
@@ -207,16 +207,14 @@ DEFAULT_FACTOR_ID = '_default_'
 
 Loadfactor = namedtuple(
     'Loadfactor',
-    'id step type id_of_source value min max',
-    defaults=(0, 'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf))
+    'id type id_of_source value min max step',
+    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, 0))
 Loadfactor.__doc__ = """Data of a load scaling factor.
 
 Parameters
 ----------
 id_: str
     unique idendifier of factor
-step: int
-    index optimization step
 type: 'var'|'const' (default value 'var')
     decision variable or parameter
 id_of_source: str (default value DEFAULT_FACTOR_ID)
@@ -227,18 +225,18 @@ value: float (default vaLue 1)
 min: float (default value numpy.inf)
     smalest possible value
 max: float, (default value numpy.inf)
-    greatest possible value"""
+    greatest possible value
+step: int (default value 0)
+    index optimization step"""
 
-def defk(id_, step, type_='var', id_of_source=None, value=1.0,
-          min_=-np.inf, max_=np.inf):
+def defk(id_, type_='var', id_of_source=None, value=1.0,
+          min_=-np.inf, max_=np.inf, step=0):
     """Creates a factor definition for each step.
 
     Parameters
     ----------
     id_: str
         unique identifier
-    step: iterable
-        int
     type_: 'var'|'const' (default value 'var')
         type of factor decision variable/constant value
     value: float (default value 1)
@@ -247,6 +245,8 @@ def defk(id_, step, type_='var', id_of_source=None, value=1.0,
         smallest possible value
     max_: float (default value numpy.inf)
         greatest possible value
+    step: iterable
+        int
 
     Returns
     -------
@@ -258,23 +258,21 @@ def defk(id_, step, type_='var', id_of_source=None, value=1.0,
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
     return [
         Loadfactor(
-            step_, myid_, type_,
+            myid_, type_,
             (myid_ if id_of_source is None else id_of_source), 
-            value, min_, max_)
+            value, min_, max_, step_)
         for myid_, step_ in product(ids, iter_steps)]
 
 Defk = namedtuple(
     'Defk',
-    'id step type id_of_source value min max',
-    defaults=(0, 'var', None, 1.0, -np.inf, np.inf))
+    'id type id_of_source value min max step',
+    defaults=('var', None, 1.0, -np.inf, np.inf, 0))
 Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
 ----------
 id: str
     identifier of scaling factor, unique among factors with same step
-step: int
-    index of optimization step
 type: 'var'|'const' (default value 'var')
     'var' - factor is a decision variable
     'const' - factor is a parameter
@@ -287,7 +285,9 @@ value: float (default value 1)
 min: float (default value -numpy.inf)
     smallest value allowed
 max: float (default value numpy.inf)
-    greates value allowed"""
+    greates value allowed
+step: int (default value 0)
+    index of optimization step"""
 
 def _expand_defk(defk_):
     """Creates factor definitions for each step and id.
@@ -306,46 +306,44 @@ def _expand_defk(defk_):
     ids = defk_.id if isinstance(defk_.id, (list, tuple)) else [defk_.id]
     return (
         Loadfactor(
-            step_, id_, defk_.type,
+            id_, defk_.type,
             (id_ if defk_.id_of_source is None else defk_.id_of_source),
-            defk_.value, defk_.min, defk_.max)
+            defk_.value, defk_.min, defk_.max, step_)
         for id_, step_ in product(ids, iter_steps))
 
-KBranchlink = namedtuple('KBranchlink', 'branchid step part id')
+KBranchlink = namedtuple('KBranchlink', 'branchid part id step', defaults=(0,))
 KBranchlink.__doc__ = """Links branch with scaling factor.
 
 Parameters
 ----------
 branchid: str
     ID of branch
-step: int
-    optimization step
 part: 'g'|'b'
     marker for conductance or susceptance
 id: str
-    unique identifier (for one step) of linked factor"""
+    unique identifier (for one step) of linked factor
+step: int  (default value 0)
+    optimization step"""
 
-KInjlink = namedtuple('KInjlink', 'injid step part id')
+KInjlink = namedtuple('KInjlink', 'injid part id step', defaults=(0,))
 KInjlink.__doc__ = """Links injection with scaling factor.
 
 Parameters
 ----------
 injid: str
     ID of injection
-step: int
-    optimization step
 part: 'p'|'q'
     marker for active or reactive power to be scaled
 id: str
-    unique identifier (for one step) of linked factor"""
+    unique identifier (for one step) of linked factor
+step: int
+    optimization step"""
 
-def _link(steps, objid, part, id_, cls_):
+def _link(objid, part, id_, cls_, steps):
     """Creates an instance of class cls.
 
     Parameters
     ----------
-    steps: int, or list<int>, or tuple<int>
-        index of step
     objid: str, or list<str>, or tuple<str>
         id of object to link
     part: 'p'|'q'
@@ -353,18 +351,20 @@ def _link(steps, objid, part, id_, cls_):
     id_: str, or list<str>, or tuple<str>
         id of linked factor
     cls_: KInjlink
-        class of link"""
+        class of link
+    steps: int, or list<int>, or tuple<int>
+        index of step"""
     try:
         iter_steps = iter(steps)
     except TypeError:
         iter_steps = iter([steps])
     objids = objid if isinstance(objid, (list, tuple)) else [objid]
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
-    return [cls_(objid_, step_, t[0], t[1])
+    return [cls_(objid_, t[0], t[1], step_, )
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
-Link = namedtuple('Link', 'objid step part id cls', defaults=(KInjlink,))
+Link = namedtuple('Link', 'objid part id cls step', defaults=(KInjlink, 0))
 Link.__doc__ = """Logical connection between injection/branch and a scaling
 factor.
 
@@ -372,16 +372,16 @@ Parameters
 ----------
 objiid: str
     identifier of injection/branch
-step: int
-    addresses the optimization step, first optimization step has index 0
 part: 'p'|'q'|'g'|'b'|str
     identifies the attribute of the injection/branch to multipy with factor
     ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
 id: str
-    identifier of object to connect
+    identifier of scaling factor to connect
 cls: KInjlink|KBranchlink (default value KInjlink)
     KInjlink - links a injection
-    KBranchlink - links a branch"""
+    KBranchlink - links a branch
+step: int (default value 0)
+    addresses the optimization step, first optimization step has index 0"""
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
@@ -430,7 +430,7 @@ SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
 def _create_slack(e_id, attributes):
-    """Creates a new instance of proto.gridmodel.Slacknode
+    """Creates a new instance of Slacknode
 
     Parameters
     ----------
@@ -440,7 +440,7 @@ def _create_slack(e_id, attributes):
 
     Returns
     -------
-    proto.gridmodel.Slacknode"""
+    Slacknode"""
     try:
         voltage = complex(attributes['V'])
         return Slacknode(id_of_node=e_id, V=voltage)
@@ -455,7 +455,7 @@ def _create_slack(e_id, attributes):
 _COMPLEX_INF = complex(np.inf, np.inf)
 
 def _create_branch(e_id, neighbours, attributes):
-    """Creates a new instance of proto.gridmodel.Branch
+    """Creates a new instance of Branch
 
     Parameters
     ----------
@@ -467,7 +467,7 @@ def _create_branch(e_id, neighbours, attributes):
 
     Returns
     -------
-    proto.gridmodel.Branch"""
+    Branch"""
     try:
         y_lo = (
             complex(e3(attributes['y_lo'])) 
@@ -495,7 +495,7 @@ def _create_branch(e_id, neighbours, attributes):
             f"(error: {str(e)})")
 
 def _create_injection(e_id, neighbours, attributes):
-    """Creates a new instance of proto.gridmodel.Injection. Returns an
+    """Creates a new instance of Injection. Returns an
     error message if instance cannot be created.
 
     Parameters
@@ -508,7 +508,7 @@ def _create_injection(e_id, neighbours, attributes):
 
     Returns
     -------
-    proto.gridmodel.Injection|str"""
+    Injection|str"""
     # id id_of_node P10 Q10 Exp_v_p Exp_v_q
     if len(neighbours) != 1:
         return (
@@ -754,25 +754,25 @@ def make_data_frames(devices):
             * .position, int, actual position
         * 'Loadfactor':
             pandas.DataFrame
-            * .step, int, index of estimation step
             * .id, str, ID of load factor
             * .type, 'var'|'const', decision variable / constant
             * .id_of_source, str, ID of ini load factor of previous step
             * .value, float, value if no valid initial load factor
             * .min, float, lower limit
             * .max, float, upper limit
+            * .step, int, index of estimation step
         * 'KInjlink':
             pandas.DataFrame
-            * .step, int, index of estimation step
             * .injid, str, ID of injection
             * .part, 'p'|'q', active/reactive power
             * .id, str, ID of (Load)factor
+            * .step, int, index of estimation step
         * 'KBranchlink':
             pandas.DataFrame
-            * .step, int, index of estimation step
             * .branchid, str, ID of branch
             * .part, 'g'|'b', conductance/susceptance
             * .id, str, ID of branch
+            * .step, int, index of estimation step
         * 'errormessages':
             pandas.DataFrame
             * .step, int, index of estimation step
@@ -832,12 +832,12 @@ def create_objects(args):
     Parameters
     ----------
     args: iterable
-        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
+        Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Branchtaps, Defk, Link, str and iterables thereof;
         strings in args are processed with graphparser.parse
 
     Returns
     -------
     iterator
-        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue"""
+        Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue"""
     return _flatten(map(_create_objects, _flatten(args)))    
