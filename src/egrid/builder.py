@@ -152,11 +152,10 @@ IValue = namedtuple(
 IValue.__doc__ = """Values of (measured) electric current. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
-corresponding Branchoutput or Injectionoutput instance having the
-identical 'id_of_batch' value must exist. Placement of multiple measurements
-in switch fields combined with several branches or injections are modeled
-by IValue and Branchoutput/Injectionoutput instances sharing
-the same 'id_of_batch'-value.
+corresponding Output instance having the identical 'id_of_batch' value 
+must exist. Placement of multiple measurements in switch fields combined with 
+several branches or injections are modeled by IValue and Output instances 
+sharing the same 'id_of_batch'-value.
 
 Parameters
 ----------
@@ -285,7 +284,7 @@ value: float (default value 1)
 min: float (default value -numpy.inf)
     smallest value allowed
 max: float (default value numpy.inf)
-    greates value allowed
+    greatest value allowed
 step: int (default value 0)
     index of optimization step"""
 
@@ -596,7 +595,7 @@ def _make_edge_objects(data):
 
     Yields
     ------
-    PValue | QValue | PQValue | IValue | Output | str"""
+    PValue | QValue | IValue | Output | str"""
     _, neighbours, attributes = data
     if len(neighbours) != 2:
         yield f"edge {neighbours} shall have two nodes"
