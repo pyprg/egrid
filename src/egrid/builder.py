@@ -102,12 +102,12 @@ id_of_batch: str
 id_of_device: str
     id referencing a branch or an injection
 id_of_node: str (default value None)
-    id of the connected node, 'None' if injection"""
+    id of the connected node, 'None' if at injection"""
 
 PValue = namedtuple(
     'PValue',
     'id_of_batch P direction',
-    defaults=(1.,))
+    defaults=(0., 1.))
 PValue.__doc__ = """Values of (measured) active power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
@@ -128,7 +128,7 @@ direction: float (default value 1)
 QValue = namedtuple(
     'QValue',
     'id_of_batch Q direction',
-    defaults=(1.,))
+    defaults=(0., 1.))
 QValue.__doc__ = """Values of (measured) reactive power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
@@ -148,7 +148,7 @@ direction: float (default value 1)
 
 IValue = namedtuple(
     'IValue',
-    'id_of_batch I')
+    'id_of_batch I', defaults=(0.0,))
 IValue.__doc__ = """Values of (measured) electric current. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
