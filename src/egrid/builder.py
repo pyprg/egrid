@@ -345,10 +345,11 @@ def _link(objid, part, id_, cls_, steps):
     ----------
     objid: str, or list<str>, or tuple<str>
         id of object to link
-    part: 'p'|'q'
+    part: 'p'|'q'|'pq'
         active power or reactive power
     id_: str, or list<str>, or tuple<str>
-        id of linked factor
+        id of linked factor, accepts number of parts ids 
+        (one for 'p' or 'q', two for 'pq')
     cls_: KInjlink
         class of link
     steps: int, or list<int>, or tuple<int>
@@ -774,10 +775,7 @@ def make_data_frames(devices):
             * .step, int, index of estimation step
         * 'errormessages':
             pandas.DataFrame
-            * .step, int, index of estimation step
-            * .branchid, str, ID of branch
-            * .part, 'g'|'b', conductance/susceptance
-            * .id, str, ID of branch"""
+            * .errormessage"""
     # collect objects per type
     _slack_and_devs = {src_type.__name__: [] for src_type in _ARG_TYPES}
     for dev in devices:
@@ -793,18 +791,20 @@ def make_data_frames(devices):
     dataframes[Loadfactor.__name__] = _factor_frame
     _injlink_frame = pd.DataFrame(
         chain.from_iterable(
+            # convert Link into KInjlink 
             _link(*args) for args in _slack_and_devs[Link.__name__]
             if args.cls == KInjlink),
         columns=KInjlink._fields)
     dataframes[KInjlink.__name__] = _injlink_frame
     _branchlink_frame = pd.DataFrame(
         chain.from_iterable(
+            # convert Link into KBranchlink 
             _link(*args) for args in _slack_and_devs[Link.__name__]
             if args.cls == KBranchlink),
         columns=KBranchlink._fields)
     dataframes[KBranchlink.__name__] = _branchlink_frame
     dataframes['errormessages'] = pd.DataFrame(
-        {'errormessages': _slack_and_devs[str.__name__]})
+        {'errormessage': _slack_and_devs[str.__name__]})
     return dataframes
 
 def _flatten(args):

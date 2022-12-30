@@ -56,12 +56,6 @@ injections: pandas.DataFrame
     * .Q10, float, reactive power at voltage magnitude 1.0 pu
     * .Exp_v_p, float, voltage dependency exponent of active power
     * .Exp_v_q, float, voltage dependency exponent of reactive power
-    * .scalingp, None | str
-    * .scalingq, None | str
-    * .kp_min, float, minimum of active power scaling factor
-    * .kp_max, float, maximum of active power scaling factor
-    * .kq_min, float, minimum of reactive power scaling factor
-    * .kq_max, float, maximum of reactive power scaling factor
     * .index_of_node, int, index of connected node
     
 branchterminals: pandas.DataFrame
@@ -108,13 +102,6 @@ qvalues: pandas.DataFrame
     * .Q, float, reactive power
     * .direction, float, -1: from device into node, 1: from node into device
     
-pqvalues: pandas.DataFrame
-
-    * .id_of_batch, unique identifier of measurement batch
-    * .P, float, active power
-    * .Q, float, reactive power
-    * .direction, float, -1: from device into node, 1: from node into device
-    
 ivalues: pandas.DataFrame
 
     * .id_of_batch, unique identifier of measurement batch
@@ -141,9 +128,9 @@ shape_of_Y: tuple (int, int)
 
     shape of admittance matrix for power flow calculation
     
-slack_indexer: pandas.Series, bool
+count_of_slacks: int
 
-    True if index is index of slack node, false otherwise
+    count_of_slacks
 
 load_scaling_factors: pandas.DataFrame
 
