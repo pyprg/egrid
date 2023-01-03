@@ -22,7 +22,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 from src.egrid import make_model
 from src.egrid.builder import (
-    Slacknode, Branch, make_data_frames, create_objects)
+    Slacknode, Branch, Injection, Loadfactor, Defk, Link,
+    make_data_frames, create_objects)
 from src.egrid.model import Model, model_from_frames
 
 class Make_model(unittest.TestCase):
@@ -57,9 +58,73 @@ class Make_model(unittest.TestCase):
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.errormessages), 4, 'four errors')
 
+    def test_make_minimal_model(self):
+        model = make_model(
+            Slacknode('n0'), 
+            Branch('line_0', 'n0', 'n1'), 
+            Injection('load_0', 'n1'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no errors')
+
+    def test_make_minimal_model2(self):
+        model = make_model(
+            ' slack=True                  P=10\n'
+            'n0(-----line_0------)n1-->> load_0_')
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no errors')
+
+class Model_errormessages(unittest.TestCase):
+    
+    elements = [
+        Slacknode('n0'), 
+        Branch('line_0', 'n0', 'n1'), 
+        Injection('load_0', 'n1')]
+    
+    def test_wrong_object(self):
+        model = make_model(self.elements, Loadfactor(id='k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 1, 'one error')
+    
+    def test_ignored_primitive(self):
+        model = make_model(self.elements, 27)
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no error')
+    
+    def test_defk_without_link(self):
+        model = make_model(self.elements, Defk(id='k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 1, 'one error')
+    
+    def test_defk_with_link(self):
+        model = make_model(
+            self.elements, 
+            Defk(id='k'), 
+            Link('load_0', 'p', 'k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 0, 'no error')
+    
+    def test_invalid_link(self):
+        """referenced load scaling factor is not existing"""
+        model = make_model(
+            self.elements, 
+            Link('load_0', 'p', 'k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 1, 'one error')
+    
+    def test_invalid_link2(self):
+        """referenced load is not existing"""
+        model = make_model(
+            self.elements, 
+            Defk(id='k'), 
+            Link('load', 'p', 'k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.errormessages), 1, 'one error')
+    
+
 class Model_from_frames(unittest.TestCase):
 
     def test_model_from_frames(self):
+        # line_2 is a bridge as admittance is to high
         string = """
                            y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
             slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j

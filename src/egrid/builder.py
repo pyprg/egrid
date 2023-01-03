@@ -220,13 +220,13 @@ id_of_source: str (default value DEFAULT_FACTOR_ID)
     id of scaling factor (previous optimization step) for initialization,
     default value ID of default factor
 value: float (default vaLue 1)
-    used of initialization if no source factor in previous optimization step,
+    used by initialization if no source factor in previous optimization step
 min: float (default value numpy.inf)
-    smalest possible value
+    smallest possible value
 max: float, (default value numpy.inf)
     greatest possible value
 step: int (default value 0)
-    index optimization step"""
+    index of optimization step"""
 
 def defk(id_, type_='var', id_of_source=None, value=1.0,
           min_=-np.inf, max_=np.inf, step=0):
@@ -382,6 +382,20 @@ cls: KInjlink|KBranchlink (default value KInjlink)
     KBranchlink - links a branch
 step: int (default value 0)
     addresses the optimization step, first optimization step has index 0"""
+
+Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))
+Term.__doc__ = """Data of an ojective-function-term.
+
+Parameters
+----------
+id: str
+    unique identifier of a term
+arg: str
+    reference to an argument of function fn
+fn: str
+    indentifier of function for calculating a term of the objective function
+step: int
+    index of optimization step"""
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
@@ -779,7 +793,11 @@ def make_data_frames(devices):
     # collect objects per type
     _slack_and_devs = {src_type.__name__: [] for src_type in _ARG_TYPES}
     for dev in devices:
-        _slack_and_devs[type(dev).__name__].append(dev)
+        if isinstance(dev, _ARG_TYPES):
+            _slack_and_devs[type(dev).__name__].append(dev)
+        else:
+            _slack_and_devs[str.__name__].append(
+                f'wrong type, ignored object: {str(dev)}')
     dataframes = {
         dev_type.__name__: pd.DataFrame(
             _slack_and_devs[dev_type.__name__],
@@ -808,11 +826,15 @@ def make_data_frames(devices):
     return dataframes
 
 def _flatten(args):
-    if isinstance(args, _ARG_TYPES):
+    if isinstance(args, str) or (
+            isinstance(args, tuple) and getattr(args, '_fields', None)):
         yield args
     else:
-        for arg in args:
-            yield from _flatten(arg)
+        try:
+            for arg in args:
+                yield from _flatten(arg)
+        except:
+            pass
 
 @singledispatch
 def _create_objects(arg):

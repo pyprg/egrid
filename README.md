@@ -132,9 +132,27 @@ count_of_slacks: int
 
     count_of_slacks
 
-load_scaling_factors: pandas.DataFrame
+load_scaling_factors: pandas.DataFrame (index: 'step','id')
 
-injection_factor_associations: pandas.DataFrame
+    * .type, 'var'|'const', type of factor decision variable or parameter
+    * .id_of_source, str, id of scaling factor (previous optimization step) 
+        for initialization
+    * .value, float, used by initialization if no source factor in previous 
+        optimization step
+    * .min, float
+        smallest possible value
+    * .max, float
+        greatest possible value
+
+mnodeinj: scipy.sparse.csc_matrix
+
+    converts a vector ordered according to injection indices to a vector 
+    ordered according to power flow calculation nodes (adding entries of 
+    injections for each node) by calculating 'mnodeinj @ vector'
+
+injection_factor_associations: pandas.DataFrame (index: 'step','injid','part')
+
+    * .id, str, unique identifier of scaling factor
 
 messages: pandas.DataFrame
 

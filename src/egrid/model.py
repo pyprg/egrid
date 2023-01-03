@@ -37,7 +37,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks '
-    'load_scaling_factors injection_factor_associations mnodeinj '
+    'load_scaling_factors injection_factor_associations mnodeinj terms '
     'errormessages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
@@ -124,6 +124,11 @@ mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector 
     ordered according to power flow calculation nodes (adding entries of 
     injections for each node) by calculating 'mnodeinj @ vector'
+terms: pandas.DataFrame
+    * .step, int
+    * .id, str, unique identifier
+    * .fn, str, identifier of function
+    * .arg, str, argument for function
 errormessages: pandas.DataFrame """
 
 _EMPTY_TUPLE = ()
@@ -165,6 +170,9 @@ _KINJLINKS = pd.DataFrame(
 _KBRANCHLINKS = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['step', 'branchid', 'part', 'id'])
+_TERM = pd.DataFrame(
+    _EMPTY_TUPLE,
+    columns=['step', 'id', 'fn', 'arg'])
 _ERRORMESSAGES = pd.DataFrame(
     _EMPTY_TUPLE,
     columns=['errormessage'])
@@ -568,6 +576,66 @@ def get_node_inj_matrix(count_of_nodes, injections):
         shape=(count_of_nodes, count_of_injections),
         dtype=np.int8).tocsc()
 
+def _check_factor_links(model):
+    """Finds factors having no link. Finds links with invalid reference
+    to not existing factors/loads.
+    
+    Parameters
+    ----------
+    model: Model
+    
+    Yields
+    ------
+    str"""
+    f = model.load_scaling_factors
+    a = model.injection_factor_associations.reset_index()
+    join = f.loc[:,['type']].join(
+        a.set_index(['step','id']), how='outer')
+    for step, id_ in join[join.injid.isna()].index:
+        yield f'load scaling factor \'{id_}\' (step {step}) '\
+            'is not linked to any injection'
+    for _, row in (
+        join[join.type.isna()]
+        .reset_index()[['id', 'injid', 'step']]
+        .iterrows()):
+        yield f'invalid link (not existing load scaling factor\'{row[0]}\', '\
+            f'injection \'{row[1]}\', step {row[2]})'
+    valid_inj_ref = a['injid'].isin(model.injections['id'])
+    for _, row in a[~valid_inj_ref].iterrows():
+        yield f'invalid link (load scaling factor \'{row[2]}\', '\
+            f'not exisiting injection \'{row[1]}\', step {row[0]})'
+
+def _check(model):
+    """Checks some properties of model.
+    
+    Parameters
+    ----------
+    model: Model
+    
+    Yields
+    ------
+    str"""
+    if model.shape_of_Y[0] < 1:
+        yield 'no node in grid-model'
+    if len(model.injections) < 1:
+        yield 'no injection in grid-model'
+    if len(model.slacks) < 1:
+        yield 'no slack-node in grid-model'
+    yield from _check_factor_links(model)
+    
+def _get_messages(model):
+    """Returns messages for model errors.
+
+    Parameters
+    ----------
+    model: Model
+    
+    Returns
+    -------
+    pandas.DataFrame
+        * .errormessage"""
+    return pd.DataFrame(_check(model), columns=['errormessage'])
+
 _EMPTY_DICT = {}
 
 def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
@@ -679,6 +747,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .count_of_slacks, int, number of slacks for power flow calculation
         * .load_scaling_factors
         * .injection_factor_associations
+        * .mnodeinj
+        * .terms
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
@@ -753,26 +823,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         dataframes
         .get('KInjlink', _KINJLINKS)
         .set_index(['step', 'injid', 'part']))
-    errormessages=dataframes.get('errormessages', _ERRORMESSAGES.copy())
-    if node_count < 1:
-        errormessages = pd.concat([
-            errormessages, 
-            pd.DataFrame(
-                ['no node in grid-model'], 
-                columns=['errormessage'])])
-    if len(injections) < 1:
-        errormessages = pd.concat([
-            errormessages, 
-            pd.DataFrame(
-                ['no injection in grid-model'], 
-                columns=['errormessage'])])
-    if len(pfc_slacks) < 1:
-        errormessages = pd.concat([
-            errormessages, 
-            pd.DataFrame(
-                ['no slack-node in grid-model'], 
-                columns=['errormessage'])])
-    return Model(
+    terms = (
+        dataframes
+        .get('Term', _TERM))
+    model = Model(
         nodes=pfc_nodes,
         slacks=pfc_slacks,
         injections=injections,
@@ -789,7 +843,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         mnodeinj=get_node_inj_matrix(node_count, injections),
-        errormessages=errormessages.reset_index(drop=True))
+        terms=terms,
+        errormessages=None)
+    errormessages = (
+        pd.concat(
+            [dataframes.get('errormessages', _ERRORMESSAGES.copy()), 
+             _get_messages(model)])
+        .reset_index(drop=True))
+    return model._replace(errormessages=errormessages)
 
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.
