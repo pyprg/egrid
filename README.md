@@ -156,7 +156,8 @@ injection_factor_associations: pandas.DataFrame (index: 'step','injid','part')
 
 messages: pandas.DataFrame
 
-    * .errormessage, str, message on reason of error
+    * .message, str, message on reason of error
+    * .level, int, 0 - information, 1 - warning. 2 - error
     
 ## Making a Model
 

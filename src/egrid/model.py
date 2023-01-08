@@ -29,6 +29,11 @@ from scipy.sparse import coo_matrix
 from collections import namedtuple
 from functools import partial
 from itertools import chain
+from src.egrid.input import (
+    SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS, 
+    OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
+    TERM,
+    MESSAGES)
 
 _Y_LO_ABS_MAX = 1e5
 
@@ -38,7 +43,7 @@ Model = namedtuple(
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks '
     'load_scaling_factors injection_factor_associations mnodeinj terms '
-    'errormessages')
+    'messages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
 
@@ -129,53 +134,9 @@ terms: pandas.DataFrame
     * .id, str, unique identifier
     * .fn, str, identifier of function
     * .arg, str, argument for function
-errormessages: pandas.DataFrame """
-
-_EMPTY_TUPLE = ()
-_BRANCHES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id', 'id_of_node_A', 'id_of_node_B', 'y_lo', 'y_tr'])
-_SLACKNODES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_node', 'V'])
-_INJECTIONS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id', 'id_of_node', 'P10', 'Q10', 'Exp_v_p', 'Exp_v_q'])
-_OUTPUTS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_batch', 'id_of_device', 'id_of_node'])
-_PVALUES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_batch', 'P', 'direction'])
-_QVALUES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_batch', 'Q', 'direction'])
-_IVALUES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_batch', 'I'])
-_VVALUES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['id_of_node', 'V'])
-_BRANCHTAPS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=[
-        'id', 'id_of_node', 'id_of_branch', 'Vstep', 'positionmin',
-        'positionneutral', 'positionmax', 'position'])
-_LOADFACTORS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['step', 'id', 'type', 'id_of_source', 'value', 'min', 'max'])
-_KINJLINKS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['step', 'injid', 'part', 'id'])
-_KBRANCHLINKS = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['step', 'branchid', 'part', 'id'])
-_TERM = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['step', 'id', 'fn', 'arg'])
-_ERRORMESSAGES = pd.DataFrame(
-    _EMPTY_TUPLE,
-    columns=['errormessage'])
+messages: pandas.DataFrame
+    * .message, str
+    * .level, 0 - information, 1 - warning, 2 - error"""
 
 def _join_on(to_join, on_field, dataframe):
     """Joins dataframe with to_join on on_field. Returns a new pandas.DataFrame.
@@ -372,12 +333,9 @@ def _get_branch_taps_data(branchterminals, tapsframe):
             on='id_of_branch'))
     return pd.concat([branchtaps_a, branchtaps_b])
 
-# def _is_short_circuit(y_lo):
-#     return _Y_LO_ABS_MAX < y_lo.abs
-
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
-        dataframes.get('Branch', _BRANCHES)[['id_of_node_A', 'id_of_node_B']]
+        dataframes.get('Branch', BRANCHES)[['id_of_node_A', 'id_of_node_B']]
         .to_numpy()
         .reshape(-1))
     node_id_index = pd.Index(node_ids, dtype=str)
@@ -386,9 +344,9 @@ def _prepare_nodes(dataframes):
         index=node_id_index)
 
 def _prepare_branch_taps(add_idx_of_node, dataframes):
-    branch = dataframes.get('Branch', _BRANCHES)
+    branch = dataframes.get('Branch', BRANCHES)
     branchtaps_ = add_idx_of_node(
-        dataframes.get('Branchtaps', _BRANCHTAPS))
+        dataframes.get('Branchtaps', BRANCHTAPS))
     valid = branchtaps_.id_of_branch.isin(branch[~branch.is_bridge].id)
     branchtaps = branchtaps_[valid].reset_index(drop=True)
     branchtaps.reset_index(inplace=True)
@@ -404,7 +362,7 @@ def _prepare_branches(branchtaps, dataframes, nodes):
     branchtaps_view = (
         branchtaps[['id_of_branch', 'id_of_node', 'index_of_taps']]
         .set_index(['id_of_branch', 'id_of_node']))
-    brs = dataframes.get('Branch', _BRANCHES)
+    brs = dataframes.get('Branch', BRANCHES)
     if not brs['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -481,7 +439,6 @@ def _get_pfc_nodes(slackids, branch_frame):
         edge_attr='id',
         create_using=None,
         edge_key='id')
-    # connected_components = [*nx.connected_components(bridge_graph)]
     connected_components_ = pd.Series(
         nx.connected_components(bridge_graph),
         dtype=object)
@@ -575,66 +532,6 @@ def get_node_inj_matrix(count_of_nodes, injections):
          (injections.index_of_node, injections.index)),
         shape=(count_of_nodes, count_of_injections),
         dtype=np.int8).tocsc()
-
-def _check_factor_links(model):
-    """Finds factors having no link. Finds links with invalid reference
-    to not existing factors/loads.
-    
-    Parameters
-    ----------
-    model: Model
-    
-    Yields
-    ------
-    str"""
-    f = model.load_scaling_factors
-    a = model.injection_factor_associations.reset_index()
-    join = f.loc[:,['type']].join(
-        a.set_index(['step','id']), how='outer')
-    for step, id_ in join[join.injid.isna()].index:
-        yield f'load scaling factor \'{id_}\' (step {step}) '\
-            'is not linked to any injection'
-    for _, row in (
-        join[join.type.isna()]
-        .reset_index()[['id', 'injid', 'step']]
-        .iterrows()):
-        yield f'invalid link (not existing load scaling factor\'{row[0]}\', '\
-            f'injection \'{row[1]}\', step {row[2]})'
-    valid_inj_ref = a['injid'].isin(model.injections['id'])
-    for _, row in a[~valid_inj_ref].iterrows():
-        yield f'invalid link (load scaling factor \'{row[2]}\', '\
-            f'not exisiting injection \'{row[1]}\', step {row[0]})'
-
-def _check(model):
-    """Checks some properties of model.
-    
-    Parameters
-    ----------
-    model: Model
-    
-    Yields
-    ------
-    str"""
-    if model.shape_of_Y[0] < 1:
-        yield 'no node in grid-model'
-    if len(model.injections) < 1:
-        yield 'no injection in grid-model'
-    if len(model.slacks) < 1:
-        yield 'no slack-node in grid-model'
-    yield from _check_factor_links(model)
-    
-def _get_messages(model):
-    """Returns messages for model errors.
-
-    Parameters
-    ----------
-    model: Model
-    
-    Returns
-    -------
-    pandas.DataFrame
-        * .errormessage"""
-    return pd.DataFrame(_check(model), columns=['errormessage'])
 
 _EMPTY_DICT = {}
 
@@ -752,14 +649,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
-    slacks = dataframes.get('Slacknode', _SLACKNODES)
-    branches_ = dataframes.get('Branch', _BRANCHES)
+    slacks = dataframes.get('Slacknode', SLACKNODES)
+    branches_ = dataframes.get('Branch', BRANCHES)
     branches_['is_bridge'] = y_lo_abs_max < branches_.y_lo.abs()
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
         slacks.id_of_node, branches_)
     if pfc_nodes.empty:
         # create one pfc-node for all injections
-        inj = dataframes.get('Injection', _INJECTIONS)
+        inj = dataframes.get('Injection', INJECTIONS)
         in_super_node = 2 < inj.shape[0]
         pfc_nodes = pd.DataFrame(
             {'index_of_node':0,
@@ -799,12 +696,12 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     branchtaps = branchtaps_.join(
         termindex, on=['id_of_node', 'id_of_branch'], how='inner')
     # injections
-    injections = add_idx_of_node(dataframes.get('Injection', _INJECTIONS))
+    injections = add_idx_of_node(dataframes.get('Injection', INJECTIONS))
     if not injections['id'].is_unique:
         msg = "Error: IDs of injections must be unique but are not."
         raise ValueError(msg)
     # measured terminals
-    outputs = dataframes.get('Output', _OUTPUTS)
+    outputs = dataframes.get('Output', OUTPUTS)
     is_branch_output = outputs.id_of_device.isin(branches.id)
     is_injection_output = ~is_branch_output
     branchoutputs = (
@@ -818,39 +715,33 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     load_scaling_factors=(
-        dataframes.get('Loadfactor', _LOADFACTORS).set_index(['step', 'id']))
+        dataframes.get('Loadfactor', LOADFACTORS).set_index(['step', 'id']))
     assoc = (
         dataframes
-        .get('KInjlink', _KINJLINKS)
+        .get('KInjlink', KINJLINKS)
         .set_index(['step', 'injid', 'part']))
     terms = (
         dataframes
-        .get('Term', _TERM))
-    model = Model(
+        .get('Term', TERM))
+    return Model(
         nodes=pfc_nodes,
         slacks=pfc_slacks,
         injections=injections,
         branchterminals=branchterminals,
         branchoutputs=branchoutputs,
         injectionoutputs=injectionoutputs,
-        pvalues=dataframes.get('PValue', _PVALUES),
-        qvalues=dataframes.get('QValue', _QVALUES),
-        ivalues=dataframes.get('IValue', _IVALUES),
-        vvalues=add_idx_of_node(dataframes.get('Vvalue', _VVALUES)),
+        pvalues=dataframes.get('PValue', PVALUES),
+        qvalues=dataframes.get('QValue', QVALUES),
+        ivalues=dataframes.get('IValue', IVALUES),
+        vvalues=add_idx_of_node(dataframes.get('Vvalue', VVALUES)),
         branchtaps=branchtaps,
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc,
         mnodeinj=get_node_inj_matrix(node_count, injections),
-        terms=terms,
-        errormessages=None)
-    errormessages = (
-        pd.concat(
-            [dataframes.get('errormessages', _ERRORMESSAGES.copy()), 
-             _get_messages(model)])
-        .reset_index(drop=True))
-    return model._replace(errormessages=errormessages)
+        terms=terms, # data of math terms for objective function
+        messages=dataframes.get('Message', MESSAGES.copy()))
 
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.

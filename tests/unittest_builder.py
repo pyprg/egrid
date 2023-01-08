@@ -20,9 +20,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 @author: pyprg
 """
 import unittest
-from src.egrid.builder import (
-    make_objects, Slacknode, PValue, QValue, Output, IValue,
-    Branch, Injection)
+from src.egrid.builder import make_objects, create_objects
+from src.egrid.input import (
+    Slacknode, PValue, QValue, Output, IValue, Branch, Injection, Message)
 
 _EMPTY_DICT = {}
 
@@ -33,7 +33,7 @@ class Make_objects(unittest.TestCase):
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         self.assertIsInstance(
-            res[0], str, "make_objects shall return one error message")
+            res[0], Message, "make_objects shall return one message")
     
     def test_make_objects_slacknode(self):
         res = [*make_objects(('node', 'slack', ('adj'), {}))]
@@ -84,7 +84,7 @@ class Make_objects(unittest.TestCase):
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         self.assertIsInstance(
-            res[0], str, "make_objects shall return one error message")
+            res[0], Message, "make_objects shall return one message")
     
     def test_make_edge_objects_PQ(self):
         res = [*make_objects(
@@ -172,9 +172,9 @@ class Make_objects(unittest.TestCase):
     def test_make_edge_objects_branch2(self):
         res = [*make_objects(
             ('node', 
-             'mybranch', 
-             ('n0', 'n1'), 
-             {'y_lo':'1+2j', 'y_tr': '3+7j'}))]
+              'mybranch', 
+              ('n0', 'n1'), 
+              {'y_lo':'1+2j', 'y_tr': '3+7j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         branch = res[0]
@@ -225,9 +225,9 @@ class Make_objects(unittest.TestCase):
     def test_make_edge_objects_injection2(self):
         res = [*make_objects(
             ('node', 
-             'myinjection', 
-             ('n0',), 
-             {'P10': '1', 'Q10': '2', 'Exp_v_p': '3', 'Exp_v_q': '7'}))]
+              'myinjection', 
+              ('n0',), 
+              {'P10': '1', 'Q10': '2', 'Exp_v_p': '3', 'Exp_v_q': '7'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         injection = res[0]
@@ -253,49 +253,129 @@ class Make_objects(unittest.TestCase):
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error P10 no float
         res = [*make_objects(('node', 'myid', ('n1',), {'P10':'1.+.4j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error P10 no float
         res = [*make_objects(('node', 'myid', ('n1',), {'P10':'hallo'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error P10 no float
         res = [*make_objects(('node', 'myid', ('n1',), {'P10':'True'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error Q10 no float
         res = [*make_objects(('node', 'myid', ('n1',), {'Q10':'1.+.4j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error Exp_v_p no float
         res = [*make_objects(('node', 'myid', ('n1',), {'Exp_v_p':'1.+.4j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
         # error Exp_v_q no float
         res = [*make_objects(('node', 'myid', ('n1',), {'Exp_v_q':'1.+.4j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         obj = res[0]
         self.assertIsInstance(
-            obj, str, "make_objects shall return an instance of str")
+            obj, Message, "make_objects shall return an instance of Message")
+
+class Create_objects(unittest.TestCase):
+    
+    def test_empty_string(self):
+        res = [*create_objects('')]
+        self.assertEqual(res, [], 'is empty')
+        
+    def test_empty_iterable(self):
+        self.assertEqual(
+            [*create_objects([])], 
+            [], 
+            'is empty')
+        self.assertEqual(
+            [*create_objects([(),()])], 
+            [], 
+            'is empty')
+    
+    def test_single_node(self):
+        msg, *_ = [*create_objects('n0')]
+        self.assertIsInstance(msg, Message, 'create object returns a message')
+        self.assertEqual(msg.level, 1, 'create_objects returns warning')
+        self.assertTrue(
+            msg.message.startswith('ignoring object'),
+            'create object ignores object')
+    
+    def test_none_node_string(self):
+        msg, *_ = [*create_objects('string')]
+        self.assertIsInstance(msg, Message, 'create object returns a message')
+        self.assertEqual(msg.level, 1, 'create_objects returns warning')
+        self.assertTrue(
+            msg.message.startswith('ignoring object'),
+            'create object ignores object')
+    
+    def test_two_none_node_strings(self):
+        _, msg, __ = [*create_objects('object_a object_b')]
+        self.assertIsInstance(msg, Message, 'create object returns a message')
+        self.assertEqual(
+            msg.level, 2, 'create_objects returns an error message')
+        self.assertTrue(
+            msg.message.startswith('Error'),
+            'create object issues an error message')
+    
+    def test_node_injection(self):
+        res = [*create_objects('node injection')]
+        self.assertAlmostEqual(
+            len(res), 1, 'create_objects returns one object')
+        self.assertIsInstance(
+            res[0], 
+            Injection, 
+            'create_objects returns an instance of Injection')
+    
+    def test_node_branch_node(self):
+        res = [*create_objects('node_A branch node_B')]
+        self.assertAlmostEqual(
+            len(res), 1, 'create_objects returns one object')
+        self.assertIsInstance(
+            res[0], 
+            Branch, 
+            'create_objects returns an instance of Branch')
+        branch = res[0]
+        self.assertEqual(
+            branch.id, 'branch', 'the ID of the branch is "branch"')
+        self.assertEqual(
+            branch.id_of_node_A, 'node_A', 'id_of_node_A is node_A')
+        self.assertEqual(
+            branch.id_of_node_B, 'node_B', 'id_of_node_B is node_B')
+    
+    def test_not_processed_type(self):
+        msg, *_ = [*create_objects(27)]
+        self.assertIsInstance(msg, Message, 'create_objects returns a message')
+        self.assertEqual(msg.level, 1, 'create_objects returns warning')
+        self.assertTrue(
+            msg.message.startswith('wrong type'),
+            'create_objects ignores object')
+    
+    def test_pass_branch(self):
+        branch = Branch('b', 'n0', 'n1')
+        res, *_ = [*create_objects(branch)]
+        self.assertEqual(
+            res, branch, 'create_objects returns Branch instance')
 
 if __name__ == '__main__':
     unittest.main()

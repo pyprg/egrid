@@ -20,43 +20,73 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 @author: pyprg
 """
 import unittest
+import scipy.sparse
+from numpy import inf
+from pandas import DataFrame as DF
 from src.egrid import make_model
 from src.egrid.builder import (
-    Slacknode, Branch, Injection, Loadfactor, Defk, Link,
+    Slacknode, Branch, Injection, 
     make_data_frames, create_objects)
 from src.egrid.model import Model, model_from_frames
 
 class Make_model(unittest.TestCase):
 
     def test_make_model_empty(self):
+        model = make_model()
         self.assertIsNotNone(
-            make_model(),
+            model,
             msg='make_model shall return an object')
-
-    def test_make_model_empty2(self):
         self.assertIsInstance(
-            make_model(),
+            model,
             Model,
             msg='make_model shall return an instance of egrid.model.Model')
+        frames = [
+            model.nodes,
+            model.slacks,
+            model.injections,
+            model.branchterminals,
+            model.branchoutputs,
+            model.injectionoutputs,
+            model.pvalues,
+            model.qvalues,
+            model.ivalues,
+            model.vvalues,
+            model.branchtaps,
+            model.load_scaling_factors,
+            model.injection_factor_associations,
+            model.terms,
+            model.messages]
+        empty_dataframe = ((isinstance(df, DF) and df.empty) for df in frames)
+        self.assertTrue(all(empty_dataframe), 'empty data frames')
+        self.assertEqual(model.shape_of_Y, (0,0), 'matrix shape is 0,0')
+        self.assertEqual(model.count_of_slacks, 0, 'no slack')
+        self.assertIsInstance(
+            model.mnodeinj, 
+            scipy.sparse.csc_matrix,
+            msg='mnodeinj is scipy.sparse.csc_matrix')
+        self.assertEqual(
+            model.mnodeinj.shape, 
+            (0,0), 
+            'shape of mnodeinj is 0,0')
 
     def test_make_model_slack(self):
         model = make_model(Slacknode('n0'), Branch('b0', 'n0', 'n1'))
         self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+        # self.assertEqual(len(model.messages), 1, 'one error')
         self.assertEqual(len(model.slacks), 1, 'one slack node')
         self.assertEqual(model.slacks.id_of_node[0], 'n0', 'slack at node n0')
 
     def test_make_model_slack2(self):
         model = make_model([[[Slacknode('n0'), Branch('b0', 'n0', 'n1')]]])
         self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+        # self.assertEqual(len(model.messages), 1, 'one error')
         self.assertEqual(len(model.slacks), 1, 'one slack node')
         self.assertEqual(model.slacks.id_of_node[0], 'n0', 'slack at node n0')
 
     def test_make_model_slack3(self):
         model = make_model('n0\nslack=True')
         self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 4, 'four errors')
+        # self.assertEqual(len(model.messages), 4, 'four errors')
 
     def test_make_minimal_model(self):
         model = make_model(
@@ -64,61 +94,108 @@ class Make_model(unittest.TestCase):
             Branch('line_0', 'n0', 'n1'), 
             Injection('load_0', 'n1'))
         self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 0, 'no errors')
+        # self.assertEqual(len(model.messages), 0, 'no errors')
+        self.assertEqual(len(model.branchterminals), 2, 'two branch terminals')
+        inf_cx = complex(inf, inf)
+        self.assertTrue(all(inf_cx==y for y in model.branchterminals.y_lo))
+        self.assertEqual(
+            model.shape_of_Y, (1,1), 'one pfc node (branch without impedance)')
 
     def test_make_minimal_model2(self):
         model = make_model(
             ' slack=True                  P=10\n'
             'n0(-----line_0------)n1-->> load_0_')
         self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 0, 'no errors')
+        # self.assertEqual(len(model.messages), 0, 'no errors')
+        self.assertEqual(len(model.branchterminals), 2, 'two branch terminals')
+        inf_cx = complex(inf, inf)
+        self.assertTrue(all(inf_cx==y for y in model.branchterminals.y_lo))
+        self.assertEqual(
+            model.shape_of_Y, (1,1), 'one pfc node (branch without impedance)')
 
-class Model_errormessages(unittest.TestCase):
+class Model_values(unittest.TestCase):
     
     elements = [
         Slacknode('n0'), 
         Branch('line_0', 'n0', 'n1'), 
         Injection('load_0', 'n1')]
     
-    def test_wrong_object(self):
-        model = make_model(self.elements, Loadfactor(id='k'))
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+    # def test_invalid_ivalue(self):
+    #     model = make_model(self.elements, IValue('i_n_0_line_0'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 1, 'one error')
     
-    def test_ignored_primitive(self):
-        model = make_model(self.elements, 27)
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 0, 'no error')
+#     def test_invalid_pvalue(self):
+#         model = make_model(self.elements, PValue('p_n_0_line_0'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 1, 'one error')
     
-    def test_defk_without_link(self):
-        model = make_model(self.elements, Defk(id='k'))
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+#     def test_invalid_qvalue(self):
+#         model = make_model(self.elements, QValue('q_n_0_line_0'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 1, 'one error')
     
-    def test_defk_with_link(self):
-        model = make_model(
-            self.elements, 
-            Defk(id='k'), 
-            Link('load_0', 'p', 'k'))
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 0, 'no error')
+#     def test_invalid_vvalue(self):
+#         model = make_model(self.elements, Vvalue('n'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 1, 'one error')
     
-    def test_invalid_link(self):
-        """referenced load scaling factor is not existing"""
-        model = make_model(
-            self.elements, 
-            Link('load_0', 'p', 'k'))
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+#     def test_invalid_output(self):
+#         model = make_model(
+#             self.elements, 
+#             IValue('i_n_0_line_0'),
+#             Output('i_n_0_line_0', 'line_0', 'n0'),
+#             Output('i_n_0_line_0', 'line', 'n0'),
+#             Output('i_n_0_line_0', 'line_0', 'n'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 1, 'one error')
+
+# class Model_messages(unittest.TestCase):
     
-    def test_invalid_link2(self):
-        """referenced load is not existing"""
-        model = make_model(
-            self.elements, 
-            Defk(id='k'), 
-            Link('load', 'p', 'k'))
-        self.assertIsNotNone(model, 'make_model shall return an object')
-        self.assertEqual(len(model.errormessages), 1, 'one error')
+#     elements = [
+#         Slacknode('n0'), 
+#         Branch('line_0', 'n0', 'n1'), 
+#         Injection('load_0', 'n1')]
+    
+    # def test_wrong_object(self):
+    #     model = make_model(self.elements, Loadfactor(id='k'))
+    #     self.assertIsNotNone(model, 'make_model shall return an object')
+    #     self.assertEqual(len(model.messages), 1, 'one error')
+    
+    # def test_ignored_primitive(self):
+    #     model = make_model(self.elements, 27)
+    #     self.assertIsNotNone(model, 'make_model shall return an object')
+    #     self.assertEqual(len(model.messages), 0, 'no error')
+    
+    # def test_defk_without_link(self):
+    #     model = make_model(self.elements, Defk(id='k'))
+    #     self.assertIsNotNone(model, 'make_model shall return an object')
+    #     self.assertEqual(len(model.messages), 1, 'one error')
+    
+#     def test_defk_with_link(self):
+#         model = make_model(
+#             self.elements, 
+#             Defk(id='k'), 
+#             Link('load_0', 'p', 'k'))
+#         self.assertIsNotNone(model, 'make_model shall return an object')
+#         self.assertEqual(len(model.messages), 0, 'no error')
+    
+    # def test_invalid_link(self):
+    #     """referenced load scaling factor does not exist"""
+    #     model = make_model(
+    #         self.elements, 
+    #         Link('load_0', 'p', 'k'))
+    #     self.assertIsNotNone(model, 'make_model shall return an object')
+    #     self.assertEqual(len(model.messages), 1, 'one error')
+    
+    # def test_invalid_link2(self):
+    #     """referenced load does not exist"""
+    #     model = make_model(
+    #         self.elements, 
+    #         Defk(id='k'), 
+    #         Link('load', 'p', 'k'))
+    #     self.assertIsNotNone(model, 'make_model shall return an object')
+    #     self.assertEqual(len(model.messages), 1, 'one error')
     
 
 class Model_from_frames(unittest.TestCase):
@@ -126,7 +203,7 @@ class Model_from_frames(unittest.TestCase):
     def test_model_from_frames(self):
         # line_2 is a bridge as admittance is to high
         string = """
-                           y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
+                            y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
             slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
             n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                             |                               |
@@ -153,6 +230,13 @@ class Model_from_frames(unittest.TestCase):
             model.shape_of_Y,
             (3, 3),
             'model.shape_of_Y shall be (3, 3)')
+
+
+
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()

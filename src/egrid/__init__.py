@@ -24,7 +24,7 @@ from .model import model_from_frames
 from .builder import make_data_frames, create_objects
 
 def make_model(*args):
-    """Creates an instance of gridmodel.Model.
+    """Creates an instance of egrid.Model.
 
     Parameters
     ----------
@@ -35,6 +35,6 @@ def make_model(*args):
 
     Returns
     -------
-    model.Model"""
+    egrid.Model"""
     frames = make_data_frames(create_objects(args))
     return model_from_frames(frames)
