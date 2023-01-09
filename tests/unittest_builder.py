@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 from src.egrid.builder import make_objects, create_objects
-from src.egrid.input import (
+from src.egrid._types import (
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection, Message)
 
 _EMPTY_DICT = {}

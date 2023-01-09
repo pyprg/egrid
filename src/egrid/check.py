@@ -21,28 +21,28 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
-from src.egrid.input import (
+from src.egrid._types import (
     SLACKNODES, LOADFACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
 
-def check_numbers(model_data):
+def check_numbers(frames):
     """Checks numbers of nodes, injections, and slack nodes.
     
     Parameters
     ----------
-    model_data: dict
-        * ['shape_of_Y'] tuple<int>, shape of branch admittance matrix
+    frames: dict
+        * ['shape_of_Y'], tuple<int>, shape of branch admittance matrix
         * ['Injection'], pandas.DataFrame, injection data
         * ['Slacknode'], pandas.DataFrame, slack data
     
     Yields
     ------
     str"""
-    if model_data.get('shape_of_Y', (0,0))[0] < 1:
+    if frames.get('shape_of_Y', (0,0))[0] < 1:
         yield 'no node in grid-model'
-    if len(model_data.get('Injection', [])) < 1:
+    if len(frames.get('Injection', [])) < 1:
         yield 'no injection in grid-model'
-    if len(model_data.get('Slacknode', [])) < 1:
+    if len(frames.get('Slacknode', [])) < 1:
         yield 'no slack-node in grid-model'
 
 def check_factor_links(frames):
@@ -155,3 +155,49 @@ def check_batch_links(frames):
             .iterrows()):
         yield '(Injection) Output with invalid id_of_injection reference '\
             f'(\'{row[1]}\'), id_of_batch \'{row[0]}\''
+
+def check_connections(frames):
+    """Checks device connections. Creates messages if not all
+    devices are connected not building one connected component.
+
+    Parameters
+    ----------
+    model_data: dict
+        * ['Injection'], pandas.DataFrame
+        * ['Branch'], pandas.DataFrame
+
+    Yields
+    -------
+    str"""
+    import networkx as nx
+    pass
+
+def check_frames(frames):
+    """Checks numbers of nodes, injections, and slack nodes.
+    Finds factors having no link. Finds links with invalid reference
+    to not existing factors/loads.
+    Finds I/P/Q/Vvalues having an invalid batch/node reference. 
+    Finds outputs having invalid value or device references.
+    
+    Parameters
+    ----------
+    model_data: dict
+        * ['shape_of_Y'], tuple<int>, shape of branch admittance matrix
+        * ['Slacknode'], pandas.DataFrame, slack data
+        * ['Branch'], pandas.DataFrame
+        * ['Injection'], pandas.DataFrame, injection data
+        * ['Loadfactor'], pandas.DataFrame
+        * ['KInjlink'], pandas.DataFrame
+        * ['IValue'], pandas.DataFrame
+        * ['PValue'], pandas.DataFrame
+        * ['QValue'], pandas.DataFrame
+        * ['Vvalue'], pandas.DataFrame
+        * ['Output'], pandas.DataFrame
+    
+    Yields
+    ------
+    str"""
+    yield from check_numbers(frames)
+    yield from check_factor_links(frames)
+    yield from check_batch_links(frames)
+

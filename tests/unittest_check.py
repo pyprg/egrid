@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 from pandas import DataFrame
 from src.egrid.builder import make_data_frames
-from src.egrid.input import (
+from src.egrid._types import (
     Slacknode, PValue, QValue, Output, IValue, Vvalue, 
     Branch, Injection, 
     Defk, Link)

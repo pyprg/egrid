@@ -29,10 +29,10 @@ from scipy.sparse import coo_matrix
 from collections import namedtuple
 from functools import partial
 from itertools import chain
-from src.egrid.input import (
+from src.egrid._types import (
     SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS, 
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
-    TERM,
+    TERMS,
     MESSAGES)
 
 _Y_LO_ABS_MAX = 1e5
@@ -714,15 +714,28 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     injectionoutputs = _prepare_injection_outputs(
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
-    load_scaling_factors=(
+    # factors
+    load_scaling_factors_=(
         dataframes.get('Loadfactor', LOADFACTORS).set_index(['step', 'id']))
     assoc = (
         dataframes
         .get('KInjlink', KINJLINKS)
         .set_index(['step', 'injid', 'part']))
+    # filter stepwise for intersection of links and factors
+    index_ = assoc.reset_index().groupby(['step', 'id']).any().index
+    df_ = pd.DataFrame([], index=index_)
+    load_scaling_factors = load_scaling_factors_.join(df_, how='inner')
+    is_valid_assoc = (
+        assoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(load_scaling_factors.type, how='left')
+        .notna())
+    is_valid_assoc.index = assoc.index
+    # math terms (parts) of objective function
     terms = (
         dataframes
-        .get('Term', TERM))
+        .get('Term', TERMS))
     return Model(
         nodes=pfc_nodes,
         slacks=pfc_slacks,
@@ -738,7 +751,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         load_scaling_factors=load_scaling_factors,
-        injection_factor_associations=assoc,
+        injection_factor_associations=assoc[is_valid_assoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=dataframes.get('Message', MESSAGES.copy()))
