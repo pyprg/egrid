@@ -75,11 +75,15 @@ def check_factor_links(frames):
         yield f'invalid link for injection \'{row[1]}\' in step {row[2]}, '\
             f'load scaling factor \'{row[0]}\' does not exist'
     kinjlinks_ = kinjlinks.reset_index()
+    assoc = kinjlinks_.copy().set_index(['step', 'injid', 'part'])
+    for idx, id_ in assoc[assoc.index.duplicated(keep='first')].iterrows():
+        yield f'duplicate KInjlink (step={idx[0]}, '\
+            f'injid=\'{idx[1]}\', part=\'{idx[2]}\'), id=\'{id_[0]}\''
     injections = frames.get('Injection', INJECTIONS)
     valid_inj_ref = kinjlinks_['injid'].isin(injections.id)
     for _, row in kinjlinks_[~valid_inj_ref].iterrows():
         yield f'invalid link for load scaling factor \'{row[1]}\' '\
-            f'in step step {row[0]}, injection \'{row[2]}\' does not exist'
+            f'in step {row[0]}, injection \'{row[2]}\' does not exist'
 
 def check_batch_links(frames):
     """Finds I/P/Q/Vvalues having an invalid batch/node reference. 

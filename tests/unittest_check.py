@@ -202,6 +202,43 @@ class Check_factors_links(unittest.TestCase):
             len(messages), 
             1,
             'check_factors_links yields 1 message')
+    
+    def test_check_factor_links(self):
+        """duplicate links"""
+        frames = make_data_frames(
+            _elements 
+            + [Defk('k'),
+               Link('load_0', 'p', 'k'), 
+               Link('load_0', 'p', 'k'), #duplicate
+               Link('load_0', 'p', 'kp'),#duplicate, invalid ref
+               Link('load_0', 'q', 'k')])
+        self.assertIsInstance(
+            frames, 
+            dict, 
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames.get('Injection'),
+            DataFrame,
+            'frames["Injection"] exists')
+        injections = frames['Injection']
+        self.assertEqual(
+            len(injections), 
+            1,
+            'make_data_frames returns 1 injection')
+        self.assertIsInstance(
+            frames.get('KInjlink'),
+            DataFrame,
+            'frames["KInjlink"] exists')
+        links = frames['KInjlink']
+        self.assertEqual(
+            len(links), 
+            4,
+            'make_data_frames returns 4 link')
+        messages = [*check_factor_links(frames)]
+        self.assertEqual(
+            len(messages), 
+            3,
+            'check_factors_links yields 3 messages')
 
 class Check_batch_links(unittest.TestCase):
     

@@ -717,10 +717,11 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     # factors
     load_scaling_factors_=(
         dataframes.get('Loadfactor', LOADFACTORS).set_index(['step', 'id']))
-    assoc = (
+    assoc_ = (
         dataframes
         .get('KInjlink', KINJLINKS)
         .set_index(['step', 'injid', 'part']))
+    assoc = assoc_[~assoc_.index.duplicated(keep='first')]
     # filter stepwise for intersection of links and factors
     index_ = assoc.reset_index().groupby(['step', 'id']).any().index
     df_ = pd.DataFrame([], index=index_)
