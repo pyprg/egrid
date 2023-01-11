@@ -407,9 +407,9 @@ level: int
     2 - error"""
 
 _EMPTY_TUPLE = ()
-BRANCHES = pd.DataFrame(_EMPTY_TUPLE, columns=Branch._fields)
 SLACKNODES = pd.DataFrame(_EMPTY_TUPLE, Slacknode._fields)
-INJECTIONS = pd.DataFrame(_EMPTY_TUPLE, Slacknode._fields)
+BRANCHES = pd.DataFrame(_EMPTY_TUPLE, columns=Branch._fields)
+INJECTIONS = pd.DataFrame(_EMPTY_TUPLE, Injection._fields)
 OUTPUTS = pd.DataFrame(_EMPTY_TUPLE, Output._fields)
 PVALUES = pd.DataFrame(_EMPTY_TUPLE, PValue._fields)
 QVALUES = pd.DataFrame(_EMPTY_TUPLE, QValue._fields)

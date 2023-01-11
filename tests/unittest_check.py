@@ -24,25 +24,27 @@ import unittest
 from pandas import DataFrame
 from src.egrid.builder import make_data_frames
 from src.egrid._types import (
-    Slacknode, PValue, QValue, Output, IValue, Vvalue, 
-    Branch, Injection, 
+    Slacknode, PValue, QValue, Output, IValue, Vvalue,
+    Branch, Injection,
     Defk, Link)
 from src.egrid.check import (
-    check_numbers, check_factor_links, check_batch_links)
+    check_numbers, check_factor_links, check_batch_links, check_ids,
+    get_failure,
+    check_connections_of_injections, check_connections_of_branches)
 
 _elements = [
-    Slacknode('n0'), 
-    Branch('line_0', 'n0', 'n1'), 
+    Slacknode('n0'),
+    Branch('line_0', 'n0', 'n1'),
     Injection('load_0', 'n1')]
 
 class Check_numbers(unittest.TestCase):
 
     def test_without_objects(self):
-        """3 messages for an empty model."""
+        """6 messages for an empty model."""
         frames = make_data_frames([])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames['Message'],
@@ -55,14 +57,19 @@ class Check_numbers(unittest.TestCase):
             'frames["Message"] is empty')
         messages = [*check_numbers(frames)]
         self.assertEqual(
-            len(messages), 
-            3,
+            len(messages),
+            4,
             'check_numbers yields 3 messages')
+        self.assertIsInstance(
+            get_failure(frames),
+            str,
+            'get_failure returns an error message')
 
 class Check_factors_links(unittest.TestCase):
-    
+
     def test_defk_with_link(self):
-        """Define a load factor and link it to an injection. No messages."""
+        """Define a load factor and link the load to an injection.
+        No messages."""
         frames = make_data_frames(
             _elements + [Defk(id='k'), Link('load_0', 'p', 'k')])
         self.assertIsInstance(
@@ -75,16 +82,19 @@ class Check_factors_links(unittest.TestCase):
             len(frames['Loadfactor']), 1, 'one instance of Loadfactor')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_factors_links yields no message')
+        self.assertIsNone(
+            get_failure(frames),
+            'get_failure returns None')
 
     def test_defk_without_link(self):
         """Message for unlinked load factor."""
         frames = make_data_frames([Defk('k')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames['Loadfactor'],
@@ -97,17 +107,17 @@ class Check_factors_links(unittest.TestCase):
             'frames["Loadfactor"] has one row')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_factors_links yields 1 message')
-        
+
     def test_defk_without_link2(self):
         """Message for unlinked load factor."""
         frames = make_data_frames(
             _elements + [Defk(id='k')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames['Loadfactor'],
@@ -120,17 +130,17 @@ class Check_factors_links(unittest.TestCase):
             'frames["Loadfactor"] has one row')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_factors_links yields 1 message')
-        
+
     def test_defk_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
             _elements + [Defk(id='k'), Link('invalid_id', 'p', id='k')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames['Loadfactor'],
@@ -143,18 +153,18 @@ class Check_factors_links(unittest.TestCase):
             'frames["Loadfactor"] has one row')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_factors_links yields 1 message')
-        
+
     def test_defk_with_invalid_link2(self):
         """Message for link with invalid reference to factor."""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Defk(id='k'), Link('load_0', 'p', id='invalid_factor_id')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames['Loadfactor'],
@@ -167,17 +177,17 @@ class Check_factors_links(unittest.TestCase):
             'frames["Loadfactor"] has one row')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             2,
             'check_factors_links yields 2 messages')
-    
+
     def test_link_with_invalid_factor_reference(self):
         """link with invalid reference to load scaling factor"""
         frames = make_data_frames(
             _elements + [Link('load_0', 'p', 'k')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames.get('Injection'),
@@ -185,7 +195,7 @@ class Check_factors_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -194,27 +204,27 @@ class Check_factors_links(unittest.TestCase):
             'frames["KInjlink"] exists')
         links = frames['KInjlink']
         self.assertEqual(
-            len(links), 
+            len(links),
             1,
             'make_data_frames returns 1 link')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_factors_links yields 1 message')
-    
+
     def test_check_factor_links(self):
         """duplicate links"""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Defk('k'),
-               Link('load_0', 'p', 'k'), 
-               Link('load_0', 'p', 'k'), #duplicate
-               Link('load_0', 'p', 'kp'),#duplicate, invalid ref
-               Link('load_0', 'q', 'k')])
+                Link('load_0', 'p', 'k'),
+                Link('load_0', 'p', 'k'), #duplicate
+                Link('load_0', 'p', 'kp'),#duplicate, invalid ref
+                Link('load_0', 'q', 'k')])
         self.assertIsInstance(
-            frames, 
-            dict, 
+            frames,
+            dict,
             'make_data_frames shall return an instance of dict')
         self.assertIsInstance(
             frames.get('Injection'),
@@ -222,7 +232,7 @@ class Check_factors_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -231,21 +241,21 @@ class Check_factors_links(unittest.TestCase):
             'frames["KInjlink"] exists')
         links = frames['KInjlink']
         self.assertEqual(
-            len(links), 
+            len(links),
             4,
             'make_data_frames returns 4 link')
         messages = [*check_factor_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             3,
             'check_factors_links yields 3 messages')
 
 class Check_batch_links(unittest.TestCase):
-    
+
     def test_single_injection_output(self):
         """invalid id_of_batch, output at injection"""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Output(id_of_batch='at_load_0', id_of_device='load_0')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -253,7 +263,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -262,7 +272,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             0,
             'make_data_frames returns no I-value')
         self.assertIsInstance(
@@ -271,21 +281,21 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields 1 message')
-    
+
     def test_single_branch_output(self):
         """invalid id_of_batch, Output at branch"""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Output(
-                id_of_batch='at_line_0', 
+                id_of_batch='at_line_0',
                 id_of_device='line_0',
                 id_of_node='n0')])
         self.assertIsInstance(
@@ -294,7 +304,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Branch"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -303,7 +313,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             0,
             'make_data_frames returns no I-value')
         self.assertIsInstance(
@@ -312,20 +322,20 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields 1 message')
-    
+
     def test_valid_ivalue_at_injection(self):
         """valid configuration, no messages, IValue at injection"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_load_0', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_load_0', I=7),
                 Output(id_of_batch='at_load_0', id_of_device='load_0')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -333,7 +343,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -342,7 +352,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             1,
             'make_data_frames returns 1 I-value')
         self.assertIsInstance(
@@ -351,20 +361,20 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_pvalue_at_injection(self):
         """valid configuration, no messages, PValue at injection"""
         frames = make_data_frames(
-            _elements 
-            + [PValue(id_of_batch='at_load_0', P=7), 
+            _elements
+            + [PValue(id_of_batch='at_load_0', P=7),
                 Output(id_of_batch='at_load_0', id_of_device='load_0')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -372,7 +382,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -381,7 +391,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["PValue"] exists')
         pvalues = frames['PValue']
         self.assertEqual(
-            len(pvalues), 
+            len(pvalues),
             1,
             'make_data_frames returns 1 P-value')
         self.assertIsInstance(
@@ -390,20 +400,20 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_qvalue_at_injection(self):
         """valid configuration, no messages, QValue at injection"""
         frames = make_data_frames(
-            _elements 
-            + [QValue(id_of_batch='at_load_0', Q=7), 
+            _elements
+            + [QValue(id_of_batch='at_load_0', Q=7),
                 Output(id_of_batch='at_load_0', id_of_device='load_0')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -411,7 +421,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -420,7 +430,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["QValue"] exists')
         qvalues = frames['QValue']
         self.assertEqual(
-            len(qvalues), 
+            len(qvalues),
             1,
             'make_data_frames returns 1 Q-value')
         self.assertIsInstance(
@@ -429,22 +439,22 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_ivalue_at_branch(self):
         """valid configuration, no messages, IValue at branch"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_line_0', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_line_0', I=7),
                 Output(
-                    id_of_batch='at_line_0', 
+                    id_of_batch='at_line_0',
                     id_of_device='line_0',
                     id_of_node='n0')])
         self.assertIsInstance(
@@ -453,7 +463,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -462,7 +472,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             1,
             'make_data_frames returns 1 I-value')
         self.assertIsInstance(
@@ -471,22 +481,22 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_pvalue_at_branch(self):
         """valid configuration, no messages, PValue at branch"""
         frames = make_data_frames(
-            _elements 
-            + [PValue(id_of_batch='at_line_0', P=7), 
+            _elements
+            + [PValue(id_of_batch='at_line_0', P=7),
                 Output(
-                    id_of_batch='at_line_0', 
+                    id_of_batch='at_line_0',
                     id_of_device='line_0',
                     id_of_node='n0')])
         self.assertIsInstance(
@@ -495,7 +505,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -504,7 +514,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["PValue"] exists')
         pvalues = frames['PValue']
         self.assertEqual(
-            len(pvalues), 
+            len(pvalues),
             1,
             'make_data_frames returns 1 P-value')
         self.assertIsInstance(
@@ -513,22 +523,22 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_qvalue_at_branch(self):
         """valid configuration, no messages, QValue at branch"""
         frames = make_data_frames(
-            _elements 
-            + [QValue(id_of_batch='at_line_0', Q=7), 
+            _elements
+            + [QValue(id_of_batch='at_line_0', Q=7),
                 Output(
-                    id_of_batch='at_line_0', 
+                    id_of_batch='at_line_0',
                     id_of_device='line_0',
                     id_of_node='n0')])
         self.assertIsInstance(
@@ -537,7 +547,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -546,7 +556,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["QValue"] exists')
         qvalues = frames['QValue']
         self.assertEqual(
-            len(qvalues), 
+            len(qvalues),
             1,
             'make_data_frames returns 1 Q-value')
         self.assertIsInstance(
@@ -555,19 +565,19 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_valid_vvalue_at_node(self):
         """valid configuration, no messages, Vvalue at node"""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Vvalue(id_of_node='n0', V=.99)])
         self.assertIsInstance(
             frames.get('Vvalue'),
@@ -575,21 +585,21 @@ class Check_batch_links(unittest.TestCase):
             'frames["Vvalue"] exists')
         vvalues = frames['Vvalue']
         self.assertEqual(
-            len(vvalues), 
+            len(vvalues),
             1,
             'make_data_frames returns 1 V-value')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             0,
             'check_batch_links yields no message')
-    
+
     def test_injection_output_with_invalid_injection_reference(self):
-        """invalid configuration, referenced injection does not exist, 
+        """invalid configuration, referenced injection does not exist,
         1 messages"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_load_0', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_load_0', I=7),
                 Output(id_of_batch='at_load_0', id_of_device='invalid')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -597,7 +607,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -606,7 +616,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             1,
             'make_data_frames returns 1 I-value')
         self.assertIsInstance(
@@ -615,23 +625,23 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields 1 message')
 
     def test_branch_output_with_invalid_branch_reference(self):
-        """invalid configuration, referenced branch does not exist, 
+        """invalid configuration, referenced branch does not exist,
         1 messages"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_line_0', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_line_0', I=7),
                 Output(
-                    id_of_batch='at_line_0', 
+                    id_of_batch='at_line_0',
                     id_of_device='invalid',
                     id_of_node='n0')])
         self.assertIsInstance(
@@ -640,7 +650,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -649,23 +659,23 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields no message')
-        
+
     def test_branch_output_with_invalid_node_reference(self):
-        """invalid configuration, referenced node does not exist, 
+        """invalid configuration, referenced node does not exist,
         1 messages"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_line_0', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_line_0', I=7),
                 Output(
-                    id_of_batch='at_line_0', 
+                    id_of_batch='at_line_0',
                     id_of_device='line_0',
                     id_of_node='invalid')])
         self.assertIsInstance(
@@ -674,7 +684,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Branch']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 branch')
         self.assertIsInstance(
@@ -683,20 +693,20 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields no message')
-    
+
     def test_ivalue_with_invalid_batch_reference(self):
         """valid configuration, 1 messages"""
         frames = make_data_frames(
-            _elements 
-            + [IValue(id_of_batch='at_load_1', I=7), 
+            _elements
+            + [IValue(id_of_batch='at_load_1', I=7),
                 Output(id_of_batch='at_load_0', id_of_device='load_0')])
         self.assertIsInstance(
             frames.get('Injection'),
@@ -704,7 +714,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["Injection"] exists')
         injections = frames['Injection']
         self.assertEqual(
-            len(injections), 
+            len(injections),
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
@@ -713,7 +723,7 @@ class Check_batch_links(unittest.TestCase):
             'frames["IValue"] exists')
         ivalues = frames['IValue']
         self.assertEqual(
-            len(ivalues), 
+            len(ivalues),
             1,
             'make_data_frames returns 1 I-value')
         self.assertIsInstance(
@@ -722,19 +732,19 @@ class Check_batch_links(unittest.TestCase):
             'frames["Output"] exists')
         outputs = frames['Output']
         self.assertEqual(
-            len(outputs), 
+            len(outputs),
             1,
             'make_data_frames returns 1 output')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             2,
             'check_batch_links yields 1 message')
-    
+
     def test_vvalue_with_invalid_node_reference(self):
         """valid configuration, no messages, Vvalue at node"""
         frames = make_data_frames(
-            _elements 
+            _elements
             + [Vvalue(id_of_node='n', V=.99)])
         self.assertIsInstance(
             frames.get('Vvalue'),
@@ -742,14 +752,182 @@ class Check_batch_links(unittest.TestCase):
             'frames["Vvalue"] exists')
         vvalues = frames['Vvalue']
         self.assertEqual(
-            len(vvalues), 
+            len(vvalues),
             1,
             'make_data_frames returns 1 V-value')
         messages = [*check_batch_links(frames)]
         self.assertEqual(
-            len(messages), 
+            len(messages),
             1,
             'check_batch_links yields no message')
-    
+
+_elements2 = [
+    Slacknode('n0'),
+    Branch('line_0', 'n0', 'n1'),
+    Injection('load_0', 'n1'),
+    Branch('line_1', 'n1', 'n2'),
+    Injection('load_1', 'n2')]
+
+
+class Check_ids(unittest.TestCase):
+
+    def test_unique_ids(self):
+        """no messages"""
+        frames = make_data_frames(_elements2)
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids(frames)]
+        self.assertEqual(
+            len(messages),
+            0,
+            'check_ids yields no message')
+
+    def test_unique_ids_duplicate_branch(self):
+        """duplicate branch id"""
+        frames = make_data_frames(_elements2 +[Branch('line_0', 'n0', 'n3')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_ids yields 1 message')
+
+    def test_unique_ids_duplicate_injection(self):
+        """duplicate injection id"""
+        frames = make_data_frames(_elements2 +[Injection('load_1', 'n3')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_ids yields 1 message')
+
+class Check_connections_of_injections(unittest.TestCase):
+
+    def test_all_connected(self):
+        """no messages"""
+        frames = make_data_frames(_elements2)
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_connections_of_injections(frames)]
+        self.assertEqual(
+            len(messages),
+            0,
+            'check_connections_of_injections yields no message')
+
+    def test_disonnected_injection(self):
+        """node of injection not connected"""
+        frames = make_data_frames(_elements2+[Injection('load_2', 'n3')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_connections_of_injections(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_connections_of_injections yields 1 message')
+
+class Check_connections_of_branches(unittest.TestCase):
+
+    def test_all_connected(self):
+        """no messages"""
+        frames = make_data_frames(_elements2)
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_connections_of_branches(frames)]
+        self.assertEqual(
+            len(messages),
+            0,
+            'check_connections_of_branches yields no message')
+
+    def test_isolated_branch(self):
+        """node of injection not connected"""
+        frames = make_data_frames(_elements2 + [Branch('line_2', 'n3', 'n4')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_connections_of_branches(frames)]
+        self.assertEqual(
+            len(messages),
+            2,
+            'check_connections_of_branches yields 2 message')
+
 if __name__ == '__main__':
     unittest.main()
