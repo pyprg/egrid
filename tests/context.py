@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Interface of egrid
-Copyright (C) 2022 pyprg
+Created on Sat Jan 14 13:01:55 2023
+
+Copyright (C) 2023 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,25 +17,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-Created on Mon Jan 31 08:00:31 2022
-
 @author: pyprg
 """
-from egrid.model import model_from_frames
-from egrid.builder import make_data_frames, create_objects
+import os, sys
+_path = os.path.dirname(__file__)
+sys.path.insert(0, os.path.abspath(os.path.join(_path, '../src')))
+sys.path.insert(0, os.path.abspath(os.path.join(_path, '../src/egrid')))
 
-def make_model(*args):
-    """Creates an instance of egrid.Model.
-
-    Parameters
-    ----------
-    args: iterable
-        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
-        Branchtaps, Defk, Link, str
-        strings in args are processed with graphparser.parse
-
-    Returns
-    -------
-    egrid.Model"""
-    frames = make_data_frames(create_objects(args))
-    return model_from_frames(frames)

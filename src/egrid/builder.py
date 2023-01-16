@@ -26,7 +26,7 @@ import numpy as np
 import re
 from functools import singledispatch
 from itertools import chain
-from src.egrid._types import (
+from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Branchtaps, Loadfactor, Defk, defk, expand_defk, DEFAULT_FACTOR_ID,
     Link, link_, KInjlink, KBranchlink,

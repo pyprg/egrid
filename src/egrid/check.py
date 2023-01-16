@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
-from src.egrid._types import (
+from _types import (
     SLACKNODES, LOADFACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
 

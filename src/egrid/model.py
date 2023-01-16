@@ -29,7 +29,7 @@ from scipy.sparse import coo_matrix
 from collections import namedtuple
 from functools import partial
 from itertools import chain
-from src.egrid._types import (
+from egrid._types import (
     SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS, 
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
@@ -439,6 +439,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         edge_attr='id',
         create_using=None,
         edge_key='id')
+    bridge_graph.add_nodes_from(slackids)
     connected_components_ = pd.Series(
         nx.connected_components(bridge_graph),
         dtype=object)
@@ -527,11 +528,17 @@ def get_node_inj_matrix(count_of_nodes, injections):
     -------
     scipy.sparse.csc_matrix"""
     count_of_injections = len(injections)
-    return coo_matrix(
-        ([1] * count_of_injections, 
-         (injections.index_of_node, injections.index)),
-        shape=(count_of_nodes, count_of_injections),
-        dtype=np.int8).tocsc()
+    return (
+        coo_matrix(
+            ([1] * count_of_injections,
+             (injections.index_of_node, injections.index)),
+            shape=(count_of_nodes, count_of_injections),
+            dtype=np.int8)
+        if count_of_nodes else
+            coo_matrix(([], ([], [])), shape=(0, 0), dtype=np.int8).tocsc()
+        ).tocsc()
+
+
 
 _EMPTY_DICT = {}
 
@@ -649,24 +656,18 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .messages"""
     if not dataframes:
         dataframes = _EMPTY_DICT
-    slacks = dataframes.get('Slacknode', SLACKNODES)
+    slacks_ = dataframes.get('Slacknode', SLACKNODES)
     branches_ = dataframes.get('Branch', BRANCHES)
+    if not branches_['id'].is_unique:
+        msg = "Error: IDs of branches must be unique but are not."
+        raise ValueError(msg)
     branches_['is_bridge'] = y_lo_abs_max < branches_.y_lo.abs()
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
-        slacks.id_of_node, branches_)
-    if pfc_nodes.empty:
-        # create one pfc-node for all injections
-        inj = dataframes.get('Injection', INJECTIONS)
-        in_super_node = 2 < inj.shape[0]
-        pfc_nodes = pd.DataFrame(
-            {'index_of_node':0,
-             'switch_flow_idx':0,
-             'in_super_node':in_super_node},
-            index=inj.id_of_node)
+        slacks_.id_of_node, branches_)
     add_idx_of_node = partial(_join_on, pfc_nodes, 'id_of_node')
     #  processing of slack nodes especially if multiple slack-nodes are
     #   placed in the same pfc-node
-    slacks = _join_index_of_node_inner(pfc_nodes, slacks)
+    slacks = _join_index_of_node_inner(pfc_nodes, slacks_)
     slack_groups = slacks.groupby('index_of_node')
     slack_groups_size = slack_groups.size()
     slack_groups_first = (

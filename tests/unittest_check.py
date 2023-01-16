@@ -22,12 +22,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import unittest
 from pandas import DataFrame
-from src.egrid.builder import make_data_frames
-from src.egrid._types import (
+import context
+from egrid.builder import (make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Vvalue,
     Branch, Injection,
     Defk, Link)
-from src.egrid.check import (
+from egrid.check import (
     check_numbers, check_factor_links, check_batch_links, check_ids,
     get_failure,
     check_connections_of_injections, check_connections_of_branches)
@@ -36,6 +36,25 @@ _elements = [
     Slacknode('n0'),
     Branch('line_0', 'n0', 'n1'),
     Injection('load_0', 'n1')]
+
+class Get_failure(unittest.TestCase):
+    
+    def test_no_failure(self):
+        """No error detected."""
+        frames = make_data_frames([
+            Slacknode('n_0', V=0.92+013j), 
+            Injection('consumer', 'n_0', P10=30.0)])
+        failure = get_failure(frames)
+        self.assertIsNone(failure, 'get_failure returns None')
+    
+    def test_disconnected_injection(self):
+        """Disconnected injection detected."""
+        frames = make_data_frames([
+            Slacknode('n_0', V=0.92+013j), 
+            Injection('consumer', 'n_1', P10=30.0)])
+        failure = get_failure(frames)
+        self.assertIsInstance(
+            failure, str, 'get_failure returns an error message')
 
 class Check_numbers(unittest.TestCase):
 

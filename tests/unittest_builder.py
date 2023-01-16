@@ -20,8 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 @author: pyprg
 """
 import unittest
-from src.egrid.builder import make_objects, create_objects
-from src.egrid._types import (
+import context
+from egrid.builder import (make_objects, create_objects,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection, Message)
 
 _EMPTY_DICT = {}

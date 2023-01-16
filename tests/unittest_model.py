@@ -23,11 +23,12 @@ import unittest
 import scipy.sparse
 from numpy import inf
 from pandas import DataFrame as DF
-from src.egrid import make_model
-from src.egrid.builder import (
+import context
+from egrid import make_model
+from egrid.builder import (
     Slacknode, Branch, Injection, 
     make_data_frames, create_objects)
-from src.egrid.model import Model, model_from_frames
+from egrid.model import Model, model_from_frames
 
 class Make_model(unittest.TestCase):
 
