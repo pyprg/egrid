@@ -30,7 +30,7 @@ Branch = namedtuple(
     'id id_of_node_A id_of_node_B y_lo y_tr',
     defaults=(complex(inf, inf), 0.0j))
 Branch.__doc__ == """Model of an electrical device having two terminals
-e.g. transformers, windings of multi-winding transformers, lines, 
+e.g. transformers, windings of multi-winding transformers, lines,
 closed switch.
 
 Parameters
@@ -108,9 +108,9 @@ PValue = namedtuple(
 PValue.__doc__ = """Values of (measured) active power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
-corresponding Output instance(s) having the identical 'id_of_batch' value must 
-exist. Placement of multiple measurements in switch fields combined with 
-several branches or injections are modeled by PValue and Output instances 
+corresponding Output instance(s) having the identical 'id_of_batch' value must
+exist. Placement of multiple measurements in switch fields combined with
+several branches or injections are modeled by PValue and Output instances
 sharing the same 'id_of_batch'-value.
 
 Parameters
@@ -129,9 +129,9 @@ QValue = namedtuple(
 QValue.__doc__ = """Values of (measured) reactive power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
-corresponding Output instance(s) having the identical 'id_of_batch' value 
-must exist. Placement of multiple measurements in switch fields combined with 
-several branches or injections are modeled by QValue and Output instances 
+corresponding Output instance(s) having the identical 'id_of_batch' value
+must exist. Placement of multiple measurements in switch fields combined with
+several branches or injections are modeled by QValue and Output instances
 sharing the same 'id_of_batch'-value.
 
 Parameters
@@ -149,9 +149,9 @@ IValue = namedtuple(
 IValue.__doc__ = """Values of (measured) electric current. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
-corresponding Output instance having the identical 'id_of_batch' value 
-must exist. Placement of multiple measurements in switch fields combined with 
-several branches or injections are modeled by IValue and Output instances 
+corresponding Output instance having the identical 'id_of_batch' value
+must exist. Placement of multiple measurements in switch fields combined with
+several branches or injections are modeled by IValue and Output instances
 sharing the same 'id_of_batch'-value.
 
 Parameters
@@ -184,6 +184,8 @@ Branchtaps.__doc__ = """Model of a set of taps.
 
 Parameters
 ----------
+id: str
+    unique identifier of taps
 id_of_node: str
     unique identifier of the connected node
 id_of_branch: str
@@ -255,7 +257,7 @@ def defk(id_, type_='var', id_of_source=None, value=1.0,
     return [
         Loadfactor(
             myid_, type_,
-            (myid_ if id_of_source is None else id_of_source), 
+            (myid_ if id_of_source is None else id_of_source),
             value, min_, max_, step_)
         for myid_, step_ in product(ids, iter_steps)]
 
@@ -345,7 +347,7 @@ def link_(objid, part, id_, cls_, steps):
     part: 'p'|'q'|'pq'
         active power or reactive power
     id_: str, or list<str>, or tuple<str>
-        id of linked factor, accepts number of parts ids 
+        id of linked factor, accepts number of parts ids
         (one for 'p' or 'q', two for 'pq')
     cls_: KInjlink
         class of link

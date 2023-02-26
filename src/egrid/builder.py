@@ -35,16 +35,16 @@ from egrid._types import (
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
 _replacement = {
-    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 
+    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3',
     'k':'e3', 'M':'e6', 'G': 'e9'}
 
 def _replace_e3(match):
     """Returns a replacement string for given match.
-    
+
     Parameters
     ----------
     match: re.match
-    
+
     Returns
     -------
     str"""
@@ -60,11 +60,11 @@ def e3(string):
     'k' -> 'e3'
     'M' -> 'e6'
     'G' -> 'e9'
-    
+
     Parameters
     ----------
     string: str
-    
+
     Returns
     -------
     str"""
@@ -72,9 +72,9 @@ def e3(string):
 
 # all device types of gridmodel.Model and taps and analog values with helper
 MODEL_TYPES = (
-    Branch, Slacknode, Injection, 
-    Output, PValue, QValue, IValue, Vvalue, 
-    Branchtaps, 
+    Branch, Slacknode, Injection,
+    Output, PValue, QValue, IValue, Vvalue,
+    Branchtaps,
     Term, Message)
 SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
 _ARG_TYPES = SOURCE_TYPES + (str,)
@@ -120,7 +120,7 @@ def _create_branch(e_id, neighbours, attributes):
     Branch"""
     try:
         y_lo = (
-            complex(e3(attributes['y_lo'])) 
+            complex(e3(attributes['y_lo']))
             if 'y_lo' in attributes else _COMPLEX_INF)
         return Branch(
             id=e_id,
@@ -303,8 +303,13 @@ def _make_node_objects(data):
     elif count_of_neighbours == 0:
         yield Message(f"ignoring object '{e_id}' as it is not connected", 1)
 
-_FACTORY_FNS = {'edge': _make_edge_objects, 'node': _make_node_objects}
-_FACTORY_NONE = lambda x: None
+def _make_nothing(_):
+    if False:
+        yield None
+
+_FACTORY_FNS = {
+    'edge': _make_edge_objects,
+    'node': _make_node_objects}
 
 def make_objects(data):
     """Creates objects for edge/node
@@ -312,14 +317,14 @@ def make_objects(data):
     Parameters
     ----------
     data: tuple
-        * 'edge'|'node'
-        * ... ('edge'/'node' specific)
+        * 'edge'|'node'|'comment'
+        * ... ('edge'/'node'/'comment' specific)
 
     Returns
     -------
-    Branch | Slacknode | Injection | Output | PValue | QValue | IValue | 
+    Branch | Slacknode | Injection | Output | PValue | QValue | IValue |
     Vvalue | None"""
-    return _FACTORY_FNS.get(data[0], _FACTORY_NONE)(data)
+    return _FACTORY_FNS.get(data[0], _make_nothing)(data)
 
 def make_model_objects(entities):
     """Creates objects from edge/node-tuples.
@@ -333,12 +338,11 @@ def make_model_objects(entities):
     -------
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue"""
-    return filter(
-        lambda x:x, (chain.from_iterable(make_objects(e) for e in entities)))
+    return chain.from_iterable(make_objects(e) for e in entities)
 
 def make_data_frames(devices):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
-    of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue, 
+    of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue,
     Vvalue, Branchtaps, Defk, Link, Message)
 
     Parameters
@@ -450,14 +454,14 @@ def make_data_frames(devices):
     dataframes[Loadfactor.__name__] = _factor_frame
     _injlink_frame = pd.DataFrame(
         chain.from_iterable(
-            # convert Link into KInjlink 
+            # convert Link into KInjlink
             link_(*args) for args in _slack_and_devs[Link.__name__]
             if args.cls == KInjlink),
         columns=KInjlink._fields)
     dataframes[KInjlink.__name__] = _injlink_frame
     _branchlink_frame = pd.DataFrame(
         chain.from_iterable(
-            # convert Link into KBranchlink 
+            # convert Link into KBranchlink
             link_(*args) for args in _slack_and_devs[Link.__name__]
             if args.cls == KBranchlink),
         columns=KBranchlink._fields)
@@ -476,14 +480,72 @@ def _flatten(args):
         except:
             yield Message(f'wrong type, ignored object: {str(args)}', 1)
 
+def _tostring(string):
+    return string[1:-1] if string.startswith(('\'', '"')) else string
+
+def _notsupported(string):
+    raise NotImplementedError('')
+
+_bools = bool, False
+_boolm = bool, True
+_ints = int, False
+_intm = int, True
+_floats = float, False
+_floatm = float, True
+_strs = _tostring, False
+_strm = _tostring, True
+_ns = _notsupported, True
+
+_meta_of_types = [
+     #          message level
+     (Message, [_strs,  _ints]),
+     #       id     type   id_of_source value     min     max      step
+     (Defk, [_strm, _strs, _strs,       _floats, _floats, _floats, _intm]),
+     #       objid  part   id     cls            step
+     (Link, [_strm, _strm, _strm, _notsupported, _intm]),
+     #       id     arg    fn     step
+     (Term, [_strs, _strs, _strs, _intm]),
+     #         id_of_batch id_of_device id_of_node
+     (Output, [_strs,      _strs,       _strs]),
+     #         id_of_batch P        direction
+     (PValue, [_strs,      _floats, _floats]),
+     #         id_of_batch Q        direction
+     (QValue, [_strs,      _floats, _floats]),
+     #         id_of_batch I
+     (IValue, [_strs,      _floats]),
+     #         id_of_node  V
+     (IValue, [_strs,      _floats]),
+     (Branchtaps,
+     # id     id_of_node id_of_branch Vstep    positionmin positionneutral
+      [_strs, _strs,     _strs,       _floats, _ints,      _ints,
+     # positionmax position
+       _ints,      _ints]),
+     #         id     id_of_node_A id_of_node_B y_lo     y_tr
+     (Branch, [_strs, _strs,       _strs,       _floats, _floats]),
+     #            id_of_node V
+     (Slacknode, [_strs,     _floats]),
+     #            id     id_of_node P10      Q10      Exp_v_p  Exp_v_q
+     (Injection, [_strs, _strs,     _floats, _floats, _floats, _floats])]
+
 @singledispatch
 def _create_objects(arg):
     return arg
 
 @_create_objects.register(str)
 def _(arg):
+    import graphparser as gp
     from graphparser.parsing import parse
-    return make_model_objects(parse(arg))
+    from itertools import tee
+    type_data = gp.make_type_data(_meta_of_types)
+    t1, t2 = tee(parse(arg))
+    is_comment = lambda t: t[0]=='comment'
+    is_instruction = lambda t: t[0]=='comment' and t[1].startswith('#.')
+    return chain(
+        make_model_objects(t for t in t1 if not is_comment(t)),
+        gp.make_objects(
+            type_data,
+            Message,
+            ('  '+t[1][2:] for t in t2 if is_instruction(t))))
 
 def create_objects(args):
     """Creates instances of network objects from strings. Supports
@@ -502,4 +564,4 @@ def create_objects(args):
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Term, Message"""
-    return _flatten(map(_create_objects, _flatten(args)))    
+    return _flatten(map(_create_objects, _flatten(args)))

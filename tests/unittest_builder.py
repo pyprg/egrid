@@ -22,47 +22,48 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 import context
 from egrid.builder import (make_objects, create_objects,
-    Slacknode, PValue, QValue, Output, IValue, Branch, Injection, Message)
+    Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
+    Message, Defk, Link)
 
 _EMPTY_DICT = {}
 
 class Make_objects(unittest.TestCase):
-    
+
     def test_make_objects_one_node(self):
         res = [*make_objects(('node', 'slack', (), {}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         self.assertIsInstance(
             res[0], Message, "make_objects shall return one message")
-    
+
     def test_make_objects_slacknode(self):
         res = [*make_objects(('node', 'slack', ('adj'), {}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         slacknode = res[0]
         self.assertIsInstance(
-            slacknode, 
-            Slacknode, 
+            slacknode,
+            Slacknode,
             "make_objects shall return one instance of Slacknode")
         self.assertEqual(
-            slacknode.V, 
-            Slacknode._field_defaults['V'], 
+            slacknode.V,
+            Slacknode._field_defaults['V'],
             'voltage attribute of slacknode shall have default value')
-    
+
     def test_make_objects_slacknode2(self):
         res = [*make_objects(('node', 'n0', ('adj'), {'slack': 'True'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         slacknode = res[0]
         self.assertIsInstance(
-            slacknode, 
-            Slacknode, 
+            slacknode,
+            Slacknode,
             "make_objects shall return one instance of Slacknode")
         self.assertEqual(
-            slacknode.V, 
-            Slacknode._field_defaults['V'], 
+            slacknode.V,
+            Slacknode._field_defaults['V'],
             'voltage attribute of slacknode shall have default value')
-    
+
     def test_make_objects_slacknode3(self):
         res = [*make_objects(
             ('node', 'n0', ('adj'), {'slack': 'True', 'V': '0.97-0.2j'}))]
@@ -70,14 +71,14 @@ class Make_objects(unittest.TestCase):
             len(res), 1, "make_objects shall return one object")
         slacknode = res[0]
         self.assertIsInstance(
-            slacknode, 
-            Slacknode, 
+            slacknode,
+            Slacknode,
             "make_objects shall return one instance of Slacknode")
         self.assertEqual(
-            slacknode.V, 
-            0.97-0.2j, 
+            slacknode.V,
+            0.97-0.2j,
             'voltage attribute of slacknode shall equal 0.97-0.2j')
-    
+
     def test_make_objects_slacknode4(self):
         res = [*make_objects(
             ('node', 'n0', ('adj'), {'slack': 'True', 'V': '0.97-j0.2'}))]
@@ -85,67 +86,67 @@ class Make_objects(unittest.TestCase):
             len(res), 1, "make_objects shall return one object")
         self.assertIsInstance(
             res[0], Message, "make_objects shall return one message")
-    
+
     def test_make_edge_objects_PQ(self):
         res = [*make_objects(
             ('edge', ('n0', 'line0'), {'P': '4.6', 'Q': '2.4'}))]
         self.assertEqual(
             len(res), 3, "make_objects shall return two object")
         self.assertIsInstance(
-            res[0], 
-            (PValue, QValue, Output), 
+            res[0],
+            (PValue, QValue, Output),
             "make_objects shall return instances of P/QValue and Output")
         self.assertIsInstance(
-            res[1], 
-            (PValue, QValue, Output), 
+            res[1],
+            (PValue, QValue, Output),
             "make_objects shall return instances of P/QValue and Output")
         self.assertIsInstance(
-            res[2], 
-            (PValue, QValue, Output), 
+            res[2],
+            (PValue, QValue, Output),
             "make_objects shall return instances of P/QValue and Output")
-    
+
     def test_make_edge_objects_P(self):
         res = [*make_objects(
             ('edge', ('n0', 'line0'), {'P': '4.6'}))]
         self.assertEqual(
             len(res), 2, "make_objects shall return two object")
         self.assertIsInstance(
-            res[0], 
-            (PValue, Output), 
+            res[0],
+            (PValue, Output),
             "make_objects shall return instances of PValue and Output")
         self.assertIsInstance(
-            res[1], 
-            (PValue, Output), 
+            res[1],
+            (PValue, Output),
             "make_objects shall return instances of PValue and Output")
-    
+
     def test_make_edge_objects_Q(self):
         res = [*make_objects(
             ('edge', ('n0', 'line0'), {'Q': '4.6'}))]
         self.assertEqual(
             len(res), 2, "make_objects shall return two object")
         self.assertIsInstance(
-            res[0], 
-            (QValue, Output), 
+            res[0],
+            (QValue, Output),
             "make_objects shall return instances of QValue and Output")
         self.assertIsInstance(
-            res[1], 
-            (QValue, Output), 
+            res[1],
+            (QValue, Output),
             "make_objects shall return instances of QValue and Output")
-    
+
     def test_make_edge_objects_I(self):
         res = [*make_objects(
             ('edge', ('n0', 'line0'), {'I': '4.0'}))]
         self.assertEqual(
             len(res), 2, "make_objects shall return two object")
         self.assertIsInstance(
-            res[0], 
-            (IValue, Output), 
+            res[0],
+            (IValue, Output),
             "make_objects shall return instances of IValue and Output")
         self.assertIsInstance(
-            res[1], 
-            (IValue, Output), 
+            res[1],
+            (IValue, Output),
             "make_objects shall return instances of IValue and Output")
-        
+
     def test_make_edge_objects_branch(self):
         res = [*make_objects(
             ('node', 'mybranch', ('n0', 'n1'), _EMPTY_DICT))]
@@ -153,44 +154,44 @@ class Make_objects(unittest.TestCase):
             len(res), 1, "make_objects shall return one object")
         branch = res[0]
         self.assertIsInstance(
-            branch, 
-            Branch, 
+            branch,
+            Branch,
             "make_objects shall return an instance of Branch")
         self.assertEqual(
-            branch.id, 
-            'mybranch', 
+            branch.id,
+            'mybranch',
             "id of branch shall be 'mybranch'")
         self.assertEqual(
-            branch.y_lo, 
-            Branch._field_defaults['y_lo'], 
+            branch.y_lo,
+            Branch._field_defaults['y_lo'],
             "y_lo of branch shall have default value")
         self.assertEqual(
-            branch.y_tr, 
-            Branch._field_defaults['y_tr'], 
+            branch.y_tr,
+            Branch._field_defaults['y_tr'],
             "y_tr of branch shall have default value")
-        
+
     def test_make_edge_objects_branch2(self):
         res = [*make_objects(
-            ('node', 
-              'mybranch', 
-              ('n0', 'n1'), 
+            ('node',
+              'mybranch',
+              ('n0', 'n1'),
               {'y_lo':'1+2j', 'y_tr': '3+7j'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         branch = res[0]
         self.assertEqual(
-            branch.id, 
-            'mybranch', 
+            branch.id,
+            'mybranch',
             "id of branch shall be 'mybranch'")
         self.assertEqual(
-            branch.y_lo, 
-            1+2j, 
+            branch.y_lo,
+            1+2j,
             "value of y_lo shall be 1+2j")
         self.assertEqual(
-            branch.y_tr, 
-            3+7j, 
+            branch.y_tr,
+            3+7j,
             "value of y_tr shall be 3+7j")
-        
+
     def test_make_edge_objects_injection(self):
         res = [*make_objects(
             ('node', 'myinjection', ('n0',), _EMPTY_DICT))]
@@ -198,42 +199,42 @@ class Make_objects(unittest.TestCase):
             len(res), 1, "make_objects shall return one object")
         injection = res[0]
         self.assertIsInstance(
-            injection, 
-            Injection, 
+            injection,
+            Injection,
             "make_objects shall return an instance of Injection")
         self.assertEqual(
-            injection.id, 
-            'myinjection', 
+            injection.id,
+            'myinjection',
             "id of branch shall be 'myinjection'")
         self.assertEqual(
-            injection.P10, 
-            Injection._field_defaults['P10'], 
+            injection.P10,
+            Injection._field_defaults['P10'],
             "P10 of injection shall have default value")
         self.assertEqual(
-            injection.Q10, 
-            Injection._field_defaults['Q10'], 
+            injection.Q10,
+            Injection._field_defaults['Q10'],
             "Q10 of injection shall have default value")
         self.assertEqual(
-            injection.Exp_v_p, 
-            Injection._field_defaults['Exp_v_p'], 
+            injection.Exp_v_p,
+            Injection._field_defaults['Exp_v_p'],
             "Exp_v_p of injection shall have default value")
         self.assertEqual(
-            injection.Exp_v_q, 
-            Injection._field_defaults['Exp_v_q'], 
+            injection.Exp_v_q,
+            Injection._field_defaults['Exp_v_q'],
             "Exp_v_q of injection shall have default value")
-        
+
     def test_make_edge_objects_injection2(self):
         res = [*make_objects(
-            ('node', 
-              'myinjection', 
-              ('n0',), 
+            ('node',
+              'myinjection',
+              ('n0',),
               {'P10': '1', 'Q10': '2', 'Exp_v_p': '3', 'Exp_v_q': '7'}))]
         self.assertEqual(
             len(res), 1, "make_objects shall return one object")
         injection = res[0]
         self.assertIsInstance(
-            injection, 
-            Injection, 
+            injection,
+            Injection,
             "make_objects shall return an instance of Injection")
         self.assertEqual(
             injection.id, 'myinjection', "id of branch shall be 'myinjection'")
@@ -245,7 +246,7 @@ class Make_objects(unittest.TestCase):
             injection.Exp_v_p, 3.0, "Exp_v_p shall equal 3.0")
         self.assertEqual(
             injection.Exp_v_q, 7.0, "Exp_v_q shall equal 7.0")
-        
+
     def test_make_edge_objects_message(self):
         # error no neighbours
         res = [*make_objects(('node', 'myid', (), {}))]
@@ -298,21 +299,21 @@ class Make_objects(unittest.TestCase):
             obj, Message, "make_objects shall return an instance of Message")
 
 class Create_objects(unittest.TestCase):
-    
+
     def test_empty_string(self):
         res = [*create_objects('')]
         self.assertEqual(res, [], 'is empty')
-        
+
     def test_empty_iterable(self):
         self.assertEqual(
-            [*create_objects([])], 
-            [], 
+            [*create_objects([])],
+            [],
             'is empty')
         self.assertEqual(
-            [*create_objects([(),()])], 
-            [], 
+            [*create_objects([(),()])],
+            [],
             'is empty')
-    
+
     def test_single_node(self):
         msg, *_ = [*create_objects('n0')]
         self.assertIsInstance(msg, Message, 'create object returns a message')
@@ -320,7 +321,7 @@ class Create_objects(unittest.TestCase):
         self.assertTrue(
             msg.message.startswith('ignoring object'),
             'create object ignores object')
-    
+
     def test_none_node_string(self):
         msg, *_ = [*create_objects('string')]
         self.assertIsInstance(msg, Message, 'create object returns a message')
@@ -328,7 +329,7 @@ class Create_objects(unittest.TestCase):
         self.assertTrue(
             msg.message.startswith('ignoring object'),
             'create object ignores object')
-    
+
     def test_two_none_node_strings(self):
         _, msg, __ = [*create_objects('object_a object_b')]
         self.assertIsInstance(msg, Message, 'create object returns a message')
@@ -337,23 +338,23 @@ class Create_objects(unittest.TestCase):
         self.assertTrue(
             msg.message.startswith('Error'),
             'create object issues an error message')
-    
+
     def test_node_injection(self):
         res = [*create_objects('node injection')]
-        self.assertAlmostEqual(
+        self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertIsInstance(
-            res[0], 
-            Injection, 
+            res[0],
+            Injection,
             'create_objects returns an instance of Injection')
-    
+
     def test_node_branch_node(self):
         res = [*create_objects('node_A branch node_B')]
-        self.assertAlmostEqual(
+        self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertIsInstance(
-            res[0], 
-            Branch, 
+            res[0],
+            Branch,
             'create_objects returns an instance of Branch')
         branch = res[0]
         self.assertEqual(
@@ -362,7 +363,7 @@ class Create_objects(unittest.TestCase):
             branch.id_of_node_A, 'node_A', 'id_of_node_A is node_A')
         self.assertEqual(
             branch.id_of_node_B, 'node_B', 'id_of_node_B is node_B')
-    
+
     def test_not_processed_type(self):
         msg, *_ = [*create_objects(27)]
         self.assertIsInstance(msg, Message, 'create_objects returns a message')
@@ -370,12 +371,51 @@ class Create_objects(unittest.TestCase):
         self.assertTrue(
             msg.message.startswith('wrong type'),
             'create_objects ignores object')
-    
+
     def test_pass_branch(self):
         branch = Branch('b', 'n0', 'n1')
-        res, *_ = [*create_objects(branch)]
+        res, *_ = create_objects(branch)
         self.assertEqual(
             res, branch, 'create_objects returns Branch instance')
+
+    def test_create_message_empty_instruction_line(self):
+        res = [*create_objects('#.')]
+        self.assertEqual(
+            len(res), 0, 'create_objects returns no object')
+
+    def test_create_instruction(self):
+        res = [*create_objects(
+            ['#.   Message(message=hallo, level=0)',
+             '#.   Defk(id=kp)'])]
+        self.assertEqual(
+            len(res), 2, 'create_objects returns two objects')
+        self.assertEqual(
+            res,
+            [Message(message='hallo', level=0),
+             Defk(id=('kp',))],
+            'create_objects creates instances of Message, Defk')
+
+    def test_create_instruction2(self):
+        """remove quotes from strings"""
+        res = [*create_objects(
+            ['#.   Message(message="hallo", level=0)',
+             '#.   Defk(id="kp")'])]
+        self.assertEqual(
+            len(res), 2, 'create_objects returns two objects')
+        self.assertEqual(
+            res,
+            [Message(message='hallo', level=0),
+             Defk(id=('kp',))],
+            'create_objects creates instances of Message, Defk')
+
+    def test_create_link(self):
+        res = [*create_objects(['#. Link(objid=hallo part=p id=myid)'])]
+        self.assertEqual(
+            len(res), 1, 'create_objects returns one object')
+        self.assertEqual(
+            res,
+            [Link(objid=('hallo',), part=('p',), id=('myid',))],
+            'create_objects creates instances of Link')
 
 if __name__ == '__main__':
     unittest.main()

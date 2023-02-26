@@ -29,7 +29,7 @@ from egrid.builder import (make_data_frames,
     Defk, Link)
 from egrid.check import (
     check_numbers, check_factor_links, check_batch_links, check_ids,
-    get_failure,
+    get_first_error,
     check_connections_of_injections, check_connections_of_branches)
 
 _elements = [
@@ -38,23 +38,23 @@ _elements = [
     Injection('load_0', 'n1')]
 
 class Get_failure(unittest.TestCase):
-    
+
     def test_no_failure(self):
         """No error detected."""
         frames = make_data_frames([
-            Slacknode('n_0', V=0.92+013j), 
+            Slacknode('n_0', V=0.92+013j),
             Injection('consumer', 'n_0', P10=30.0)])
-        failure = get_failure(frames)
-        self.assertIsNone(failure, 'get_failure returns None')
-    
+        failure = get_first_error(frames)
+        self.assertIsNone(failure, 'get_first_error returns None')
+
     def test_disconnected_injection(self):
         """Disconnected injection detected."""
         frames = make_data_frames([
-            Slacknode('n_0', V=0.92+013j), 
+            Slacknode('n_0', V=0.92+013j),
             Injection('consumer', 'n_1', P10=30.0)])
-        failure = get_failure(frames)
+        failure = get_first_error(frames)
         self.assertIsInstance(
-            failure, str, 'get_failure returns an error message')
+            failure, str, 'get_first_error returns an error message')
 
 class Check_numbers(unittest.TestCase):
 
@@ -80,9 +80,9 @@ class Check_numbers(unittest.TestCase):
             4,
             'check_numbers yields 3 messages')
         self.assertIsInstance(
-            get_failure(frames),
+            get_first_error(frames),
             str,
-            'get_failure returns an error message')
+            'get_first_error returns an error message')
 
 class Check_factors_links(unittest.TestCase):
 
@@ -105,8 +105,8 @@ class Check_factors_links(unittest.TestCase):
             0,
             'check_factors_links yields no message')
         self.assertIsNone(
-            get_failure(frames),
-            'get_failure returns None')
+            get_first_error(frames),
+            'get_first_error returns None')
 
     def test_defk_without_link(self):
         """Message for unlinked load factor."""

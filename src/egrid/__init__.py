@@ -20,8 +20,10 @@ Created on Mon Jan 31 08:00:31 2022
 
 @author: pyprg
 """
+from pandas import DataFrame
 from egrid.model import model_from_frames
 from egrid.builder import make_data_frames, create_objects
+from egrid.check import check_frames, get_first_error
 
 def make_model(*args):
     """Creates an instance of egrid.Model.
@@ -37,4 +39,23 @@ def make_model(*args):
     -------
     egrid.Model"""
     frames = make_data_frames(create_objects(args))
+    return model_from_frames(frames)
+
+def make_model_checked(*args):
+    """Creates an instance of egrid.Model. Checks data.
+
+    Parameters
+    ----------
+    args: iterable
+        Branch, Slacknode, Injection, Output, PQValue, IValue, Vvalue,
+        Branchtaps, Defk, Link, str
+        strings in args are processed with graphparser.parse
+
+    Returns
+    -------
+    egrid.Model"""
+    frames = make_data_frames(create_objects(args))
+    frames['Message'] = DataFrame.from_records(
+        check_frames(frames),
+        columns=['message','message_class'])
     return model_from_frames(frames)

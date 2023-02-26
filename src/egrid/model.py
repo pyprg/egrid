@@ -30,7 +30,7 @@ from collections import namedtuple
 from functools import partial
 from itertools import chain
 from egrid._types import (
-    SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS, 
+    SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
@@ -126,8 +126,8 @@ load_scaling_factors: pandas.DataFrame
 injection_factor_associations: pandas.DataFrame
 
 mnodeinj: scipy.sparse.csc_matrix
-    converts a vector ordered according to injection indices to a vector 
-    ordered according to power flow calculation nodes (adding entries of 
+    converts a vector ordered according to injection indices to a vector
+    ordered according to power flow calculation nodes (adding entries of
     injections for each node) by calculating 'mnodeinj @ vector'
 terms: pandas.DataFrame
     * .step, int
@@ -140,7 +140,7 @@ messages: pandas.DataFrame
 
 def _join_on(to_join, on_field, dataframe):
     """Joins dataframe with to_join on on_field. Returns a new pandas.DataFrame.
-    
+
     Parameters
     ----------
     to_join: pandas.DataFrame
@@ -149,7 +149,7 @@ def _join_on(to_join, on_field, dataframe):
         name of field to join on
     dataframe: pandas.DataFrame
         * .'on_field'
-    
+
     Result
     ------
     pandas.DataFrame"""
@@ -444,7 +444,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         nx.connected_components(bridge_graph),
         dtype=object)
     connected_components = pd.DataFrame(
-        data={'connected_components': connected_components_, 
+        data={'connected_components': connected_components_,
               'is_slack': connected_components_.apply(is_slack)},
         columns=['connected_components', 'is_slack'])
     cc_count = len(connected_components)
@@ -487,7 +487,7 @@ def _get_pfc_nodes(slackids, branch_frame):
     #   which are usable for matrix building including additional indices
     #   for matrices of switch flow calculation
     return (
-        count_of_slacks, 
+        count_of_slacks,
         len(connected_components) + len(branch_nodes),
         pd.DataFrame(
             chain.from_iterable([
@@ -503,7 +503,7 @@ def _get_pfc_nodes(slackids, branch_frame):
                   for switch_flow_idx, id_ in enumerate(ids)),
                 ((id_, idx, 0, False, False)
                   for idx, id_ in enumerate(
-                    branch_nodes_nonslacks.id_of_node, 
+                    branch_nodes_nonslacks.id_of_node,
                     count_of_slacks + len(cc_nonslacks)))
                 ]),
             columns=['node_id', 'index_of_node', 'switch_flow_idx',
@@ -512,18 +512,18 @@ def _get_pfc_nodes(slackids, branch_frame):
 
 def get_node_inj_matrix(count_of_nodes, injections):
     """Creates a sparse matrix converting a vector which is ordered
-    according to injections to a vector ordered according to power flow 
+    according to injections to a vector ordered according to power flow
     calculation nodes (adding entries of injections for each node) by
     calculating 'M @ vector'. Transposed M is usable for mapping e.g.
     the vector of node voltage to the vector of injection voltages.
-    
+
     Parameters
     ----------
     count_of_nodes: int
         number of power flow calculation nodes
     injections: pandas.DataFrame (index of injection)
         * .index_of_node, int
-    
+
     Returns
     -------
     scipy.sparse.csc_matrix"""
@@ -537,10 +537,6 @@ def get_node_inj_matrix(count_of_nodes, injections):
         if count_of_nodes else
             coo_matrix(([], ([], [])), shape=(0, 0), dtype=np.int8).tocsc()
         ).tocsc()
-
-
-
-_EMPTY_DICT = {}
 
 def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     """Creates a network model for power flow calculation.
@@ -655,7 +651,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .terms
         * .messages"""
     if not dataframes:
-        dataframes = _EMPTY_DICT
+        dataframes = {}
     slacks_ = dataframes.get('Slacknode', SLACKNODES)
     branches_ = dataframes.get('Branch', BRANCHES)
     if not branches_['id'].is_unique:
@@ -681,9 +677,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     super_slack_idxs = super_slacks[super_slacks].index
     head_tail = lambda col: (col[0], col[1:].to_list())
     slackid_groups = [
-        head_tail(slack_groups.id_of_node.get_group(group_name)) 
+        head_tail(slack_groups.id_of_node.get_group(group_name))
         for group_name in super_slack_idxs]
-    #    
+    #
     branchtaps_ = _prepare_branch_taps(add_idx_of_node, dataframes)
     branches = _prepare_branches(branchtaps_, dataframes, pfc_nodes)
     branchterminals = _get_branch_terminals(_add_bg(branches))
@@ -709,7 +705,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         _prepare_branch_outputs(
             add_idx_of_node, branches, outputs[is_branch_output])
         .join(
-            termindex['index_of_term'], 
+            termindex['index_of_term'],
             on=['id_of_node', 'id_of_branch'],
             how='inner'))
     injectionoutputs = _prepare_injection_outputs(
@@ -760,14 +756,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
 
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.
-    
+
     Parameters
     ----------
     nodes: pandas.DataFrame (node_id, str)
         * .index_of_node, int
         * .in_super_node, bool
         * .is_slack, bool
-    
+
     Returns
     -------
     pandas.DataFrame (node_id, str)

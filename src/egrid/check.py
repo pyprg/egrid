@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
-from _types import (
+from egrid._types import (
     SLACKNODES, LOADFACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
 
@@ -298,8 +298,13 @@ def check_frames(frames):
     Finds I/P/Q/Vvalues having an invalid batch/node reference.
     Finds outputs having invalid value reference or device references.
     Finds disconnected injections and branches.
-    Finds duplicates in identifiesr of injections and branches.
+    Finds duplicates in identifiers of injections and branches.
     Issues warnings (message_class == 1) and errors (message_class == 2).
+    Create a pandas DataFrame with:
+    ::
+        pandas.DataFrame.from_records(
+            check_frames(frames),
+            columns=['message','message_class'])
 
     Parameters
     ----------
@@ -318,7 +323,7 @@ def check_frames(frames):
     Yields
     ------
     tuple
-        str, int"""
+        str, int (message, message_class)"""
     yield from check_numbers(frames)
     yield from check_factor_links(frames)
     yield from check_batch_links(frames)
@@ -326,10 +331,10 @@ def check_frames(frames):
     yield from check_connections_of_injections(frames)
     yield from check_connections_of_branches(frames)
 
-def get_failure(frames):
-    """Checks if data is usable (free of errors), returns the first error 
+def get_first_error(frames):
+    """Checks if data is usable (free of errors), returns the first error
     message or None.
-    
+
     Parameters
     ----------
     model_data: dict

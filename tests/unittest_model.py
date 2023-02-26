@@ -26,9 +26,10 @@ from pandas import DataFrame as DF
 import context
 from egrid import make_model
 from egrid.builder import (
-    Slacknode, Branch, Injection, 
+    Slacknode, Branch, Injection,
     make_data_frames, create_objects)
 from egrid.model import Model, model_from_frames
+from egrid.builder import Loadfactor
 
 class Make_model(unittest.TestCase):
 
@@ -62,12 +63,12 @@ class Make_model(unittest.TestCase):
         self.assertEqual(model.shape_of_Y, (0,0), 'matrix shape is 0,0')
         self.assertEqual(model.count_of_slacks, 0, 'no slack')
         self.assertIsInstance(
-            model.mnodeinj, 
+            model.mnodeinj,
             scipy.sparse.csc_matrix,
             msg='mnodeinj is scipy.sparse.csc_matrix')
         self.assertEqual(
-            model.mnodeinj.shape, 
-            (0,0), 
+            model.mnodeinj.shape,
+            (0,0),
             'shape of mnodeinj is 0,0')
 
     def test_make_model_slack(self):
@@ -91,8 +92,8 @@ class Make_model(unittest.TestCase):
 
     def test_make_minimal_model(self):
         model = make_model(
-            Slacknode('n0'), 
-            Branch('line_0', 'n0', 'n1'), 
+            Slacknode('n0'),
+            Branch('line_0', 'n0', 'n1'),
             Injection('load_0', 'n1'))
         self.assertIsNotNone(model, 'make_model shall return an object')
         # self.assertEqual(len(model.messages), 0, 'no errors')
@@ -115,89 +116,28 @@ class Make_model(unittest.TestCase):
             model.shape_of_Y, (1,1), 'one pfc node (branch without impedance)')
 
 class Model_values(unittest.TestCase):
-    
-    elements = [
-        Slacknode('n0'), 
-        Branch('line_0', 'n0', 'n1'), 
-        Injection('load_0', 'n1')]
-    
-    # def test_invalid_ivalue(self):
-    #     model = make_model(self.elements, IValue('i_n_0_line_0'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 1, 'one error')
-    
-#     def test_invalid_pvalue(self):
-#         model = make_model(self.elements, PValue('p_n_0_line_0'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 1, 'one error')
-    
-#     def test_invalid_qvalue(self):
-#         model = make_model(self.elements, QValue('q_n_0_line_0'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 1, 'one error')
-    
-#     def test_invalid_vvalue(self):
-#         model = make_model(self.elements, Vvalue('n'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 1, 'one error')
-    
-#     def test_invalid_output(self):
-#         model = make_model(
-#             self.elements, 
-#             IValue('i_n_0_line_0'),
-#             Output('i_n_0_line_0', 'line_0', 'n0'),
-#             Output('i_n_0_line_0', 'line', 'n0'),
-#             Output('i_n_0_line_0', 'line_0', 'n'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 1, 'one error')
 
-# class Model_messages(unittest.TestCase):
-    
-#     elements = [
-#         Slacknode('n0'), 
-#         Branch('line_0', 'n0', 'n1'), 
-#         Injection('load_0', 'n1')]
-    
-    # def test_wrong_object(self):
-    #     model = make_model(self.elements, Loadfactor(id='k'))
-    #     self.assertIsNotNone(model, 'make_model shall return an object')
-    #     self.assertEqual(len(model.messages), 1, 'one error')
-    
-    # def test_ignored_primitive(self):
-    #     model = make_model(self.elements, 27)
-    #     self.assertIsNotNone(model, 'make_model shall return an object')
-    #     self.assertEqual(len(model.messages), 0, 'no error')
-    
-    # def test_defk_without_link(self):
-    #     model = make_model(self.elements, Defk(id='k'))
-    #     self.assertIsNotNone(model, 'make_model shall return an object')
-    #     self.assertEqual(len(model.messages), 1, 'one error')
-    
-#     def test_defk_with_link(self):
-#         model = make_model(
-#             self.elements, 
-#             Defk(id='k'), 
-#             Link('load_0', 'p', 'k'))
-#         self.assertIsNotNone(model, 'make_model shall return an object')
-#         self.assertEqual(len(model.messages), 0, 'no error')
-    
-    # def test_invalid_link(self):
-    #     """referenced load scaling factor does not exist"""
-    #     model = make_model(
-    #         self.elements, 
-    #         Link('load_0', 'p', 'k'))
-    #     self.assertIsNotNone(model, 'make_model shall return an object')
-    #     self.assertEqual(len(model.messages), 1, 'one error')
-    
-    # def test_invalid_link2(self):
-    #     """referenced load does not exist"""
-    #     model = make_model(
-    #         self.elements, 
-    #         Defk(id='k'), 
-    #         Link('load', 'p', 'k'))
-    #     self.assertIsNotNone(model, 'make_model shall return an object')
-    #     self.assertEqual(len(model.messages), 1, 'one error')
-    
+    elements = [
+        Slacknode('n0'),
+        Branch('line_0', 'n0', 'n1'),
+        Injection('load_0', 'n1')]
+
+class Model_messages(unittest.TestCase):
+
+    elements = [
+        Slacknode('n0'),
+        Branch('line_0', 'n0', 'n1'),
+        Injection('load_0', 'n1')]
+
+    def test_wrong_object(self):
+        model = make_model(self.elements, Loadfactor(id='k'))
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.messages), 1, 'one error')
+
+    def test_ignored_primitive(self):
+        model = make_model(self.elements, 27)
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(len(model.messages), 1, 'one message')
 
 class Model_from_frames(unittest.TestCase):
 
@@ -231,13 +171,6 @@ class Model_from_frames(unittest.TestCase):
             model.shape_of_Y,
             (3, 3),
             'model.shape_of_Y shall be (3, 3)')
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
     unittest.main()
