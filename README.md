@@ -15,7 +15,6 @@ The main function is make_model(*args). The arguments are of type
     - Output (indicates that measured flow (I or PQ) or a part thereof flows through the referenced terminal (device or node+device))
     - PValue (measured active power)
     - QValue (measured reactive power)
-    - PQValue (measured active and reactive power)
     - IValue (measured electric current)
     - Vvalue (measured voltage or setpoint)
     - Branchtaps
