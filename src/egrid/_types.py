@@ -269,8 +269,8 @@ Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
 ----------
-id: str
-    identifier of scaling factor, unique among factors with same step
+id: str|iterable_of_str
+    identifier of scaling factor, unique among factors of same step
 type: 'var'|'const' (default value 'var')
     'var' - factor is a decision variable
     'const' - factor is a parameter
@@ -369,17 +369,18 @@ factor.
 
 Parameters
 ----------
-objiid: str
+objiid: str|iterable_of_str
     identifier of injection/branch
-part: 'p'|'q'|'g'|'b'|str
+part: 'p'|'q'|'g'|'b'|iterable_of_two_char
     identifies the attribute of the injection/branch to multipy with factor
     ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
-id: str
-    identifier of scaling factor to connect
+id: str|iterable_of_str
+    identifier of scaling factor to connect, one identifier for each
+    given value or argument 'part'
 cls: KInjlink|KBranchlink (default value KInjlink)
-    KInjlink - links a injection
+    KInjlink - links an injection
     KBranchlink - links a branch
-step: int (default value 0)
+step: int (default value 0)|iterable_of_int
     addresses the optimization step, first optimization step has index 0"""
 
 Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))

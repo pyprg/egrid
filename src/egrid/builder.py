@@ -486,46 +486,46 @@ def _tostring(string):
 def _notsupported(string):
     raise NotImplementedError('')
 
-_bools = bool, False
-_boolm = bool, True
-_ints = int, False
-_intm = int, True
-_floats = float, False
-_floatm = float, True
-_strs = _tostring, False
-_strm = _tostring, True
+_bool = bool, False
+_bools = bool, True
+_int = int, False
+_ints = int, True
+_float = float, False
+_floats = float, True
+_str = _tostring, False
+_strs = _tostring, True
 _ns = _notsupported, True
 
 _meta_of_types = [
      #          message level
-     (Message, [_strs,  _ints]),
-     #       id     type   id_of_source value     min     max      step
-     (Defk, [_strm, _strs, _strs,       _floats, _floats, _floats, _intm]),
+     (Message, [_str,   _int]),
+     #       id     type  id_of_source value   min     max     step
+     (Defk, [_strs, _str, _str,        _float, _float, _float, _ints]),
      #       objid  part   id     cls            step
-     (Link, [_strm, _strm, _strm, _notsupported, _intm]),
-     #       id     arg    fn     step
-     (Term, [_strs, _strs, _strs, _intm]),
+     (Link, [_strs, _strs, _strs, _notsupported, _ints]),
+     #       id    arg   fn    step
+     (Term, [_str, _str, _str, _ints]),
      #         id_of_batch id_of_device id_of_node
-     (Output, [_strs,      _strs,       _strs]),
+     (Output, [_str,       _str,        _str]),
      #         id_of_batch P        direction
-     (PValue, [_strs,      _floats, _floats]),
+     (PValue, [_str,       _float, _float]),
      #         id_of_batch Q        direction
-     (QValue, [_strs,      _floats, _floats]),
+     (QValue, [_str,       _float, _float]),
      #         id_of_batch I
-     (IValue, [_strs,      _floats]),
+     (IValue, [_str,       _float]),
      #         id_of_node  V
-     (IValue, [_strs,      _floats]),
+     (IValue, [_str,       _float]),
      (Branchtaps,
-     # id     id_of_node id_of_branch Vstep    positionmin positionneutral
-      [_strs, _strs,     _strs,       _floats, _ints,      _ints,
+     # id    id_of_node id_of_branch Vstep   positionmin positionneutral
+      [_str, _str,      _str,        _float, _int,       _int,
      # positionmax position
-       _ints,      _ints]),
-     #         id     id_of_node_A id_of_node_B y_lo     y_tr
-     (Branch, [_strs, _strs,       _strs,       _floats, _floats]),
+       _int,       _int]),
+     #         id    id_of_node_A id_of_node_B y_lo    y_tr
+     (Branch, [_str, _str,        _str,        _float, _float]),
      #            id_of_node V
-     (Slacknode, [_strs,     _floats]),
-     #            id     id_of_node P10      Q10      Exp_v_p  Exp_v_q
-     (Injection, [_strs, _strs,     _floats, _floats, _floats, _floats])]
+     (Slacknode, [_str,     _float]),
+     #            id    id_of_node P10     Q10     Exp_v_p  Exp_v_q
+     (Injection, [_str, _str,      _float, _float, _float, _float])]
 
 @singledispatch
 def _create_objects(arg):
@@ -534,7 +534,7 @@ def _create_objects(arg):
 @_create_objects.register(str)
 def _(arg):
     import graphparser as gp
-    from graphparser.parsing import parse
+    from graphparser import parse
     from itertools import tee
     type_data = gp.make_type_data(_meta_of_types)
     t1, t2 = tee(parse(arg))
