@@ -484,7 +484,9 @@ def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
 def _notsupported(string):
-    raise NotImplementedError('')
+    def raiseerror(_):
+        raise NotImplementedError(string)
+    return raiseerror
 
 _bool = bool, False
 _bools = bool, True
@@ -494,15 +496,19 @@ _float = float, False
 _floats = float, True
 _str = _tostring, False
 _strs = _tostring, True
-_ns = _notsupported, True
+_ns = (
+       _notsupported(
+           'attribute cls is not supported by the text interface, '
+           'the default value will be applied when removed'), 
+       True)
 
 _meta_of_types = [
      #          message level
      (Message, [_str,   _int]),
      #       id     type  id_of_source value   min     max     step
      (Defk, [_strs, _str, _str,        _float, _float, _float, _ints]),
-     #       objid  part   id     cls            step
-     (Link, [_strs, _strs, _strs, _notsupported, _ints]),
+     #       objid  part   id     cls  step
+     (Link, [_strs, _strs, _strs, _ns, _ints]),
      #       id    arg   fn    step
      (Term, [_str, _str, _str, _ints]),
      #         id_of_batch id_of_device id_of_node
@@ -550,18 +556,28 @@ def _(arg):
 def create_objects(args):
     """Creates instances of network objects from strings. Supports
     engineering notation for floats and complex (see function e3).
-    Flattens nested structures. Simply passes network objects to output.
+    ::
+            'n' -> 'e-9'
+            'u' -> 'e-6'
+            'µ' -> 'e-6'
+            'm' -> 'e-3'
+            'k' -> 'e3'
+            'M' -> 'e6'
+            'G' -> 'e9'
+
+    Flattens nested structures. Simply passes network objects (and others?)
+    to output.
 
     Parameters
     ----------
     args: iterable
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link, str and iterables thereof;
+        Branchtaps, Defk, Link, Term, Message, str and iterables thereof;
         strings in args are processed with graphparser.parse
 
     Returns
     -------
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Term, Message"""
+        Branchtaps, Defk, Link, Term, Message"""
     return _flatten(map(_create_objects, _flatten(args)))
