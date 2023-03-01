@@ -74,16 +74,18 @@ id: str
 id_of_node: str
     id of connected node
 P10: float, (default value 0)
-    active power at a voltage of 1.0 pu
+    active power when magnitude of voltage is 1.0 pu,
+    the value is the sum for all three phases
 Q10: float, (default value 0)
-    reactive power at a voltage of 1.0 pu
+    reactive power when magnitude of voltage is 1.0 pu
+    the value is the sum for all three phases
 Exp_v_p: float, (default value 0)
     exponent for voltage dependency of active power,
-    0.0 if power is independent from voltage-magnitude power e.g. generators
+    0.0 active power P is independent from voltage-magnitude e.g. generators
     2.0 for constant conductance
 Exp_v_q: float, (default value 0)
     exponent for voltage dependency of active power,
-    0.0 power is independent from voltage-magnitude power e.g. generators
+    0.0 reactive power is independent from voltage-magnitude e.g. generators
     2.0 for constant susceptance"""
 
 Output = namedtuple(
@@ -95,7 +97,7 @@ of a device which is part of a group of devices whose flow is measured.
 Parameters
 ----------
 id_of_batch: str
-    unique identifier of the point
+    unique identifier of the batch
 id_of_device: str
     id referencing a branch or an injection
 id_of_node: str (default value None)
@@ -105,7 +107,7 @@ PValue = namedtuple(
     'PValue',
     'id_of_batch P direction',
     defaults=(0., 1.))
-PValue.__doc__ = """Values of (measured) active power. The
+PValue.__doc__ = """Value of (measured) active power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance(s) having the identical 'id_of_batch' value must
@@ -118,7 +120,7 @@ Parameters
 id_of_batch: str
     unique identifier of the point
 P: float
-    active power
+    active power, sum of all three phases
 direction: float (default value 1)
     -1 or 1"""
 
@@ -126,7 +128,7 @@ QValue = namedtuple(
     'QValue',
     'id_of_batch Q direction',
     defaults=(0., 1.))
-QValue.__doc__ = """Values of (measured) reactive power. The
+QValue.__doc__ = """Value of (measured) reactive power. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance(s) having the identical 'id_of_batch' value
@@ -139,14 +141,14 @@ Parameters
 id_of_batch: str
     unique identifier of the point
 Q: float
-    reactive power
+    reactive power, sum of all three phases
 direction: float (default value 1)
     -1 or 1"""
 
 IValue = namedtuple(
     'IValue',
     'id_of_batch I', defaults=(0.0,))
-IValue.__doc__ = """Values of (measured) electric current. The
+IValue.__doc__ = """Value of (measured) electric current. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance having the identical 'id_of_batch' value
@@ -159,7 +161,7 @@ Parameters
 id_of_batch: str
     unique identifier of the point
 I: float
-    electric current"""
+    magnitude of electric current, value for one phase"""
 
 Vvalue = namedtuple(
     'Vvalue',
@@ -173,7 +175,7 @@ id_of_node: str
     unique identifier of node the voltage was measured at or the
     setpoint is for
 Vvalue: float (default value 1.0)
-    electric voltage"""
+    magnitude of electric voltage"""
 
 Branchtaps = namedtuple(
     'Branchtaps',
@@ -337,18 +339,18 @@ id: str
 step: int
     optimization step"""
 
-def link_(objid, part, id_, cls_, steps):
+def link_(objid, id_, part, cls_, steps):
     """Creates an instance of class cls.
 
     Parameters
     ----------
     objid: str, or list<str>, or tuple<str>
         id of object to link
-    part: 'p'|'q'|'pq'
-        active power or reactive power
     id_: str, or list<str>, or tuple<str>
         id of linked factor, accepts number of parts ids
         (one for 'p' or 'q', two for 'pq')
+    part: 'p'|'q'|'pq'
+        active power or reactive power
     cls_: KInjlink
         class of link
     steps: int, or list<int>, or tuple<int>
@@ -363,7 +365,8 @@ def link_(objid, part, id_, cls_, steps):
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
-Link = namedtuple('Link', 'objid part id cls step', defaults=(KInjlink, 0))
+Link = namedtuple(
+    'Link', 'objid id part cls step', defaults=('pq', KInjlink, 0))
 Link.__doc__ = """Logical connection between injection/branch and a scaling
 factor.
 
@@ -371,12 +374,12 @@ Parameters
 ----------
 objiid: str|iterable_of_str
     identifier of injection/branch
-part: 'p'|'q'|'g'|'b'|iterable_of_two_char
-    identifies the attribute of the injection/branch to multipy with factor
-    ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
 id: str|iterable_of_str
     identifier of scaling factor to connect, one identifier for each
     given value or argument 'part'
+part: 'p'|'q'|'g'|'b'|iterable_of_two_char (default 'pq')
+    identifies the attribute of the injection/branch to multipy with factor
+    ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
 cls: KInjlink|KBranchlink (default value KInjlink)
     KInjlink - links an injection
     KBranchlink - links a branch

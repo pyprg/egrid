@@ -90,7 +90,7 @@ class Check_factors_links(unittest.TestCase):
         """Define a load factor and link the load to an injection.
         No messages."""
         frames = make_data_frames(
-            _elements + [Defk(id='k'), Link('load_0', 'p', 'k')])
+            _elements + [Defk(id='k'), Link('load_0', 'k', 'p')])
         self.assertIsInstance(
             frames, dict, 'make_data_frames shall return an instance of dict')
         self.assertEqual(len(frames['Message']), 0, 'no error')
@@ -156,7 +156,7 @@ class Check_factors_links(unittest.TestCase):
     def test_defk_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
-            _elements + [Defk(id='k'), Link('invalid_id', 'p', id='k')])
+            _elements + [Defk(id='k'), Link('invalid_id', id='k', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -180,7 +180,7 @@ class Check_factors_links(unittest.TestCase):
         """Message for link with invalid reference to factor."""
         frames = make_data_frames(
             _elements
-            + [Defk(id='k'), Link('load_0', 'p', id='invalid_factor_id')])
+            + [Defk(id='k'), Link('load_0', id='invalid_factor_id', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -237,10 +237,10 @@ class Check_factors_links(unittest.TestCase):
         frames = make_data_frames(
             _elements
             + [Defk('k'),
-                Link('load_0', 'p', 'k'),
-                Link('load_0', 'p', 'k'), #duplicate
-                Link('load_0', 'p', 'kp'),#duplicate, invalid ref
-                Link('load_0', 'q', 'k')])
+                Link('load_0', 'k', 'p'),
+                Link('load_0', 'k', 'p'), #duplicate
+                Link('load_0', 'kp', 'p'),#duplicate, invalid ref
+                Link('load_0', 'k', 'q')])
         self.assertIsInstance(
             frames,
             dict,
