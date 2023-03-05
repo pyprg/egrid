@@ -339,14 +339,14 @@ def make_model_objects(entities):
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue"""
     return chain.from_iterable(make_objects(e) for e in entities)
 
-def make_data_frames(devices):
+def make_data_frames(devices=()):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
     of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue,
     Vvalue, Branchtaps, Defk, Link, Message)
 
     Parameters
     ----------
-    devices: iterable
+    devices: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Branchtaps, Defk, Link
 
@@ -499,7 +499,7 @@ def _(arg):
             Message,
             ('  '+t[1][2:] for t in t2 if is_instruction(t))))
 
-def create_objects(args):
+def create_objects(args=()):
     """Creates instances of network objects from strings. Supports
     engineering notation for floats and complex (see function e3).
     ::
@@ -516,7 +516,7 @@ def create_objects(args):
 
     Parameters
     ----------
-    args: iterable
+    args: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Branchtaps, Defk, Link, Term, Message, str and iterables thereof;
         strings in args are processed with graphparser.parse

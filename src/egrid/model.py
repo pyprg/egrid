@@ -30,6 +30,9 @@ from collections import namedtuple
 from functools import partial
 from itertools import chain
 from egrid._types import (
+    df_astype,
+    Slacknode, Branch, Branchtaps, Loadfactor, KInjlink, Injection,
+    Output, IValue, PValue, QValue, Vvalue, Term, Message,
     SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
@@ -41,7 +44,7 @@ Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
-    'branchtaps shape_of_Y count_of_slacks '
+    'branchtaps shape_of_Y count_of_slacks y_max '
     'load_scaling_factors injection_factor_associations mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network for
@@ -121,6 +124,12 @@ shape_of_Y: tuple (int, int)
     shape of admittance matrix for power flow calculation
 count_of_slacks: int
     number of slack-nodes for power flow calculation
+y_max: float
+    * maximum conductance/susceptance value of a branch longitudinal
+      admittance, if a branch has a greater admittance value is is regarded
+      a connection with inifinite admittance (no impedance), the connectivity
+      nodes of both terminals are aggregated into one power-flow-calculation
+      node
 load_scaling_factors: pandas.DataFrame
 
 injection_factor_associations: pandas.DataFrame
@@ -335,7 +344,8 @@ def _get_branch_taps_data(branchterminals, tapsframe):
 
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
-        dataframes.get('Branch', BRANCHES)[['id_of_node_A', 'id_of_node_B']]
+        _getframe(dataframes, Branch, BRANCHES)
+        [['id_of_node_A', 'id_of_node_B']]
         .to_numpy()
         .reshape(-1))
     node_id_index = pd.Index(node_ids, dtype=str)
@@ -343,41 +353,38 @@ def _prepare_nodes(dataframes):
         data={'idx': range(len(node_id_index))},
         index=node_id_index)
 
-def _prepare_branch_taps(add_idx_of_node, dataframes):
-    branch = dataframes.get('Branch', BRANCHES)
-    branchtaps_ = add_idx_of_node(
-        dataframes.get('Branchtaps', BRANCHTAPS))
-    valid = branchtaps_.id_of_branch.isin(branch[~branch.is_bridge].id)
+def _prepare_branch_taps(add_idx_of_node, dfbranch, dfbranchtaps):
+    branchtaps_ = add_idx_of_node(dfbranchtaps)
+    valid = branchtaps_.id_of_branch.isin(dfbranch[~dfbranch.is_bridge].id)
     branchtaps = branchtaps_[valid].reset_index(drop=True)
     branchtaps.reset_index(inplace=True)
     branchtaps.rename(columns={'index':'index_of_taps'}, inplace=True)
     branchindex = (
-        branch['id']
+        dfbranch['id']
         .reset_index()
         .rename(columns={'index':'index_of_branch'})
         .set_index('id'))
     return branchtaps.join(branchindex, on='id_of_branch')
 
-def _prepare_branches(branchtaps, dataframes, nodes):
+def _prepare_branches(branchtaps, branches, nodes):
     branchtaps_view = (
         branchtaps[['id_of_branch', 'id_of_node', 'index_of_taps']]
         .set_index(['id_of_branch', 'id_of_node']))
-    brs = dataframes.get('Branch', BRANCHES)
-    if not brs['id'].is_unique:
+    if not branches['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
     nodes_ = nodes[['index_of_node', 'switch_flow_idx']]
-    _branches = (
-        brs
+    branches_ = (
+        branches
         .join(nodes_, on='id_of_node_A')
         .join(nodes_, on='id_of_node_B', lsuffix='_A', rsuffix='_B'))
-    _branches.reset_index(inplace=True)
-    _branches.rename(columns={'index':'index_of_branch'}, inplace=True)
-    branchcount = len(_branches)
-    _branches['index_of_term_A'] = range(branchcount)
-    _branches['index_of_term_B'] = range(branchcount, 2 * branchcount)
+    branches_.reset_index(inplace=True)
+    branches_.rename(columns={'index':'index_of_branch'}, inplace=True)
+    branchcount = len(branches_)
+    branches_['index_of_term_A'] = range(branchcount)
+    branches_['index_of_term_B'] = range(branchcount, 2 * branchcount)
     return (
-        _branches
+        branches_
         .join(branchtaps_view, on=['id', 'id_of_node_A'], how='left')
         .join(branchtaps_view, on=['id', 'id_of_node_B'], how='left',
             lsuffix='_A',
@@ -538,6 +545,32 @@ def get_node_inj_matrix(count_of_nodes, injections):
             coo_matrix(([], ([], [])), shape=(0, 0), dtype=np.int8).tocsc()
         ).tocsc()
 
+def _getframe(frames, cls_, default):
+    """Extracts a pandas.DataFrame from frames and returns a copy with
+    column types casted to predefined types.
+
+    Parameters
+    ----------
+    frames: dict
+        pandas.DataFrame
+    cls_: class
+        class of predifined named tuples
+    default: pandas.DataFrame
+        returned of frames does not provide a DataFrame with
+        key cls_.__name__
+
+    Returns
+    -------
+    pandas.DataFrame
+
+    Raises
+    ------
+    Exception if data cannot be converted into required type"""
+    df = frames.get(cls_.__name__)
+    if df is None:
+        return default
+    return df_astype(df, cls_)
+
 def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     """Creates a network model for power flow calculation.
 
@@ -645,15 +678,17 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .branchtaps, pandas.DataFrame
         * .shape_of_Y, tuple of int, shape of admittance matrix
         * .count_of_slacks, int, number of slacks for power flow calculation
+        * .y_max, float, maximum admittance between two power-flow-calculation
+            nodes
         * .load_scaling_factors
         * .injection_factor_associations
         * .mnodeinj
         * .terms
         * .messages"""
-    if not dataframes:
+    if dataframes is None:
         dataframes = {}
-    slacks_ = dataframes.get('Slacknode', SLACKNODES)
-    branches_ = dataframes.get('Branch', BRANCHES)
+    slacks_ = _getframe(dataframes, Slacknode, SLACKNODES)
+    branches_ = _getframe(dataframes, Branch, BRANCHES)
     if not branches_['id'].is_unique:
         msg = "Error: IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -680,8 +715,11 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         head_tail(slack_groups.id_of_node.get_group(group_name))
         for group_name in super_slack_idxs]
     #
-    branchtaps_ = _prepare_branch_taps(add_idx_of_node, dataframes)
-    branches = _prepare_branches(branchtaps_, dataframes, pfc_nodes)
+    branchtaps_ = _prepare_branch_taps(
+        add_idx_of_node,
+        branches_,
+        _getframe(dataframes, Branchtaps, BRANCHTAPS))
+    branches = _prepare_branches(branchtaps_, branches_, pfc_nodes)
     branchterminals = _get_branch_terminals(_add_bg(branches))
     branchterminals['at_slack'] = (
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
@@ -693,12 +731,12 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     branchtaps = branchtaps_.join(
         termindex, on=['id_of_node', 'id_of_branch'], how='inner')
     # injections
-    injections = add_idx_of_node(dataframes.get('Injection', INJECTIONS))
+    injections = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
     if not injections['id'].is_unique:
         msg = "Error: IDs of injections must be unique but are not."
         raise ValueError(msg)
     # measured terminals
-    outputs = dataframes.get('Output', OUTPUTS)
+    outputs = _getframe(dataframes, Output, OUTPUTS)
     is_branch_output = outputs.id_of_device.isin(branches.id)
     is_injection_output = ~is_branch_output
     branchoutputs = (
@@ -713,10 +751,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     # factors
     load_scaling_factors_=(
-        dataframes.get('Loadfactor', LOADFACTORS).set_index(['step', 'id']))
+        _getframe(dataframes, Loadfactor, LOADFACTORS)
+        .set_index(['step', 'id']))
     assoc_ = (
-        dataframes
-        .get('KInjlink', KINJLINKS)
+        _getframe(dataframes, KInjlink, KINJLINKS)
         .set_index(['step', 'injid', 'part']))
     assoc = assoc_[~assoc_.index.duplicated(keep='first')]
     # filter stepwise for intersection of links and factors
@@ -731,9 +769,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         .notna())
     is_valid_assoc.index = assoc.index
     # math terms (parts) of objective function
-    terms = (
-        dataframes
-        .get('Term', TERMS))
+    terms = _getframe(dataframes, Term, TERMS)
     return Model(
         nodes=pfc_nodes,
         slacks=pfc_slacks,
@@ -741,18 +777,19 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         branchterminals=branchterminals,
         branchoutputs=branchoutputs,
         injectionoutputs=injectionoutputs,
-        pvalues=dataframes.get('PValue', PVALUES),
-        qvalues=dataframes.get('QValue', QVALUES),
-        ivalues=dataframes.get('IValue', IVALUES),
-        vvalues=add_idx_of_node(dataframes.get('Vvalue', VVALUES)),
+        pvalues=_getframe(dataframes, PValue, PVALUES),
+        qvalues=_getframe(dataframes, QValue, QVALUES),
+        ivalues=_getframe(dataframes, IValue, IVALUES),
+        vvalues=add_idx_of_node(_getframe(dataframes, Vvalue, VVALUES)),
         branchtaps=branchtaps,
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
+        y_max=y_lo_abs_max,
         load_scaling_factors=load_scaling_factors,
         injection_factor_associations=assoc[is_valid_assoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
-        messages=dataframes.get('Message', MESSAGES.copy()))
+        messages=_getframe(dataframes, Message, MESSAGES.copy()))
 
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.

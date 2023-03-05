@@ -421,7 +421,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_empty(self):
         import pandas as pd
-        frames = make_data_frames(())
+        frames = make_data_frames()
         self.assertEqual(
             len(frames), 14, 'make_data_frames creates 14 items')
         self.assertTrue(

@@ -502,13 +502,13 @@ _attribute_types = {
        [False, False, False, False, False, False, False, False]),
      #    id      id_of_node_A id_of_node_B y_lo   y_tr
      Branch:(
-         [object, object, object, np.float64, np.float64],
-         [_tostring, _tostring, _tostring, np.float64, np.float64],
+         [object, object, object, np.complex128, np.complex128],
+         [_tostring, _tostring, _tostring, np.complex128, np.complex128],
          [False, False, False, False, False]),
      #    id_of_node V
      Slacknode:(
-         [object, np.float64],
-         [_tostring, np.float64],
+         [object, np.complex128],
+         [_tostring, np.complex128],
          [False, False]),
      #    id     id_of_node  P10      Q10         Exp_v_p     Exp_v_q
      Injection:(
@@ -521,22 +521,57 @@ meta_of_types = [
     (cls_, tuple(zip(*info[1:3]))) for cls_, info in _attribute_types.items()]
 _EMPTY_TUPLE = ()
 
-def _empty_df(cls_):
-    return (
-        pd.DataFrame(_EMPTY_TUPLE, columns=cls_._fields)
-        .astype(dict(zip(cls_._fields, _attribute_types[cls_][0]))))
+def df_astype(df, cls_):
+    """Casts types of pandas.DataFrame columns to types according
+    to _attribute_types.
+
+    Parameters
+    ----------
+    df: pandas.DataFrame
+    cls_: class
+        class of named tuple
+
+    Returns
+    -------
+    pandas.DataFrame
+
+    Raises
+    ------
+    Exception if data cannot be converted into required type"""
+    return df.astype(dict(zip(cls_._fields, _attribute_types[cls_][0])))
+
+def make_df(cls_, content=_EMPTY_TUPLE):
+    """Creates a pandas.DataFrame instance with column types set according
+    to _attribute_types.
+
+    Parameters
+    ----------
+    cls_: class
+        class of named tuple
+    content: array_like (iterable?)
+        instances of cls_
+
+    Returns
+    -------
+    pandas.DataFrame
+
+    Raises
+    ------
+    Exception when data cannot be converted into required type"""
+    return df_astype(pd.DataFrame(content, columns=cls_._fields), cls_)
+
 # frames with types for columns
-SLACKNODES = _empty_df(Slacknode)
-BRANCHES = _empty_df(Branch)
-INJECTIONS = _empty_df(Injection)
-OUTPUTS = _empty_df(Output)
-PVALUES = _empty_df(PValue)
-QVALUES = _empty_df(QValue)
-IVALUES = _empty_df(IValue)
-VVALUES = _empty_df(Vvalue)
-BRANCHTAPS = _empty_df(Branchtaps)
-LOADFACTORS = _empty_df(Loadfactor)
-KINJLINKS = _empty_df(KInjlink)
-KBRANCHLINKS = _empty_df(KBranchlink)
-TERMS = _empty_df(Term)
-MESSAGES = _empty_df(Message)
+SLACKNODES = make_df(Slacknode)
+BRANCHES = make_df(Branch)
+INJECTIONS = make_df(Injection)
+OUTPUTS = make_df(Output)
+PVALUES = make_df(PValue)
+QVALUES = make_df(QValue)
+IVALUES = make_df(IValue)
+VVALUES = make_df(Vvalue)
+BRANCHTAPS = make_df(Branchtaps)
+LOADFACTORS = make_df(Loadfactor)
+KINJLINKS = make_df(KInjlink)
+KBRANCHLINKS = make_df(KBranchlink)
+TERMS = make_df(Term)
+MESSAGES = make_df(Message)
