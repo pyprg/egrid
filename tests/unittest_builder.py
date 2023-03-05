@@ -21,7 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 import context
-from egrid.builder import (make_objects, create_objects,
+from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
     Message, Defk, Link)
 
@@ -416,6 +416,21 @@ class Create_objects(unittest.TestCase):
             res,
             [Link(objid=('hallo',), part=('p',), id=('myid',))],
             'create_objects creates instances of Link')
+
+class Make_data_frames(unittest.TestCase):
+
+    def test_empty(self):
+        import pandas as pd
+        frames = make_data_frames(())
+        self.assertEqual(
+            len(frames), 14, 'make_data_frames creates 14 items')
+        self.assertTrue(
+            all(isinstance(df, pd.DataFrame)
+                for key, df in frames.items()),
+            'all values are pandas.DataFrames')
+        self.assertTrue(
+            all(df.empty for key, df in frames.items()),
+            'all dataframes are empty')
 
 if __name__ == '__main__':
     unittest.main()

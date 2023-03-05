@@ -30,13 +30,12 @@ from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Branchtaps, Loadfactor, Defk, defk, expand_defk, DEFAULT_FACTOR_ID,
     Link, link_, KInjlink, KBranchlink,
-    Term, Message)
+    Term, Message, meta_of_types)
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
-_replacement = {
-    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3',
-    'k':'e3', 'M':'e6', 'G': 'e9'}
+_replacement = dict(
+    n='e-3', u='e-6', µ='e-6', m='e-3', k='e3', M='e6', G='e9')
 
 def _replace_e3(match):
     """Returns a replacement string for given match.
@@ -480,59 +479,6 @@ def _flatten(args):
         except:
             yield Message(f'wrong type, ignored object: {str(args)}', 1)
 
-def _tostring(string):
-    return string[1:-1] if string.startswith(('\'', '"')) else string
-
-def _notsupported(string):
-    def raiseerror(_):
-        raise NotImplementedError(string)
-    return raiseerror
-
-_bool = bool, False
-_bools = bool, True
-_int = int, False
-_ints = int, True
-_float = float, False
-_floats = float, True
-_str = _tostring, False
-_strs = _tostring, True
-_ns = (
-       _notsupported(
-           'attribute cls is not supported by the text interface, '
-           'the default value will be applied when removed'), 
-       True)
-
-_meta_of_types = [
-     #          message level
-     (Message, [_str,   _int]),
-     #       id     type  id_of_source value   min     max     step
-     (Defk, [_strs, _str, _str,        _float, _float, _float, _ints]),
-     #       objid  part   id     cls  step
-     (Link, [_strs, _strs, _strs, _ns, _ints]),
-     #       id    arg   fn    step
-     (Term, [_str, _str, _str, _ints]),
-     #         id_of_batch id_of_device id_of_node
-     (Output, [_str,       _str,        _str]),
-     #         id_of_batch P        direction
-     (PValue, [_str,       _float, _float]),
-     #         id_of_batch Q        direction
-     (QValue, [_str,       _float, _float]),
-     #         id_of_batch I
-     (IValue, [_str,       _float]),
-     #         id_of_node  V
-     (IValue, [_str,       _float]),
-     (Branchtaps,
-     # id    id_of_node id_of_branch Vstep   positionmin positionneutral
-      [_str, _str,      _str,        _float, _int,       _int,
-     # positionmax position
-       _int,       _int]),
-     #         id    id_of_node_A id_of_node_B y_lo    y_tr
-     (Branch, [_str, _str,        _str,        _float, _float]),
-     #            id_of_node V
-     (Slacknode, [_str,     _float]),
-     #            id    id_of_node P10     Q10     Exp_v_p  Exp_v_q
-     (Injection, [_str, _str,      _float, _float, _float, _float])]
-
 @singledispatch
 def _create_objects(arg):
     return arg
@@ -542,7 +488,7 @@ def _(arg):
     import graphparser as gp
     from graphparser import parse
     from itertools import tee
-    type_data = gp.make_type_data(_meta_of_types)
+    type_data = gp.make_type_data(meta_of_types)
     t1, t2 = tee(parse(arg))
     is_comment = lambda t: t[0]=='comment'
     is_instruction = lambda t: t[0]=='comment' and t[1].startswith('#.')

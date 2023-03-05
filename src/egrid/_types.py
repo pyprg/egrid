@@ -21,14 +21,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
-from numpy import inf
+import numpy as np
 from collections import namedtuple
 from itertools import product
 
 Branch = namedtuple(
     'Branch',
     'id id_of_node_A id_of_node_B y_lo y_tr',
-    defaults=(complex(inf, inf), 0.0j))
+    defaults=(complex(np.inf, np.inf), 0.0j))
 Branch.__doc__ == """Model of an electrical device having two terminals
 e.g. transformers, windings of multi-winding transformers, lines,
 closed switch.
@@ -208,7 +208,7 @@ DEFAULT_FACTOR_ID = '_default_'
 Loadfactor = namedtuple(
     'Loadfactor',
     'id type id_of_source value min max step',
-    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -inf, inf, 0))
+    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, 0))
 Loadfactor.__doc__ = """Data of a load scaling factor.
 
 Parameters
@@ -230,7 +230,7 @@ step: int (default value 0)
     index of optimization step"""
 
 def defk(id_, type_='var', id_of_source=None, value=1.0,
-          min_=-inf, max_=inf, step=0):
+          min_=-np.inf, max_=np.inf, step=0):
     """Creates a factor definition for each step.
 
     Parameters
@@ -266,7 +266,7 @@ def defk(id_, type_='var', id_of_source=None, value=1.0,
 Defk = namedtuple(
     'Defk',
     'id type id_of_source value min max step',
-    defaults=('var', None, 1.0, -inf, inf, 0))
+    defaults=('var', None, 1.0, -np.inf, np.inf, 0))
 Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
@@ -408,22 +408,135 @@ Parameters
 message: str
     human readable text
 level: int
-    0 - information#
+    0 - information
     1 - warning
     2 - error"""
 
+def _tostring(string):
+    return string[1:-1] if string.startswith(('\'', '"')) else string
+
+def _notsupported(string):
+    def raiseerror(_):
+        raise NotImplementedError(string)
+    return raiseerror
+
+_ns = (_notsupported
+       ('attribute cls is not supported by the text interface, '
+        'remove the attribute cls in order to apply the default value'),
+       True)
+# class => (column_types, function_string_to_type, is_tuple?)
+_attribute_types = {
+     #    message level
+     Message:(
+         [object, np.int16],
+         [_tostring, np.int16],
+         [False, False]),
+     #    id      type id_of_source value     min
+     #    max         step
+     Defk:(
+         [object, object, object, np.float64, np.float64,
+          np.float64, np.int16],
+         [_tostring, _tostring, _tostring,
+          np.float64, np.float64, np.float64, np.int16],
+         [True, False, False, False, False, False, True]),
+     #    id, type, id_of_source, value, min, max, step
+     Loadfactor:(
+         [object, object, object,
+          np.float64, np.float64, np.float64, np.int16],
+         [_tostring, _tostring, _tostring,
+          np.float64, np.float64, np.float64, np.int16],
+         [False, False, False,
+          False, False, False, False]),
+     #    injid, part, id, step
+     KInjlink:(
+         [object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, np.int16],
+         [False, False, False, False]),
+     #    branchid, part, id, step
+     KBranchlink:(
+         [object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, np.int16],
+         [False, False, False, False]),
+     #    objid   part    id      cls     step
+     Link:(
+         [object, object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, _ns, np.int16],
+         [True, True, True, False, True]),
+     #    id       arg     fn      step
+     Term:(
+         [object,  object, object, np.int32],
+         [_tostring, _tostring, _tostring, np.int32],
+         [False, False, False, True]),
+     #    id_of_batch id_of_device id_of_node
+     Output:(
+         [object, object, object],
+         [_tostring, _tostring, _tostring],
+         [False, False, False]),
+     #    id_of_batch   P     direction
+     PValue:(
+         [object, np.float64, np.float64],
+         [_tostring,  np.float64, np.float64],
+         [False, False, False]),
+     #    id_of_batch   Q     direction
+     QValue:(
+         [object, np.float64, np.float64],
+         [_tostring, np.float64, np.float64],
+         [False, False, False]),
+     #    id_of_batch   I
+     IValue:(
+         [object, np.float64],
+         [_tostring, np.float64],
+         [False, False]),
+     #    id_of_node  V
+     Vvalue:(
+         [object, np.float64],
+         [_tostring, np.float64],
+         [False, False]),
+     Branchtaps:
+     #  id   id_of_node id_of_branch Vstep  positionmin positionneutral
+     # positionmax position
+      ([object, object, object, np.float64, np.int16, np.int16,
+        np.int16, np.int16],
+       [_tostring, _tostring, _tostring, np.float64, np.int16, np.int16,
+       np.int16, np.int16],
+       [False, False, False, False, False, False, False, False]),
+     #    id      id_of_node_A id_of_node_B y_lo   y_tr
+     Branch:(
+         [object, object, object, np.float64, np.float64],
+         [_tostring, _tostring, _tostring, np.float64, np.float64],
+         [False, False, False, False, False]),
+     #    id_of_node V
+     Slacknode:(
+         [object, np.float64],
+         [_tostring, np.float64],
+         [False, False]),
+     #    id     id_of_node  P10      Q10         Exp_v_p     Exp_v_q
+     Injection:(
+         [object, object, np.float64, np.float64, np.float64, np.float64],
+         [_tostring, _tostring, np.float64, np.float64, np.float64,
+          np.float64],
+         [False, False, False, False, False, False])}
+
+meta_of_types = [
+    (cls_, tuple(zip(*info[1:3]))) for cls_, info in _attribute_types.items()]
 _EMPTY_TUPLE = ()
-SLACKNODES = pd.DataFrame(_EMPTY_TUPLE, Slacknode._fields)
-BRANCHES = pd.DataFrame(_EMPTY_TUPLE, columns=Branch._fields)
-INJECTIONS = pd.DataFrame(_EMPTY_TUPLE, Injection._fields)
-OUTPUTS = pd.DataFrame(_EMPTY_TUPLE, Output._fields)
-PVALUES = pd.DataFrame(_EMPTY_TUPLE, PValue._fields)
-QVALUES = pd.DataFrame(_EMPTY_TUPLE, QValue._fields)
-IVALUES = pd.DataFrame(_EMPTY_TUPLE, IValue._fields)
-VVALUES = pd.DataFrame(_EMPTY_TUPLE, Vvalue._fields)
-BRANCHTAPS = pd.DataFrame(_EMPTY_TUPLE, Branchtaps._fields)
-LOADFACTORS = pd.DataFrame(_EMPTY_TUPLE, Loadfactor._fields)
-KINJLINKS = pd.DataFrame(_EMPTY_TUPLE, KInjlink._fields)
-KBRANCHLINKS = pd.DataFrame(_EMPTY_TUPLE, KBranchlink._fields)
-TERMS = pd.DataFrame(_EMPTY_TUPLE, Term._fields)
-MESSAGES = pd.DataFrame(_EMPTY_TUPLE, Message._fields)
+
+def _empty_df(cls_):
+    return (
+        pd.DataFrame(_EMPTY_TUPLE, columns=cls_._fields)
+        .astype(dict(zip(cls_._fields, _attribute_types[cls_][0]))))
+# frames with types for columns
+SLACKNODES = _empty_df(Slacknode)
+BRANCHES = _empty_df(Branch)
+INJECTIONS = _empty_df(Injection)
+OUTPUTS = _empty_df(Output)
+PVALUES = _empty_df(PValue)
+QVALUES = _empty_df(QValue)
+IVALUES = _empty_df(IValue)
+VVALUES = _empty_df(Vvalue)
+BRANCHTAPS = _empty_df(Branchtaps)
+LOADFACTORS = _empty_df(Loadfactor)
+KINJLINKS = _empty_df(KInjlink)
+KBRANCHLINKS = _empty_df(KBranchlink)
+TERMS = _empty_df(Term)
+MESSAGES = _empty_df(Message)
