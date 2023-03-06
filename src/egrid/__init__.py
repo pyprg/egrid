@@ -57,5 +57,5 @@ def make_model_checked(*args):
     frames = make_data_frames(create_objects(args))
     frames['Message'] = DataFrame.from_records(
         check_frames(frames),
-        columns=['message','message_class'])
+        columns=['message','level'])
     return model_from_frames(frames)

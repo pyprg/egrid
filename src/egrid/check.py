@@ -299,12 +299,12 @@ def check_frames(frames):
     Finds outputs having invalid value reference or device references.
     Finds disconnected injections and branches.
     Finds duplicates in identifiers of injections and branches.
-    Issues warnings (message_class == 1) and errors (message_class == 2).
+    Issues warnings (level == 1) and errors (level == 2).
     Create a pandas DataFrame with:
     ::
         pandas.DataFrame.from_records(
             check_frames(frames),
-            columns=['message','message_class'])
+            columns=['message','level'])
 
     Parameters
     ----------
