@@ -47,11 +47,9 @@ def check_numbers(frames, msg_cls=(2, 0, 2)):
     count_of_slacknodes = len(frames.get('Slacknode', []))
     count_of_branches = len(frames.get('Branch', BRANCHES))
     count_of_injections = len(frames.get('Injection', []))
-    yield (
-        f'count of slack-nodes: {count_of_slacknodes}, '
-        f'count of branches: {count_of_branches}, '
-        f'count of injections: {count_of_injections}, ',
-        0)
+    yield f'count of slack-nodes: {count_of_slacknodes}', 0
+    yield f'count of branches: {count_of_branches}', 0
+    yield f'count of injections: {count_of_injections}', 0
     if count_of_slacknodes < 1:
         yield 'no slack-node in grid-model', msg_cls[0]
     if count_of_injections < 1:

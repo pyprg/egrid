@@ -77,8 +77,8 @@ class Check_numbers(unittest.TestCase):
         messages = [*check_numbers(frames)]
         self.assertEqual(
             len(messages),
-            4,
-            'check_numbers yields 3 messages')
+            6,
+            'check_numbers yields 6 messages')
         self.assertIsInstance(
             get_first_error(frames),
             str,
