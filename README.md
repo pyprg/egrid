@@ -142,7 +142,7 @@ load_scaling_factors: pandas.DataFrame (index: 'step','id')
     * .value, float, used by initialization if no source factor in previous
        optimization step
     * .min, float
-        smallest possible value
+       smallest possible value
     * .max, float
        greatest possible value
 
