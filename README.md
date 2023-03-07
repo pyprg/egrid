@@ -3,13 +3,13 @@
 ## Purpose
 
 Model of a balanced electric distribution network for experimental power flow
-calculation and state estimation. Instances of Model shall be the input for
+calculation and state estimation. Instances of Model can be the input for
 (a variety of) power flow calculation or estimation algorithms. They
 provide an easy to use structure for calculating current and power flow
-through lines and into consumers using an additional voltage vector which
-is the result of a power-flow-calculation.
+through lines and into consumers (using an additional voltage vector which
+is the result of a power-flow-calculation).
 
-Function **make_model(*args)** creates an instance of Model from  arguments
+Function **make_model(\*args)** creates an instance of Model from  arguments
 of type
 
     - Slacknode
@@ -94,24 +94,24 @@ injectionoutputs: pandas.DataFrame
 
 pvalues: pandas.DataFrame
 
-    * .id_of_batch, unique identifier of measurement batch
+    * .id_of_batch, str, unique identifier of measurement batch
     * .P, float, active power
     * .direction, float, -1: from device into node, 1: from node into device
 
 qvalues: pandas.DataFrame
 
-    * .id_of_batch, unique identifier of measurement batch
+    * .id_of_batch, str, unique identifier of measurement batch
     * .Q, float, reactive power
     * .direction, float, -1: from device into node, 1: from node into device
 
 ivalues: pandas.DataFrame
 
-    * .id_of_batch, unique identifier of measurement batch
+    * .id_of_batch, str, unique identifier of measurement batch
     * .I, float, electric current
 
 vvalues: pandas.DataFrame
 
-    * .id_of_node, unique identifier of node voltage is given for
+    * .id_of_node, str, unique identifier of node voltage is given for
     * .V, float, magnitude of voltage
     * .index_of_node, index of node voltage is given for
 
@@ -149,7 +149,7 @@ load_scaling_factors: pandas.DataFrame (index: 'step','id')
 mnodeinj: scipy.sparse.csc_matrix
 
     converts a vector ordered according to injection indices to a vector
-    ordered according to power flow calculation nodes (adding entries of
+    ordered according to power flow calculation nodes (adding values of
     injections for each node) by calculating 'mnodeinj @ vector'
 
 injection_factor_associations: pandas.DataFrame (index: 'step','injid','part')
@@ -192,9 +192,11 @@ from egrid.builder import (
 
 example = [
     Slacknode(id_of_node='n_0', V=1.+0.j),
-    PQValue(
+    PValue(
         id_of_batch='pq_line_0',
-        P=30.,
+        P=30.),
+    QValue(
+        id_of_batch='pq_line_0',
         Q=8.),
     Output(
         id_of_batch='pq_line_0',
