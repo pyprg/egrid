@@ -13,10 +13,12 @@ Function **make_model(*args)** creates an instance of Model from  arguments
 of type
 
     - Slacknode
-    - Branch (line, series capacitor, transformer winding, transformer, closed switch)
+    - Branch (line, series capacitor, transformer winding, transformer, 
+      closed switch)
     - Injection (consumer, shunt capacitor, PQ/PV-generator, battery)
     - Branchtaps
-    - Output (indicates that measured flow (I or PQ) or a part thereof flows through the referenced terminal (device or node+device))
+    - Output (indicates that measured flow (I, P or Q) or a part thereof 
+      flows through the referenced terminal (device or node+device))
     - PValue (measured active power)
     - QValue (measured reactive power)
     - IValue (measured electric current)
@@ -64,10 +66,10 @@ branchterminals: pandas.DataFrame
     * .id_of_branch, str, unique idendifier of branch
     * .id_of_node, str, unique identifier of connected node
     * .id_of_other_node, str, unique identifier of node connected
-        at other side of the branch
+       at other side of the branch
     * .index_of_node, int, index of connected node
     * .index_of_other_node, int, index of node connected at other side
-        of the branch
+       of the branch
     * .y_lo, complex, longitudinal branch admittance
     * .y_tr_half, complex, half of transversal branch admittance
     * .g_lo, float, longitudinal conductance
@@ -136,13 +138,13 @@ load_scaling_factors: pandas.DataFrame (index: 'step','id')
 
     * .type, 'var'|'const', type of factor decision variable or parameter
     * .id_of_source, str, id of scaling factor (previous optimization step)
-        for initialization
+       for initialization
     * .value, float, used by initialization if no source factor in previous
-        optimization step
+       optimization step
     * .min, float
         smallest possible value
     * .max, float
-        greatest possible value
+       greatest possible value
 
 mnodeinj: scipy.sparse.csc_matrix
 
@@ -246,7 +248,7 @@ example = [
 Valid input to **make_model** is a multiline pseudo graphic string e.g.
 this one:
 ```
-               y_tr_half=1e-6+1e-6j            y_tr_half=1e-6+1e-6j
+               y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |                               |
@@ -255,7 +257,7 @@ n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |      Q10=5            Q10=5.7        Q10=2
                                 |
                                 |              y_lo=1e3-1e3j
-                                |              y_mm_half=1e-6+1e-6j
+                                |              y_tr=1e-6+1e-6j
                                 n1(---------- line_2 ----------)n3
                                                                 |
                                                       _load2 <<-n3->> load2_1_
