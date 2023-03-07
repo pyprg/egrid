@@ -187,8 +187,8 @@ Python code for example, suitable input for function **egrid.make_model**
 however, transformers/transformerwindings are modeled using class Branch too.):
 ```
 from egrid.builder import (
-    Slacknode, PQValue, IValue, Output, Branch, Branchtaps, Injection,
-    Defk, Link)
+    Slacknode, PValue, QValue, IValue, Output, Branch, Branchtaps, 
+    Injection, Defk, Link)
 
 example = [
     Slacknode(id_of_node='n_0', V=1.+0.j),
@@ -214,7 +214,7 @@ example = [
         id_of_node_A='n_0',
         id_of_node_B='n_1',
         y_lo=1e3-1e3j,
-        y_tr_half=1e-6+1e-6j),
+        y_tr=1e-6+1e-6j),
     Branchtaps(
         id='taps_0',
         id_of_node='n_0',
@@ -229,7 +229,7 @@ example = [
         id_of_node_A='n_1',
         id_of_node_B='n_2',
         y_lo=1e3-1e3j,
-        y_tr_half=1e-6+1e-6j),
+        y_tr=1e-6+1e-6j),
     Output(
         id_of_batch='pq_consumer_0',
         id_of_device='consumer_0'),
