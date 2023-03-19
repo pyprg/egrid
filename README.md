@@ -23,7 +23,7 @@ of type
     - QValue (measured reactive power)
     - IValue (measured electric current)
     - Vvalue (measured voltage or setpoint)
-    - Defk (definition of a scaling factor, for estimation)
+    - Deff (definition of a factor, for estimation)
     - Link (associates a scaling factor to a load)
 
 including tuples, lists and iterables thereof (for a power-flow-calculation
@@ -117,9 +117,9 @@ vvalues: pandas.DataFrame
 
 branchtaps: pandas.DataFrame
 
-    * .id, str, IDs of taps
-    * .id_of_node, str, ID of associated node
-    * .id_of_branch, str, ID of associated branch
+    * .id, str, unique identifier of taps
+    * .id_of_node, str, unique identifier of associated node
+    * .id_of_branch, str, unique identifier of associated branch
     * .Vstep, float, magnitude of voltage difference per step, pu
     * .positionmin, int, smallest tap position
     * .positionneutral, int, tap with ratio 1:1
@@ -134,10 +134,10 @@ count_of_slacks: int
 
     count_of_slacks
 
-load_scaling_factors: pandas.DataFrame (index: 'step','id')
+factors: pandas.DataFrame (index: 'step','id')
 
     * .type, 'var'|'const', type of factor decision variable or parameter
-    * .id_of_source, str, id of scaling factor (previous optimization step)
+    * .id_of_source, str, id of factor (previous optimization step)
        for initialization
     * .value, float, used by initialization if no source factor in previous
        optimization step
@@ -191,7 +191,7 @@ however, transformers/transformerwindings are modeled using class Branch too.):
 ```
 from egrid.builder import (
     Slacknode, PValue, QValue, IValue, Output, Branch, Branchtaps, 
-    Injection, Defk, Link)
+    Injection, Deff, Link)
 
 example = [
     Slacknode(id_of_node='n_0', V=1.+0.j),
@@ -246,7 +246,7 @@ example = [
         Q10=10.0,
         Exp_v_p=2.0,
         Exp_v_q=2.0),
-    Defk(step=(0, 1, 2), id=('kp', 'kq')),
+    Deff(step=(0, 1, 2), id=('kp', 'kq')),
     Link(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
 ```
 

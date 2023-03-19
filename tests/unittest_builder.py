@@ -23,7 +23,7 @@ import unittest
 import context
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Link)
+    Message, Deff, Link)
 
 _EMPTY_DICT = {}
 
@@ -386,27 +386,27 @@ class Create_objects(unittest.TestCase):
     def test_create_instruction(self):
         res = [*create_objects(
             ['#.   Message(message=hallo, level=0)',
-             '#.   Defk(id=kp)'])]
+             '#.   Deff(id=kp)'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-             Defk(id=('kp',))],
-            'create_objects creates instances of Message, Defk')
+             Deff(id=('kp',))],
+            'create_objects creates instances of Message, Deff')
 
     def test_create_instruction2(self):
         """remove quotes from strings"""
         res = [*create_objects(
             ['#.   Message(message="hallo", level=0)',
-             '#.   Defk(id="kp")'])]
+             '#.   Deff(id="kp")'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-             Defk(id=('kp',))],
-            'create_objects creates instances of Message, Defk')
+             Deff(id=('kp',))],
+            'create_objects creates instances of Message, Deff')
 
     def test_create_link(self):
         res = [*create_objects(['#. Link(objid=hallo part=p id=myid)'])]

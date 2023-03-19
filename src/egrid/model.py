@@ -31,9 +31,9 @@ from functools import partial
 from itertools import chain
 from egrid._types import (
     df_astype,
-    Slacknode, Branch, Branchtaps, Loadfactor, KInjlink, Injection,
+    Slacknode, Branch, Branchtaps, Factor, KInjlink, Injection,
     Output, IValue, PValue, QValue, Vvalue, Term, Message,
-    SLACKNODES, BRANCHES, BRANCHTAPS, LOADFACTORS, KINJLINKS, INJECTIONS,
+    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
@@ -45,7 +45,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks y_max '
-    'load_scaling_factors injection_factor_associations mnodeinj terms '
+    'factors injection_factor_associations mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
@@ -130,7 +130,7 @@ y_max: float
       a connection with inifinite admittance (no impedance), the connectivity
       nodes of both terminals are aggregated into one power-flow-calculation
       node
-load_scaling_factors: pandas.DataFrame
+factors: pandas.DataFrame
 
 injection_factor_associations: pandas.DataFrame
 
@@ -634,7 +634,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             * .index_of_branch
             * .index_of_term
             * .index_of_other_term
-        * 'Loadfactor':
+        * 'Factor':
             pandas.DataFrame
             * .step, int, index of estimation step
             * .id, str, ID of load factor
@@ -680,7 +680,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .count_of_slacks, int, number of slacks for power flow calculation
         * .y_max, float, maximum admittance between two power-flow-calculation
             nodes
-        * .load_scaling_factors
+        * .factors
         * .injection_factor_associations
         * .mnodeinj
         * .terms
@@ -750,8 +750,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     # factors
-    load_scaling_factors_=(
-        _getframe(dataframes, Loadfactor, LOADFACTORS)
+    factors_=(
+        _getframe(dataframes, Factor, FACTORS)
         .set_index(['step', 'id']))
     assoc_ = (
         _getframe(dataframes, KInjlink, KINJLINKS)
@@ -760,12 +760,12 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     # filter stepwise for intersection of links and factors
     index_ = assoc.reset_index().groupby(['step', 'id']).any().index
     df_ = pd.DataFrame([], index=index_)
-    load_scaling_factors = load_scaling_factors_.join(df_, how='inner')
+    factors = factors_.join(df_, how='inner')
     is_valid_assoc = (
         assoc
         .reset_index(['step'])
         .set_index(['step', 'id'])
-        .join(load_scaling_factors.type, how='left')
+        .join(factors.type, how='left')
         .notna())
     is_valid_assoc.index = assoc.index
     # math terms (parts) of objective function
@@ -785,7 +785,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
-        load_scaling_factors=load_scaling_factors,
+        factors=factors,
         injection_factor_associations=assoc[is_valid_assoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function

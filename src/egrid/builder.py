@@ -28,7 +28,7 @@ from functools import singledispatch
 from itertools import chain
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-    Branchtaps, Loadfactor, Defk, defk, expand_defk, DEFAULT_FACTOR_ID,
+    Branchtaps, Factor, Deff, deff, expand_deff, DEFAULT_FACTOR_ID,
     Link, link_, KInjlink, KBranchlink,
     Term, Message, meta_of_types)
 
@@ -75,7 +75,7 @@ MODEL_TYPES = (
     Output, PValue, QValue, IValue, Vvalue,
     Branchtaps,
     Term, Message)
-SOURCE_TYPES = MODEL_TYPES + (Defk, Link)
+SOURCE_TYPES = MODEL_TYPES + (Deff, Link)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
 def _create_slack(e_id, attributes):
@@ -342,13 +342,13 @@ def make_model_objects(entities):
 def make_data_frames(devices=()):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
     of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue,
-    Vvalue, Branchtaps, Defk, Link, Message)
+    Vvalue, Branchtaps, Deff, Link, Message)
 
     Parameters
     ----------
     devices: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link
+        Branchtaps, Deff, Link
 
     Returns
     -------
@@ -405,7 +405,7 @@ def make_data_frames(devices=()):
             * .positionneutral, int, tap with ratio 1:1
             * .positionmax, int, position of greates tap
             * .position, int, actual position
-        * 'Loadfactor':
+        * 'Factor':
             pandas.DataFrame
             * .id, str, ID of load factor
             * .type, 'var'|'const', decision variable / constant
@@ -448,9 +448,9 @@ def make_data_frames(devices=()):
             columns=model_type._fields)
         for model_type in MODEL_TYPES}
     _factor_frame = pd.DataFrame(
-        chain.from_iterable(map(expand_defk, _slack_and_devs[Defk.__name__])),
-        columns=Loadfactor._fields)
-    dataframes[Loadfactor.__name__] = _factor_frame
+        chain.from_iterable(map(expand_deff, _slack_and_devs[Deff.__name__])),
+        columns=Factor._fields)
+    dataframes[Factor.__name__] = _factor_frame
     _injlink_frame = pd.DataFrame(
         chain.from_iterable(
             # convert Link into KInjlink
@@ -518,12 +518,12 @@ def create_objects(args=()):
     ----------
     args: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link, Term, Message, str and iterables thereof;
+        Branchtaps, Deff, Link, Term, Message, str and iterables thereof;
         strings in args are processed with graphparser.parse
 
     Returns
     -------
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link, Term, Message"""
+        Branchtaps, Deff, Link, Term, Message"""
     return _flatten(map(_create_objects, _flatten(args)))

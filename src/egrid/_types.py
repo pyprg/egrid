@@ -205,11 +205,11 @@ position: int (default vaLue 0)
 
 DEFAULT_FACTOR_ID = '_default_'
 
-Loadfactor = namedtuple(
-    'Loadfactor',
+Factor = namedtuple(
+    'Factor',
     'id type id_of_source value min max is_discrete step',
     defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 0))
-Loadfactor.__doc__ = """Data of a load scaling factor.
+Factor.__doc__ = """Data of a load scaling factor.
 
 Parameters
 ----------
@@ -232,7 +232,7 @@ is_discrete: bool (default is False)
 step: int (default value 0)
     index of optimization step"""
 
-def defk(id_, type_='var', id_of_source=None, value=1.0,
+def deff(id_, type_='var', id_of_source=None, value=1.0,
           min_=-np.inf, max_=np.inf, is_discrete=False, step=0):
     """Creates a factor definition for each step.
 
@@ -262,17 +262,17 @@ def defk(id_, type_='var', id_of_source=None, value=1.0,
         iter_steps = iter([step])
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
     return [
-        Loadfactor(
+        Factor(
             myid_, type_,
             (myid_ if id_of_source is None else id_of_source),
             value, min_, max_, is_discrete, step_)
         for myid_, step_ in product(ids, iter_steps)]
 
-Defk = namedtuple(
-    'Defk',
+Deff = namedtuple(
+    'Deff',
     'id type id_of_source value min max step',
     defaults=('var', None, 1.0, -np.inf, np.inf, 0))
-Defk.__doc__ = """Definition of a scaling factor.
+Deff.__doc__ = """Definition of a scaling factor.
 
 Parameters
 ----------
@@ -294,26 +294,26 @@ max: float (default value numpy.inf)
 step: int (default value 0)
     index of optimization step"""
 
-def expand_defk(defk_):
+def expand_deff(deff_):
     """Creates factor definitions for each step and id.
 
     Parameters
     ----------
-    defk_: Defk
+    deff_: Deff
 
     Returns
     -------
     iterator"""
     try:
-        iter_steps = iter(defk_.step)
+        iter_steps = iter(deff_.step)
     except TypeError:
-        iter_steps = iter([defk_.step])
-    ids = defk_.id if isinstance(defk_.id, (list, tuple)) else [defk_.id]
+        iter_steps = iter([deff_.step])
+    ids = deff_.id if isinstance(deff_.id, (list, tuple)) else [deff_.id]
     return (
-        Loadfactor(
-            id_, defk_.type,
-            (id_ if defk_.id_of_source is None else defk_.id_of_source),
-            defk_.value, defk_.min, defk_.max, step_)
+        Factor(
+            id_, deff_.type,
+            (id_ if deff_.id_of_source is None else deff_.id_of_source),
+            deff_.value, deff_.min, deff_.max, step_)
         for id_, step_ in product(ids, iter_steps))
 
 KBranchlink = namedtuple('KBranchlink', 'branchid part id step', defaults=(0,))
@@ -438,14 +438,14 @@ _attribute_types = {
          [False, False]),
      #    id      type id_of_source value     min
      #    max     is_discrete    step
-     Defk:(
+     Deff:(
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.int16],
          [_tostring, _tostring, _tostring, np.float64, np.float64, 
           np.float64, bool, np.int16],
          [True, False, False, False, False, False, False, True]),
      #    id, type, id_of_source, value, min, max, step
-     Loadfactor:(
+     Factor:(
          [object, object, object,
           np.float64, np.float64, np.float64, np.int16],
          [_tostring, _tostring, _tostring,
@@ -575,7 +575,7 @@ QVALUES = make_df(QValue)
 IVALUES = make_df(IValue)
 VVALUES = make_df(Vvalue)
 BRANCHTAPS = make_df(Branchtaps)
-LOADFACTORS = make_df(Loadfactor)
+FACTORS = make_df(Factor)
 KINJLINKS = make_df(KInjlink)
 KBRANCHLINKS = make_df(KBranchlink)
 TERMS = make_df(Term)

@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import pandas as pd
 from egrid._types import (
-    SLACKNODES, LOADFACTORS, KINJLINKS, INJECTIONS,
+    SLACKNODES, FACTORS, KINJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
 
 def check_numbers(frames, msg_cls=(2, 0, 2)):
@@ -64,7 +64,7 @@ def check_factor_links(frames, msg_cls=1):
     Parameters
     ----------
     frames : dict
-        * ['Loadfactor'], pandas.DataFrame
+        * ['Factor'], pandas.DataFrame
         * ['KInjlink'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame
     msg_cls: int
@@ -75,7 +75,7 @@ def check_factor_links(frames, msg_cls=1):
     tuple
         str, int"""
     factors = (
-        frames.get('Loadfactor', LOADFACTORS)
+        frames.get('Factor', FACTORS)
         .set_index(['step', 'id'], drop=True))
     kinjlinks = (
         frames.get('KInjlink', KINJLINKS)
@@ -310,7 +310,7 @@ def check_frames(frames):
         * ['Slacknode'], pandas.DataFrame, slack data
         * ['Branch'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame, injection data
-        * ['Loadfactor'], pandas.DataFrame
+        * ['Factor'], pandas.DataFrame
         * ['KInjlink'], pandas.DataFrame
         * ['IValue'], pandas.DataFrame
         * ['PValue'], pandas.DataFrame
@@ -339,7 +339,7 @@ def get_first_error(frames):
         * ['Slacknode'], pandas.DataFrame, slack data
         * ['Branch'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame, injection data
-        * ['Loadfactor'], pandas.DataFrame
+        * ['Factor'], pandas.DataFrame
         * ['KInjlink'], pandas.DataFrame
         * ['IValue'], pandas.DataFrame
         * ['PValue'], pandas.DataFrame

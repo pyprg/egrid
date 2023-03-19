@@ -29,7 +29,7 @@ from egrid.builder import (
     Slacknode, Branch, Injection,
     make_data_frames, create_objects)
 from egrid.model import Model, model_from_frames
-from egrid.builder import Loadfactor
+from egrid.builder import Factor
 
 class Make_model(unittest.TestCase):
 
@@ -54,7 +54,7 @@ class Make_model(unittest.TestCase):
             model.ivalues,
             model.vvalues,
             model.branchtaps,
-            model.load_scaling_factors,
+            model.factors,
             model.injection_factor_associations,
             model.terms,
             model.messages]
@@ -130,7 +130,7 @@ class Model_messages(unittest.TestCase):
         Injection('load_0', 'n1')]
 
     def test_wrong_object(self):
-        model = make_model(self.elements, Loadfactor(id='k'))
+        model = make_model(self.elements, Factor(id='k'))
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.messages), 1, 'one error')
 
