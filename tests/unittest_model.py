@@ -134,7 +134,7 @@ class Model_messages(unittest.TestCase):
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.messages), 1, 'one error')
 
-    def test_ignored_primitive(self):
+    def test_ignored(self):
         model = make_model(self.elements, 27)
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.messages), 1, 'one message')

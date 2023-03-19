@@ -207,8 +207,8 @@ DEFAULT_FACTOR_ID = '_default_'
 
 Loadfactor = namedtuple(
     'Loadfactor',
-    'id type id_of_source value min max step',
-    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, 0))
+    'id type id_of_source value min max is_discrete step',
+    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 0))
 Loadfactor.__doc__ = """Data of a load scaling factor.
 
 Parameters
@@ -226,11 +226,14 @@ min: float (default value numpy.inf)
     smallest possible value
 max: float, (default value numpy.inf)
     greatest possible value
+is_discrete: bool (default is False)
+    no values after decimal point if True, input for solver accepted
+    by MINLP solvers
 step: int (default value 0)
     index of optimization step"""
 
 def defk(id_, type_='var', id_of_source=None, value=1.0,
-          min_=-np.inf, max_=np.inf, step=0):
+          min_=-np.inf, max_=np.inf, is_discrete=False, step=0):
     """Creates a factor definition for each step.
 
     Parameters
@@ -245,6 +248,8 @@ def defk(id_, type_='var', id_of_source=None, value=1.0,
         smallest possible value
     max_: float (default value numpy.inf)
         greatest possible value
+    is_discrete: bool (default values is False)
+        input for MINLP solver, indicates if factor shall be processed like int
     step: iterable
         int
 
@@ -260,7 +265,7 @@ def defk(id_, type_='var', id_of_source=None, value=1.0,
         Loadfactor(
             myid_, type_,
             (myid_ if id_of_source is None else id_of_source),
-            value, min_, max_, step_)
+            value, min_, max_, is_discrete, step_)
         for myid_, step_ in product(ids, iter_steps)]
 
 Defk = namedtuple(
@@ -432,13 +437,13 @@ _attribute_types = {
          [_tostring, np.int16],
          [False, False]),
      #    id      type id_of_source value     min
-     #    max         step
+     #    max     is_discrete    step
      Defk:(
          [object, object, object, np.float64, np.float64,
-          np.float64, np.int16],
-         [_tostring, _tostring, _tostring,
-          np.float64, np.float64, np.float64, np.int16],
-         [True, False, False, False, False, False, True]),
+          np.float64, bool, np.int16],
+         [_tostring, _tostring, _tostring, np.float64, np.float64, 
+          np.float64, bool, np.int16],
+         [True, False, False, False, False, False, False, True]),
      #    id, type, id_of_source, value, min, max, step
      Loadfactor:(
          [object, object, object,

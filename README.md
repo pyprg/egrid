@@ -145,6 +145,9 @@ load_scaling_factors: pandas.DataFrame (index: 'step','id')
        smallest possible value
     * .max, float
        greatest possible value
+    * .is_discrete, bool
+        no values after decimal point if True, input for solver accepted
+        by MINLP solvers
 
 mnodeinj: scipy.sparse.csc_matrix
 
