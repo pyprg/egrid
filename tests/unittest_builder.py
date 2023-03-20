@@ -23,7 +23,7 @@ import unittest
 import context
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Deff, Link)
+    Message, Deff, Link, KTerminallink)
 
 _EMPTY_DICT = {}
 
@@ -386,26 +386,26 @@ class Create_objects(unittest.TestCase):
     def test_create_instruction(self):
         res = [*create_objects(
             ['#.   Message(message=hallo, level=0)',
-             '#.   Deff(id=kp)'])]
+              '#.   Deff(id=kp)'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-             Deff(id=('kp',))],
+              Deff(id=('kp',))],
             'create_objects creates instances of Message, Deff')
 
     def test_create_instruction2(self):
         """remove quotes from strings"""
         res = [*create_objects(
             ['#.   Message(message="hallo", level=0)',
-             '#.   Deff(id="kp")'])]
+              '#.   Deff(id="kp")'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-             Deff(id=('kp',))],
+              Deff(id=('kp',))],
             'create_objects creates instances of Message, Deff')
 
     def test_create_link(self):
@@ -415,6 +415,22 @@ class Create_objects(unittest.TestCase):
         self.assertEqual(
             res,
             [Link(objid=('hallo',), part=('p',), id=('myid',))],
+            'create_objects creates instances of Link')
+
+    def test_create_link2(self):
+        res = [*create_objects(
+            ['#. Link(objid=hallo nodeid=node0 id=myid cls=KTerminallink '
+              'step=(1 2))'])]
+        self.assertEqual(
+            len(res), 1, 'create_objects returns one object')
+        self.assertEqual(
+            res,
+            [Link(
+                objid=('hallo',), 
+                nodeid=('node0',), 
+                cls=KTerminallink, 
+                id=('myid',),
+                step=(1,2))],
             'create_objects creates instances of Link')
 
 class Make_data_frames(unittest.TestCase):
@@ -431,6 +447,64 @@ class Make_data_frames(unittest.TestCase):
         self.assertTrue(
             all(df.empty for key, df in frames.items()),
             'all dataframes are empty')
+
+    def test_injlink(self):
+        objs = create_objects(
+            ['#. Link(objid=hallo part=p id=f0 cls=KInjlink',
+             '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['KInjlink']), 
+            2,
+            'two rows in table KInjlink')
+
+    def test_injlink2(self):
+        objs = create_objects(
+            ['#. Link(objid=hallo part=(p q) id=(f0 f1) cls=KInjlink',
+             '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['KInjlink']), 
+            4,
+            'four rows in table KInjlink')
+
+    def test_terminallink(self):
+        objs = create_objects(
+            ['#. Link(objid=hallo nodeid=node0 id=myid cls=KTerminallink',
+             '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['KTerminallink']), 
+            2,
+            'two rows in table KTerminallink')
+
+    def test_terminallink2(self):
+        objs = create_objects(
+            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0 cls=KTerminallink',
+             '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['KTerminallink']), 
+            4,
+            'four rows in table KTerminallink')
+
+    def test_wrong_class(self):
+        objs = create_objects(
+            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0 cls=float',
+             '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']), 
+            1,
+            'one error message')
+        self.assertEqual(
+            len(frames['KTerminallink']), 
+            0,
+            'KTerminallink is empty')
+        self.assertEqual(
+            len(frames['KInjlink']), 
+            0,
+            'KInjlink is empty')
 
 if __name__ == '__main__':
     unittest.main()

@@ -643,18 +643,21 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             * .value, float, value if no valid initial load factor
             * .min, float, lower limit
             * .max, float, upper limit
+            * .is_discrete, bool
+            * .m, float, increase of multiplier w.r.t. var/const
+            * .n, float, multiplier if var/const is 0.
         * 'KInjlink':
             pandas.DataFrame
             * .step, int, index of estimation step
             * .injid, str, ID of injection
             * .part, 'p'|'q', active/reactive power
-            * .id, str, ID of (Load)factor
-        * 'KBranchlink':
+            * .id, str, ID of (Load)'Factor'
+        * 'KTerminallink':
             pandas.DataFrame
             * .step, int, index of estimation step
             * .branchid, str, ID of branch
-            * .part, 'g'|'b', conductance/susceptance
-            * .id, str, ID of branch
+            * .nodeid, str, ID of connectivity node
+            * .id, str, ID of 'Factor'
     y_lo_abs_max: float (default value _Y_LO_ABS_MAX)
         * maximum value of branch longitudinal admittance,
           if the absolute value of the branch admittance is greater
@@ -753,21 +756,21 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     factors_=(
         _getframe(dataframes, Factor, FACTORS)
         .set_index(['step', 'id']))
-    assoc_ = (
+    injassoc_ = (
         _getframe(dataframes, KInjlink, KINJLINKS)
         .set_index(['step', 'injid', 'part']))
-    assoc = assoc_[~assoc_.index.duplicated(keep='first')]
+    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
     # filter stepwise for intersection of links and factors
-    index_ = assoc.reset_index().groupby(['step', 'id']).any().index
+    index_ = injassoc.reset_index().groupby(['step', 'id']).any().index
     df_ = pd.DataFrame([], index=index_)
     factors = factors_.join(df_, how='inner')
-    is_valid_assoc = (
-        assoc
+    is_valid_injassoc = (
+        injassoc
         .reset_index(['step'])
         .set_index(['step', 'id'])
         .join(factors.type, how='left')
         .notna())
-    is_valid_assoc.index = assoc.index
+    is_valid_injassoc.index = injassoc.index
     # math terms (parts) of objective function
     terms = _getframe(dataframes, Term, TERMS)
     return Model(
@@ -786,7 +789,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
         factors=factors,
-        injection_factor_associations=assoc[is_valid_assoc.type],
+        injection_factor_associations=injassoc[is_valid_injassoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))

@@ -207,8 +207,9 @@ DEFAULT_FACTOR_ID = '_default_'
 
 Factor = namedtuple(
     'Factor',
-    'id type id_of_source value min max is_discrete step',
-    defaults=('var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 0))
+    'id type id_of_source value min max is_discrete m n step',
+    defaults=(
+        'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., 0))
 Factor.__doc__ = """Data of a load scaling factor.
 
 Parameters
@@ -229,11 +230,16 @@ max: float, (default value numpy.inf)
 is_discrete: bool (default is False)
     no values after decimal point if True, input for solver accepted
     by MINLP solvers
+m: float (default 1.)
+    dy/dx, effective multiplier is a linear function f(x) = mx + n, m is the
+    increase of that linear function
+n: float (default 0.)
+    effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value 0)
     index of optimization step"""
 
 def deff(id_, type_='var', id_of_source=None, value=1.0,
-          min_=-np.inf, max_=np.inf, is_discrete=False, step=0):
+          min_=-np.inf, max_=np.inf, is_discrete=False, m=1., n=0., step=0):
     """Creates a factor definition for each step.
 
     Parameters
@@ -250,6 +256,11 @@ def deff(id_, type_='var', id_of_source=None, value=1.0,
         greatest possible value
     is_discrete: bool (default values is False)
         input for MINLP solver, indicates if factor shall be processed like int
+    m: float (default 1.)
+        dy/dx, effective multiplier is a linear function f(x) = mx + n, 
+        m is the increase of that linear function
+    n: float (default 0.)
+        effective multiplier is a linear function f(x) = mx + n, n is f(0)
     step: iterable
         int
 
@@ -265,14 +276,14 @@ def deff(id_, type_='var', id_of_source=None, value=1.0,
         Factor(
             myid_, type_,
             (myid_ if id_of_source is None else id_of_source),
-            value, min_, max_, is_discrete, step_)
+            value, min_, max_, is_discrete, m, n, step_)
         for myid_, step_ in product(ids, iter_steps)]
 
 Deff = namedtuple(
     'Deff',
-    'id type id_of_source value min max step',
-    defaults=('var', None, 1.0, -np.inf, np.inf, 0))
-Deff.__doc__ = """Definition of a scaling factor.
+    'id type id_of_source value min max is_discrete m n step',
+    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., 0))
+Deff.__doc__ = """Definition of a factor.
 
 Parameters
 ----------
@@ -291,6 +302,13 @@ min: float (default value -numpy.inf)
     smallest value allowed
 max: float (default value numpy.inf)
     greatest value allowed
+is_discrete: bool (default values is False)
+    input for MINLP solver, indicates if factor shall be processed like int
+m: float (default 1.)
+    dy/dx, effective multiplier is a linear function f(x) = mx + n, 
+    m is the increase of that linear function
+n: float (default 0.)
+    effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value 0)
     index of optimization step"""
 
@@ -313,39 +331,41 @@ def expand_deff(deff_):
         Factor(
             id_, deff_.type,
             (id_ if deff_.id_of_source is None else deff_.id_of_source),
-            deff_.value, deff_.min, deff_.max, step_)
+            deff_.value, deff_.min, deff_.max, deff_.is_discrete, 
+            deff_.m, deff_.n, step_)
         for id_, step_ in product(ids, iter_steps))
 
-KBranchlink = namedtuple('KBranchlink', 'branchid part id step', defaults=(0,))
-KBranchlink.__doc__ = """Links branch with scaling factor.
+KTerminallink = namedtuple(
+    'KTerminallink', 'branchid nodeid id step', defaults=(0,))
+KTerminallink.__doc__ = """Links a branch terminal with a factor.
 
 Parameters
 ----------
 branchid: str
     ID of branch
-part: 'g'|'b'
-    marker for conductance or susceptance
+nodeid: str
+    ID of connectivity node
 id: str
     unique identifier (for one step) of linked factor
 step: int  (default value 0)
     optimization step"""
 
 KInjlink = namedtuple('KInjlink', 'injid part id step', defaults=(0,))
-KInjlink.__doc__ = """Links injection with scaling factor.
+KInjlink.__doc__ = """Links an injection with a factor.
 
 Parameters
 ----------
 injid: str
     ID of injection
 part: 'p'|'q'
-    marker for active or reactive power to be scaled
+    marker for active or reactive power to be multiplied
 id: str
     unique identifier (for one step) of linked factor
 step: int
     optimization step"""
 
-def link_(objid, id_, part, cls_, steps):
-    """Creates an instance of class cls.
+def injlink_(objid, id_, part, _, cls_, steps):
+    """Creates instances of class cls.
 
     Parameters
     ----------
@@ -356,6 +376,8 @@ def link_(objid, id_, part, cls_, steps):
         (one for 'p' or 'q', two for 'pq')
     part: 'p'|'q'|'pq'
         active power or reactive power
+    _: str
+        not used
     cls_: KInjlink
         class of link
     steps: int, or list<int>, or tuple<int>
@@ -366,14 +388,47 @@ def link_(objid, id_, part, cls_, steps):
         iter_steps = iter([steps])
     objids = objid if isinstance(objid, (list, tuple)) else [objid]
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
-    return [cls_(objid_, t[0], t[1], step_, )
+    return [cls_(objid_, t[0], t[1], step_)
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
+def termlink_(objid, id_, _, nodeid, cls_, steps):
+    """Creates instances of class cls.
+
+    Parameters
+    ----------
+    objid: str, or list<str>, or tuple<str>
+        id of object to link
+    id_: str, or list<str>, or tuple<str>
+        id of linked factor, accepts number of parts ids
+        (one for 'p' or 'q', two for 'pq')
+    _: str
+        not used
+    nodeid: str, or list<str>, or tuple<str>
+        ID of connectivity node
+    cls_: KInjlink
+        class of link
+    steps: int, or list<int>, or tuple<int>
+        index of step"""
+    try:
+        iter_steps = iter(steps)
+    except TypeError:
+        iter_steps = iter([steps])
+    objids = objid if isinstance(objid, (list, tuple)) else [objid]
+    nodeids = nodeid if isinstance(nodeid, (list, tuple)) else [nodeid]
+    factorids = id_ if isinstance(id_, (list, tuple)) else [id_]
+    if (len(factorids)==1) and (1 < len(nodeids)):
+        factorids *= len(nodeids)
+    return [cls_(t[0], t[1], t[2], step_)
+            for step_, t in
+                product(iter_steps, zip(objids, nodeids, factorids))]
+
 Link = namedtuple(
-    'Link', 'objid id part cls step', defaults=('pq', KInjlink, 0))
-Link.__doc__ = """Logical connection between injection/branch and a scaling
-factor.
+    'Link', 
+    'objid id part nodeid cls step', 
+    defaults=('pq', None, KInjlink, 0))
+Link.__doc__ = """Logical connection between injection/terminal_of_branch
+and a factor.
 
 Parameters
 ----------
@@ -382,10 +437,14 @@ objiid: str|iterable_of_str
 id: str|iterable_of_str
     identifier of scaling factor to connect, one identifier for each
     given value or argument 'part'
-part: 'p'|'q'|'g'|'b'|iterable_of_two_char (default 'pq')
-    identifies the attribute of the injection/branch to multipy with factor
-    ('p'/'q'- injected active/reactive power, 'g'/'b'- g_lo/b_lo of branch)
-cls: KInjlink|KBranchlink (default value KInjlink)
+part: 'p'|'q'|iterable_of_two_char (default 'pq')
+    identifies the attribute of the injection to multipy with factor
+    ('p'/'q'- injected active/reactive power), the value is relevant
+    in case argument 'cls' is KInjlink only
+nodeid: str
+    ID of connectivity node, the value is relevant
+    in case argument 'cls' is KTerminallink only
+cls: KInjlink|KTerminallink (default value KInjlink)
     KInjlink - links an injection
     KBranchlink - links a branch
 step: int (default value 0)|iterable_of_int
@@ -420,15 +479,15 @@ level: int
 def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
-def _notsupported(string):
-    def raiseerror(_):
-        raise NotImplementedError(string)
-    return raiseerror
+def _tocls(string):
+    if string==KTerminallink.__name__:
+        return KTerminallink
+    if string==KInjlink.__name__:
+        return KInjlink
+    raise ValueError(
+        f'name of class not accepted \'{string}\', '
+        'possible values are \'KTerminallink\', \'KInjlink\'')
 
-_ns = (_notsupported
-       ('attribute cls is not supported by the text interface, '
-        'remove the attribute cls in order to apply the default value'),
-       True)
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
      #    message level
@@ -437,36 +496,37 @@ _attribute_types = {
          [_tostring, np.int16],
          [False, False]),
      #    id      type id_of_source value     min
-     #    max     is_discrete    step
+     #    max     is_discrete   m   n    step
      Deff:(
          [object, object, object, np.float64, np.float64,
-          np.float64, bool, np.int16],
+          np.float64, bool, np.float64, np.float64, np.int16],
          [_tostring, _tostring, _tostring, np.float64, np.float64, 
-          np.float64, bool, np.int16],
-         [True, False, False, False, False, False, False, True]),
-     #    id, type, id_of_source, value, min, max, step
+          np.float64, bool, np.float64, np.float64, np.int16],
+         [True, False, False, False, False, False, False, False, False, True]),
+     #    id, type, id_of_source, value, min, max, 
+     #    is_discrete, m, n, step
      Factor:(
-         [object, object, object,
-          np.float64, np.float64, np.float64, np.int16],
-         [_tostring, _tostring, _tostring,
-          np.float64, np.float64, np.float64, np.int16],
-         [False, False, False,
+         [object, object, object, np.float64, np.float64, np.float64, 
+          bool, np.float64, np.float64, np.int16],
+         [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64, 
+          bool, np.float64, np.float64, np.int16],
+         [False, False, False, False, False, False, 
           False, False, False, False]),
      #    injid, part, id, step
      KInjlink:(
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [False, False, False, False]),
-     #    branchid, part, id, step
-     KBranchlink:(
+     #    branchid, nodeid, id, step
+     KTerminallink:(
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [False, False, False, False]),
-     #    objid   part    id      cls     step
+     #    objid   id      part    nodeid  cls     step
      Link:(
-         [object, object, object, object, np.int16],
-         [_tostring,  _tostring, _tostring, _ns, np.int16],
-         [True, True, True, False, True]),
+         [object, object, object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, _tostring, _tocls, np.int16],
+         [True, True, True, True, False, True]),
      #    id       arg     fn      step
      Term:(
          [object,  object, object, np.int32],
@@ -577,6 +637,6 @@ VVALUES = make_df(Vvalue)
 BRANCHTAPS = make_df(Branchtaps)
 FACTORS = make_df(Factor)
 KINJLINKS = make_df(KInjlink)
-KBRANCHLINKS = make_df(KBranchlink)
+KTERMINAKLINKS = make_df(KTerminallink)
 TERMS = make_df(Term)
 MESSAGES = make_df(Message)

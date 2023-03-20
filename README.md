@@ -24,7 +24,7 @@ of type
     - IValue (measured electric current)
     - Vvalue (measured voltage or setpoint)
     - Deff (definition of a factor, for estimation)
-    - Link (associates a scaling factor to a load)
+    - Link (associates a factor to an injection or terminal of a branch)
 
 including tuples, lists and iterables thereof (for a power-flow-calculation
 just Slacknode ... Branchtaps are necessary).
@@ -117,7 +117,7 @@ vvalues: pandas.DataFrame
 
 branchtaps: pandas.DataFrame
 
-    * .id, str, unique identifier of taps
+    * .id, str, unique identifier of branchtaps
     * .id_of_node, str, unique identifier of associated node
     * .id_of_branch, str, unique identifier of associated branch
     * .Vstep, float, magnitude of voltage difference per step, pu
@@ -146,8 +146,14 @@ factors: pandas.DataFrame (index: 'step','id')
     * .max, float
        greatest possible value
     * .is_discrete, bool
-        no values after decimal point if True, input for solver accepted
-        by MINLP solvers
+       just 0 digits after decimal point if True, input for solver, accepted
+       by MINLP solvers
+    * .m, float
+       increase of multiplier with respect to change of var/const
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .n, float
+       multiplier when var/const is 0.
+       the effective multiplier is a linear function of var/const (mx + n)
 
 mnodeinj: scipy.sparse.csc_matrix
 

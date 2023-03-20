@@ -24,12 +24,11 @@ Created on Tue Jan  4 00:21:20 2022
 import pandas as pd
 import numpy as np
 import re
-from functools import singledispatch
-from itertools import chain
+from itertools import chain, tee
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Branchtaps, Factor, Deff, deff, expand_deff, DEFAULT_FACTOR_ID,
-    Link, link_, KInjlink, KBranchlink,
+    Link, injlink_, termlink_, KInjlink, KTerminallink,
     Term, Message, meta_of_types)
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
@@ -420,11 +419,11 @@ def make_data_frames(devices=()):
             * .part, 'p'|'q', active/reactive power
             * .id, str, ID of (Load)factor
             * .step, int, index of estimation step
-        * 'KBranchlink':
+        * 'KTerminallink':
             pandas.DataFrame
             * .branchid, str, ID of branch
-            * .part, 'g'|'b', conductance/susceptance
-            * .id, str, ID of branch
+            * .nodeid, str, ID of connectivity node
+            * .id, str, ID of factor
             * .step, int, index of estimation step
         * 'Term': pandas.DataFrame
             * .id, str
@@ -454,17 +453,22 @@ def make_data_frames(devices=()):
     _injlink_frame = pd.DataFrame(
         chain.from_iterable(
             # convert Link into KInjlink
-            link_(*args) for args in _slack_and_devs[Link.__name__]
+            injlink_(*args) for args in _slack_and_devs[Link.__name__]
             if args.cls == KInjlink),
         columns=KInjlink._fields)
     dataframes[KInjlink.__name__] = _injlink_frame
-    _branchlink_frame = pd.DataFrame(
+    _terminallink_frame = pd.DataFrame(
         chain.from_iterable(
             # convert Link into KBranchlink
-            link_(*args) for args in _slack_and_devs[Link.__name__]
-            if args.cls == KBranchlink),
-        columns=KBranchlink._fields)
-    dataframes[KBranchlink.__name__] = _branchlink_frame
+            termlink_(*args) for args in _slack_and_devs[Link.__name__]
+            if args.cls == KTerminallink),
+        columns=KTerminallink._fields)
+    _slack_and_devs[Message.__name__].extend(
+        'error: attribute \'cls\' of Link has not accepted '
+        f'value \'{lnk.cls}\' ({str(lnk)})' 
+        for lnk in _slack_and_devs[Link.__name__] 
+        if lnk.cls not in (KInjlink, KTerminallink))
+    dataframes[KTerminallink.__name__] = _terminallink_frame
     return dataframes
 
 def _flatten(args):
@@ -479,17 +483,11 @@ def _flatten(args):
         except:
             yield Message(f'wrong type, ignored object: {str(args)}', 1)
 
-@singledispatch
-def _create_objects(arg):
-    return arg
-
-@_create_objects.register(str)
-def _(arg):
+def _create_objects_from_strings(strings):
     import graphparser as gp
     from graphparser import parse
-    from itertools import tee
     type_data = gp.make_type_data(meta_of_types)
-    t1, t2 = tee(parse(arg))
+    t1, t2 = tee(parse(strings))
     is_comment = lambda t: t[0]=='comment'
     is_instruction = lambda t: t[0]=='comment' and t[1].startswith('#.')
     return chain(
@@ -526,4 +524,7 @@ def create_objects(args=()):
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
         Branchtaps, Deff, Link, Term, Message"""
-    return _flatten(map(_create_objects, _flatten(args)))
+    t1, t2 = tee(_flatten(args))
+    return chain(
+        (t for t in t1 if not isinstance(t, str)), 
+        _create_objects_from_strings(t for t in t2 if isinstance(t, str)))
