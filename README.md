@@ -163,7 +163,7 @@ mnodeinj: scipy.sparse.csc_matrix
 
 injection_factor_associations: pandas.DataFrame (index: 'step','injid','part')
 
-    * .id, str, unique identifier of scaling factor
+    * .id, str, unique identifier of factor
 
 messages: pandas.DataFrame
 

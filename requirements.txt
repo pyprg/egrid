@@ -1,4 +1,4 @@
-graphparser==0.8.2
+graphparser==0.8.3
 networkx==2.6.4a0
 numpy==1.22.3
 pandas==1.4.0

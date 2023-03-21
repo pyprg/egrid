@@ -426,9 +426,9 @@ class Create_objects(unittest.TestCase):
         self.assertEqual(
             res,
             [Link(
-                objid=('hallo',), 
-                nodeid=('node0',), 
-                cls=KTerminallink, 
+                objid=('hallo',),
+                nodeid=('node0',),
+                cls=KTerminallink,
                 id=('myid',),
                 step=(1,2))],
             'create_objects creates instances of Link')
@@ -454,7 +454,7 @@ class Make_data_frames(unittest.TestCase):
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['KInjlink']), 
+            len(frames['KInjlink']),
             2,
             'two rows in table KInjlink')
 
@@ -464,7 +464,7 @@ class Make_data_frames(unittest.TestCase):
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['KInjlink']), 
+            len(frames['KInjlink']),
             4,
             'four rows in table KInjlink')
 
@@ -474,7 +474,7 @@ class Make_data_frames(unittest.TestCase):
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['KTerminallink']), 
+            len(frames['KTerminallink']),
             2,
             'two rows in table KTerminallink')
 
@@ -484,7 +484,7 @@ class Make_data_frames(unittest.TestCase):
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['KTerminallink']), 
+            len(frames['KTerminallink']),
             4,
             'four rows in table KTerminallink')
 
@@ -494,15 +494,15 @@ class Make_data_frames(unittest.TestCase):
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['Message']), 
+            len(frames['Message']),
             1,
             'one error message')
         self.assertEqual(
-            len(frames['KTerminallink']), 
+            len(frames['KTerminallink']),
             0,
             'KTerminallink is empty')
         self.assertEqual(
-            len(frames['KInjlink']), 
+            len(frames['KInjlink']),
             0,
             'KInjlink is empty')
 

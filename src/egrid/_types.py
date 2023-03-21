@@ -257,7 +257,7 @@ def deff(id_, type_='var', id_of_source=None, value=1.0,
     is_discrete: bool (default values is False)
         input for MINLP solver, indicates if factor shall be processed like int
     m: float (default 1.)
-        dy/dx, effective multiplier is a linear function f(x) = mx + n, 
+        dy/dx, effective multiplier is a linear function f(x) = mx + n,
         m is the increase of that linear function
     n: float (default 0.)
         effective multiplier is a linear function f(x) = mx + n, n is f(0)
@@ -305,7 +305,7 @@ max: float (default value numpy.inf)
 is_discrete: bool (default values is False)
     input for MINLP solver, indicates if factor shall be processed like int
 m: float (default 1.)
-    dy/dx, effective multiplier is a linear function f(x) = mx + n, 
+    dy/dx, effective multiplier is a linear function f(x) = mx + n,
     m is the increase of that linear function
 n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
@@ -331,7 +331,7 @@ def expand_deff(deff_):
         Factor(
             id_, deff_.type,
             (id_ if deff_.id_of_source is None else deff_.id_of_source),
-            deff_.value, deff_.min, deff_.max, deff_.is_discrete, 
+            deff_.value, deff_.min, deff_.max, deff_.is_discrete,
             deff_.m, deff_.n, step_)
         for id_, step_ in product(ids, iter_steps))
 
@@ -424,8 +424,8 @@ def termlink_(objid, id_, _, nodeid, cls_, steps):
                 product(iter_steps, zip(objids, nodeids, factorids))]
 
 Link = namedtuple(
-    'Link', 
-    'objid id part nodeid cls step', 
+    'Link',
+    'objid id part nodeid cls step',
     defaults=('pq', None, KInjlink, 0))
 Link.__doc__ = """Logical connection between injection/terminal_of_branch
 and a factor.
@@ -500,17 +500,17 @@ _attribute_types = {
      Deff:(
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16],
-         [_tostring, _tostring, _tostring, np.float64, np.float64, 
+         [_tostring, _tostring, _tostring, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16],
          [True, False, False, False, False, False, False, False, False, True]),
-     #    id, type, id_of_source, value, min, max, 
+     #    id, type, id_of_source, value, min, max,
      #    is_discrete, m, n, step
      Factor:(
-         [object, object, object, np.float64, np.float64, np.float64, 
+         [object, object, object, np.float64, np.float64, np.float64,
           bool, np.float64, np.float64, np.int16],
-         [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64, 
+         [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64,
           bool, np.float64, np.float64, np.int16],
-         [False, False, False, False, False, False, 
+         [False, False, False, False, False, False,
           False, False, False, False]),
      #    injid, part, id, step
      KInjlink:(
@@ -637,6 +637,6 @@ VVALUES = make_df(Vvalue)
 BRANCHTAPS = make_df(Branchtaps)
 FACTORS = make_df(Factor)
 KINJLINKS = make_df(KInjlink)
-KTERMINAKLINKS = make_df(KTerminallink)
+KTERMINALLINKS = make_df(KTerminallink)
 TERMS = make_df(Term)
 MESSAGES = make_df(Message)

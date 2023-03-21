@@ -33,8 +33,8 @@ from egrid._types import (
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
-_replacement = dict(
-    n='e-3', u='e-6', µ='e-6', m='e-3', k='e3', M='e6', G='e9')
+_replacement = {
+    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 'k':'e3', 'M':'e6', 'G':'e9'}
 
 def _replace_e3(match):
     """Returns a replacement string for given match.
@@ -465,8 +465,8 @@ def make_data_frames(devices=()):
         columns=KTerminallink._fields)
     _slack_and_devs[Message.__name__].extend(
         'error: attribute \'cls\' of Link has not accepted '
-        f'value \'{lnk.cls}\' ({str(lnk)})' 
-        for lnk in _slack_and_devs[Link.__name__] 
+        f'value \'{lnk.cls}\' ({str(lnk)})'
+        for lnk in _slack_and_devs[Link.__name__]
         if lnk.cls not in (KInjlink, KTerminallink))
     dataframes[KTerminallink.__name__] = _terminallink_frame
     return dataframes
@@ -526,5 +526,5 @@ def create_objects(args=()):
         Branchtaps, Deff, Link, Term, Message"""
     t1, t2 = tee(_flatten(args))
     return chain(
-        (t for t in t1 if not isinstance(t, str)), 
+        (t for t in t1 if not isinstance(t, str)),
         _create_objects_from_strings(t for t in t2 if isinstance(t, str)))

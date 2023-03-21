@@ -31,10 +31,10 @@ from functools import partial
 from itertools import chain
 from egrid._types import (
     df_astype,
-    Slacknode, Branch, Branchtaps, Factor, KInjlink, Injection,
-    Output, IValue, PValue, QValue, Vvalue, Term, Message,
-    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, KINJLINKS, INJECTIONS,
-    OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
+    Slacknode, Branch, Branchtaps, Factor, KInjlink, KTerminallink,
+    Injection, Output, IValue, PValue, QValue, Vvalue, Term, Message,
+    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, KINJLINKS, KTERMINALLINKS,
+    INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
 
@@ -45,7 +45,8 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks y_max '
-    'factors injection_factor_associations mnodeinj terms '
+    'factors injection_factor_associations '
+    'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network for
 power flow calculation and state estimation.
@@ -753,16 +754,23 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     # factors
-    factors_=(
+    factors_ = (
         _getframe(dataframes, Factor, FACTORS)
         .set_index(['step', 'id']))
+    # links of injection
     injassoc_ = (
         _getframe(dataframes, KInjlink, KINJLINKS)
         .set_index(['step', 'injid', 'part']))
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
-    # filter stepwise for intersection of links and factors
-    index_ = injassoc.reset_index().groupby(['step', 'id']).any().index
-    df_ = pd.DataFrame([], index=index_)
+    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
+    # links of terminals
+    termassoc_ = (
+        _getframe(dataframes, KTerminallink, KTERMINALLINKS)
+        .set_index(['step', 'branchid', 'nodeid']))
+    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
+    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
+    # filter stepwise for intersection of injlinks and factors
+    df_ = pd.DataFrame([], index=injindex_)
     factors = factors_.join(df_, how='inner')
     is_valid_injassoc = (
         injassoc
