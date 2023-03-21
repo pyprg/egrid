@@ -45,7 +45,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks y_max '
-    'factors injection_factor_associations '
+    'factors injection_factor_associations terminal_factor_associations '
     'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network for
@@ -131,10 +131,23 @@ y_max: float
       a connection with inifinite admittance (no impedance), the connectivity
       nodes of both terminals are aggregated into one power-flow-calculation
       node
-factors: pandas.DataFrame
-
-injection_factor_associations: pandas.DataFrame
-
+factors: pandas.DataFrame 
+    (index: (step, id))
+    * .type, 'var'|'const', decision variable or parameter
+    * .id_of_source, str, initialize with referenced factor of previous step
+    * .value, float, use this value for initialization 
+      if no factor with 'id_of_source' in previous step
+    * .min, float, smallest possible value
+    * .max, float, greatest possible value
+    * .is_discrete, bool, value shall be in, input for MINLP solver
+    * .m, float, applied multiplier is 'mx + n' (x is var/const)
+    * .n, float, applied multiplier is 'mx + n' (x is var/const)
+injection_factor_associations: pandas.DataFrame 
+    (index: (step, injid, part))
+    * .id, str, ID of factor
+terminal_factor_associations: pandas.DataFrame 
+    (index: (step, branchid, nodeid))
+    * .id, str, ID of factor
 mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector
     ordered according to power flow calculation nodes (adding entries of
@@ -447,7 +460,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         edge_attr='id',
         create_using=None,
         edge_key='id')
-    bridge_graph.add_nodes_from(slackids)
+    #bridge_graph.add_nodes_from(slackids)
     connected_components_ = pd.Series(
         nx.connected_components(bridge_graph),
         dtype=object)
@@ -686,6 +699,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             nodes
         * .factors
         * .injection_factor_associations
+        * .terminal_factor_associations
         * .mnodeinj
         * .terms
         * .messages"""
@@ -769,16 +783,25 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         .set_index(['step', 'branchid', 'nodeid']))
     termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
-    # filter stepwise for intersection of injlinks and factors
-    df_ = pd.DataFrame([], index=injindex_)
+    # filter stepwise for intersection of injlinks+termlinks and factors
+    df_ = pd.DataFrame([], index=injindex_.union(termindex_))
     factors = factors_.join(df_, how='inner')
+    # injection links
     is_valid_injassoc = (
         injassoc
         .reset_index(['step'])
         .set_index(['step', 'id'])
         .join(factors.type, how='left')
-        .notna())
+        .isin(('const', 'var')))
     is_valid_injassoc.index = injassoc.index
+    # terminal links
+    is_valid_termassoc = (
+        termassoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(factors.type, how='left')
+        .isin(('const', 'var')))
+    is_valid_termassoc.index = termassoc.index
     # math terms (parts) of objective function
     terms = _getframe(dataframes, Term, TERMS)
     return Model(
@@ -798,6 +821,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         y_max=y_lo_abs_max,
         factors=factors,
         injection_factor_associations=injassoc[is_valid_injassoc.type],
+        terminal_factor_associations=termassoc[is_valid_termassoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))

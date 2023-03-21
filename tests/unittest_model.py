@@ -2,7 +2,7 @@
 """
 Created on Sat Feb  5 13:07:21 2022
 
-Copyright (C) 2022 pyprg
+Copyright (C) 2022, 2023 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -30,6 +30,45 @@ from egrid.builder import (
     make_data_frames, create_objects)
 from egrid.model import Model, model_from_frames
 from egrid.builder import Factor
+
+
+_factor_test_string = """
+                                  P10=7 Q10=4
+                         n1 -->> inj1
+                         ||
+slack0 <------br0------> n1 <------br1------> n2 -->> inj2
+               y_tr=1µ+1µj          y_tr=1µ+1µj        P10=1 Q10=.3
+               y_lo=1k-1kj          y_lo=1k-1kj
+
+# >> FACTORS for INJECTIONS <<
+
+#.  Deff(id=Pinj1 m=2 type=const step(0 1 2))
+#.  Link(objid=inj1 id=Pinj1 part=p step(0 1 2))
+#.  Deff(id=Qinj1 type=var step(0 1 2))
+#.  Link(objid=inj1 id=Qinj1 part=q step(0 1 2))
+
+# >> FACTORS for BRANCHTERMINALS <<
+
+#.  Deff(
+#.     id=br0_slack0 value=0 m=-.00625 n=1 min=-16 max=16
+#.     is_discrete=True type=const step(0 1 2))
+#.  Link(objid=br0 nodeid=slack0 id=br0_slack0 cls=KTerminallink step(0 1 2))
+#.  Deff(
+#.     id=br1_n1 value=0 m=-.00625 n=1 min=-16 max=16
+#.     is_discrete=True type=var step(0 1 2))
+#.  Link(objid=br1 nodeid=n1 id=br1_n1 cls=KTerminallink step(0 1 2))"""
+
+class Make_data_Frames(unittest.TestCase):
+
+    def test_make_data_frames(self):
+        frames = make_data_frames(create_objects(_factor_test_string))
+        rowcounts = {
+            'Branch': 2, 'Slacknode': 1, 'Injection': 2, 'Factor': 12,
+            'KInjlink': 6, 'KTerminallink': 6}
+        self.assertTrue(
+            all(rowcounts.get(table_name, 0)==len(table)
+                for table_name, table in frames.items()),
+            'row count matches expectations')
 
 class Make_model(unittest.TestCase):
 
@@ -115,12 +154,13 @@ class Make_model(unittest.TestCase):
         self.assertEqual(
             model.shape_of_Y, (1,1), 'one pfc node (branch without impedance)')
 
-class Model_values(unittest.TestCase):
-
-    elements = [
-        Slacknode('n0'),
-        Branch('line_0', 'n0', 'n1'),
-        Injection('load_0', 'n1')]
+    def test_make_with_factors(self):
+        model = make_model(_factor_test_string)
+        self.assertIsNotNone(model, 'make_model shall return an object')
+        self.assertEqual(
+            len(model.branchterminals), 4, 'four branch terminals')
+        self.assertEqual(
+            model.shape_of_Y, (3,3), 'three pfc nodes')
 
 class Model_messages(unittest.TestCase):
 
