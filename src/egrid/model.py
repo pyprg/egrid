@@ -460,7 +460,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         edge_attr='id',
         create_using=None,
         edge_key='id')
-    #bridge_graph.add_nodes_from(slackids)
+    bridge_graph.add_nodes_from(slackids)
     connected_components_ = pd.Series(
         nx.connected_components(bridge_graph),
         dtype=object)
