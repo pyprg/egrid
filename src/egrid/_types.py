@@ -209,7 +209,7 @@ Factor = namedtuple(
     'Factor',
     'id type id_of_source value min max is_discrete m n step',
     defaults=(
-        'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., 0))
+        'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., -1))
 Factor.__doc__ = """Data of a load scaling factor.
 
 Parameters
@@ -235,11 +235,11 @@ m: float (default 1.)
     increase of that linear function
 n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
-step: int (default value 0)
-    index of optimization step"""
+step: int (default value -1)
+    index of optimization step, defined for each step if set to -1"""
 
 def deff(id_, type_='var', id_of_source=None, value=1.0,
-          min_=-np.inf, max_=np.inf, is_discrete=False, m=1., n=0., step=0):
+          min_=-np.inf, max_=np.inf, is_discrete=False, m=1., n=0., step=-1):
     """Creates a factor definition for each step.
 
     Parameters
@@ -282,7 +282,7 @@ def deff(id_, type_='var', id_of_source=None, value=1.0,
 Deff = namedtuple(
     'Deff',
     'id type id_of_source value min max is_discrete m n step',
-    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., 0))
+    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1))
 Deff.__doc__ = """Definition of a factor.
 
 Parameters
@@ -309,8 +309,8 @@ m: float (default 1.)
     m is the increase of that linear function
 n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
-step: int (default value 0)
-    index of optimization step"""
+step: int (default value -1)
+    index of optimization step, for each step set to -1"""
 
 def expand_deff(deff_):
     """Creates factor definitions for each step and id.
@@ -336,7 +336,7 @@ def expand_deff(deff_):
         for id_, step_ in product(ids, iter_steps))
 
 KTerminallink = namedtuple(
-    'KTerminallink', 'branchid nodeid id step', defaults=(0,))
+    'KTerminallink', 'branchid nodeid id step', defaults=(-1,))
 KTerminallink.__doc__ = """Links a branch terminal with a factor.
 
 Parameters
@@ -347,10 +347,10 @@ nodeid: str
     ID of connectivity node
 id: str
     unique identifier (for one step) of linked factor
-step: int  (default value 0)
-    optimization step"""
+step: int (default value -1)
+    optimization step, defined for each step if -1"""
 
-KInjlink = namedtuple('KInjlink', 'injid part id step', defaults=(0,))
+KInjlink = namedtuple('KInjlink', 'injid part id step', defaults=(-1,))
 KInjlink.__doc__ = """Links an injection with a factor.
 
 Parameters
@@ -361,8 +361,8 @@ part: 'p'|'q'
     marker for active or reactive power to be multiplied
 id: str
     unique identifier (for one step) of linked factor
-step: int
-    optimization step"""
+step: int (default value -1)
+    optimization step, defined for each step if -1"""
 
 def injlink_(objid, id_, part, _, cls_, steps):
     """Creates instances of class cls.
@@ -426,7 +426,7 @@ def termlink_(objid, id_, _, nodeid, cls_, steps):
 Link = namedtuple(
     'Link',
     'objid id part nodeid cls step',
-    defaults=('pq', None, KInjlink, 0))
+    defaults=('pq', None, KInjlink, -1))
 Link.__doc__ = """Logical connection between injection/terminal_of_branch
 and a factor.
 
@@ -447,8 +447,9 @@ nodeid: str
 cls: KInjlink|KTerminallink (default value KInjlink)
     KInjlink - links an injection
     KBranchlink - links a branch
-step: int (default value 0)|iterable_of_int
-    addresses the optimization step, first optimization step has index 0"""
+step: int (default value -1)|iterable_of_int
+    addresses the optimization step, first optimization step has index 0,
+    defined for each step if -1"""
 
 Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))
 Term.__doc__ = """Data of an ojective-function-term.
