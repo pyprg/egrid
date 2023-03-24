@@ -28,7 +28,7 @@ from itertools import chain, tee
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Branchtaps, Factor, Deff, deff, expand_deff, DEFAULT_FACTOR_ID,
-    Link, injlink_, termlink_, KInjlink, KTerminallink,
+    Link, injlink_, termlink_, Injectionlink, Terminallink,
     Term, Message, meta_of_types)
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
@@ -413,13 +413,13 @@ def make_data_frames(devices=()):
             * .min, float, lower limit
             * .max, float, upper limit
             * .step, int, index of estimation step
-        * 'KInjlink':
+        * 'Injectionlink':
             pandas.DataFrame
             * .injid, str, ID of injection
             * .part, 'p'|'q', active/reactive power
             * .id, str, ID of (Load)factor
             * .step, int, index of estimation step
-        * 'KTerminallink':
+        * 'Terminallink':
             pandas.DataFrame
             * .branchid, str, ID of branch
             * .nodeid, str, ID of connectivity node
@@ -452,23 +452,23 @@ def make_data_frames(devices=()):
     dataframes[Factor.__name__] = _factor_frame
     _injlink_frame = pd.DataFrame(
         chain.from_iterable(
-            # convert Link into KInjlink
+            # convert Link into Injectionlink
             injlink_(*args) for args in _slack_and_devs[Link.__name__]
-            if args.cls == KInjlink),
-        columns=KInjlink._fields)
-    dataframes[KInjlink.__name__] = _injlink_frame
+            if args.cls == Injectionlink),
+        columns=Injectionlink._fields)
+    dataframes[Injectionlink.__name__] = _injlink_frame
     _terminallink_frame = pd.DataFrame(
         chain.from_iterable(
             # convert Link into KBranchlink
             termlink_(*args) for args in _slack_and_devs[Link.__name__]
-            if args.cls == KTerminallink),
-        columns=KTerminallink._fields)
+            if args.cls == Terminallink),
+        columns=Terminallink._fields)
     _slack_and_devs[Message.__name__].extend(
         'error: attribute \'cls\' of Link has not accepted '
         f'value \'{lnk.cls}\' ({str(lnk)})'
         for lnk in _slack_and_devs[Link.__name__]
-        if lnk.cls not in (KInjlink, KTerminallink))
-    dataframes[KTerminallink.__name__] = _terminallink_frame
+        if lnk.cls not in (Injectionlink, Terminallink))
+    dataframes[Terminallink.__name__] = _terminallink_frame
     return dataframes
 
 def _flatten(args):

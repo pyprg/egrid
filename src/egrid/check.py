@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import pandas as pd
 from egrid._types import (
-    SLACKNODES, FACTORS, KINJLINKS, INJECTIONS,
+    SLACKNODES, FACTORS, INJLINKS, INJECTIONS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
 
 def check_numbers(frames, msg_cls=(2, 0, 2)):
@@ -65,7 +65,7 @@ def check_factor_links(frames, msg_cls=1):
     ----------
     frames : dict
         * ['Factor'], pandas.DataFrame
-        * ['KInjlink'], pandas.DataFrame
+        * ['Injectionlink'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame
     msg_cls: int
         class of message
@@ -77,10 +77,10 @@ def check_factor_links(frames, msg_cls=1):
     factors = (
         frames.get('Factor', FACTORS)
         .set_index(['step', 'id'], drop=True))
-    kinjlinks = (
-        frames.get('KInjlink', KINJLINKS)
+    injlinks = (
+        frames.get('Injectionlink', INJLINKS)
         .set_index(['step', 'id'], drop=True))
-    join = factors[['type']].join(kinjlinks, how="outer")
+    join = factors[['type']].join(injlinks, how="outer")
     for step, id_ in join[join.injid.isna()].index:
         yield (
             f'missing link to load scaling factor \'{id_}\' (step {step})',
@@ -93,14 +93,14 @@ def check_factor_links(frames, msg_cls=1):
             f'invalid link for injection \'{row.injid}\' in step {row.step}, '
             f'load scaling factor \'{row.id}\' does not exist',
             msg_cls)
-    kinjlinks_ = kinjlinks.reset_index()
-    assoc = kinjlinks_.copy().set_index(['step', 'injid', 'part'])
+    injlinks_ = injlinks.reset_index()
+    assoc = injlinks_.copy().set_index(['step', 'injid', 'part'])
     for idx, id_ in assoc[assoc.index.duplicated(keep='first')].iterrows():
-        yield f'duplicate KInjlink (step={idx[0]}, '\
+        yield f'duplicate Injectionlink (step={idx[0]}, '\
             f'injid=\'{idx[1]}\', part=\'{idx[2]}\'), id=\'{id_[0]}\''
     injections = frames.get('Injection', INJECTIONS)
-    valid_inj_ref = kinjlinks_['injid'].isin(injections.id)
-    for _, row in kinjlinks_[~valid_inj_ref].iterrows():
+    valid_inj_ref = injlinks_['injid'].isin(injections.id)
+    for _, row in injlinks_[~valid_inj_ref].iterrows():
         yield (
             f'invalid link for load scaling factor \'{row[1]}\' '
             f'in step {row[0]}, injection \'{row[2]}\' does not exist',
@@ -311,7 +311,7 @@ def check_frames(frames):
         * ['Branch'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame, injection data
         * ['Factor'], pandas.DataFrame
-        * ['KInjlink'], pandas.DataFrame
+        * ['Injectionlink'], pandas.DataFrame
         * ['IValue'], pandas.DataFrame
         * ['PValue'], pandas.DataFrame
         * ['QValue'], pandas.DataFrame
@@ -340,7 +340,7 @@ def get_first_error(frames):
         * ['Branch'], pandas.DataFrame
         * ['Injection'], pandas.DataFrame, injection data
         * ['Factor'], pandas.DataFrame
-        * ['KInjlink'], pandas.DataFrame
+        * ['Injectionlink'], pandas.DataFrame
         * ['IValue'], pandas.DataFrame
         * ['PValue'], pandas.DataFrame
         * ['QValue'], pandas.DataFrame

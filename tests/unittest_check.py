@@ -96,7 +96,7 @@ class Check_factors_links(unittest.TestCase):
         self.assertEqual(len(frames['Message']), 0, 'no error')
         self.assertEqual(len(frames['Injection']), 1, 'one injection')
         self.assertEqual(
-            len(frames['KInjlink']), 1, 'one instance of KInjlink')
+            len(frames['Injectionlink']), 1, 'one instance of Injectionlink')
         self.assertEqual(
             len(frames['Factor']), 1, 'one instance of Factor')
         messages = [*check_factor_links(frames)]
@@ -218,10 +218,10 @@ class Check_factors_links(unittest.TestCase):
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
-            frames.get('KInjlink'),
+            frames.get('Injectionlink'),
             DataFrame,
-            'frames["KInjlink"] exists')
-        links = frames['KInjlink']
+            'frames["Injectionlink"] exists')
+        links = frames['Injectionlink']
         self.assertEqual(
             len(links),
             1,
@@ -255,10 +255,10 @@ class Check_factors_links(unittest.TestCase):
             1,
             'make_data_frames returns 1 injection')
         self.assertIsInstance(
-            frames.get('KInjlink'),
+            frames.get('Injectionlink'),
             DataFrame,
-            'frames["KInjlink"] exists')
-        links = frames['KInjlink']
+            'frames["Injectionlink"] exists')
+        links = frames['Injectionlink']
         self.assertEqual(
             len(links),
             4,

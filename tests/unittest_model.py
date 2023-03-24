@@ -52,11 +52,11 @@ slack0 <------br0------> n1 <------br1------> n2 -->> inj2
 #.  Deff(
 #.     id=br0_slack0 value=0 m=-.00625 n=1 min=-16 max=16
 #.     is_discrete=True type=const step(0 1 2))
-#.  Link(objid=br0 nodeid=slack0 id=br0_slack0 cls=KTerminallink step(0 1 2))
+#.  Link(objid=br0 nodeid=slack0 id=br0_slack0 cls=Terminallink step(0 1 2))
 #.  Deff(
 #.     id=br1_n1 value=0 m=-.00625 n=1 min=-16 max=16
 #.     is_discrete=True type=var step(0 1 2))
-#.  Link(objid=br1 nodeid=n1 id=br1_n1 cls=KTerminallink step(0 1 2))"""
+#.  Link(objid=br1 nodeid=n1 id=br1_n1 cls=Terminallink step(0 1 2))"""
 
 class Make_data_Frames(unittest.TestCase):
 
@@ -64,7 +64,7 @@ class Make_data_Frames(unittest.TestCase):
         frames = make_data_frames(create_objects(_factor_test_string))
         rowcounts = {
             'Branch': 2, 'Slacknode': 1, 'Injection': 2, 'Factor': 12,
-            'KInjlink': 6, 'KTerminallink': 6}
+            'Injectionlink': 6, 'Terminallink': 6}
         self.assertTrue(
             all(rowcounts.get(table_name, 0)==len(table)
                 for table_name, table in frames.items()),

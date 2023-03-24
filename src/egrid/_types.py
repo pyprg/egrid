@@ -335,9 +335,9 @@ def expand_deff(deff_):
             deff_.m, deff_.n, step_)
         for id_, step_ in product(ids, iter_steps))
 
-KTerminallink = namedtuple(
-    'KTerminallink', 'branchid nodeid id step', defaults=(-1,))
-KTerminallink.__doc__ = """Links a branch terminal with a factor.
+Terminallink = namedtuple(
+    'Terminallink', 'branchid nodeid id step', defaults=(-1,))
+Terminallink.__doc__ = """Links a branch terminal with a factor.
 
 Parameters
 ----------
@@ -350,8 +350,9 @@ id: str
 step: int (default value -1)
     optimization step, defined for each step if -1"""
 
-KInjlink = namedtuple('KInjlink', 'injid part id step', defaults=(-1,))
-KInjlink.__doc__ = """Links an injection with a factor.
+Injectionlink = namedtuple(
+    'Injectionlink', 'injid part id step', defaults=(-1,))
+Injectionlink.__doc__ = """Links an injection with a factor.
 
 Parameters
 ----------
@@ -378,7 +379,7 @@ def injlink_(objid, id_, part, _, cls_, steps):
         active power or reactive power
     _: str
         not used
-    cls_: KInjlink
+    cls_: Injectionlink
         class of link
     steps: int, or list<int>, or tuple<int>
         index of step"""
@@ -406,7 +407,7 @@ def termlink_(objid, id_, _, nodeid, cls_, steps):
         not used
     nodeid: str, or list<str>, or tuple<str>
         ID of connectivity node
-    cls_: KInjlink
+    cls_: Injectionlink
         class of link
     steps: int, or list<int>, or tuple<int>
         index of step"""
@@ -426,7 +427,7 @@ def termlink_(objid, id_, _, nodeid, cls_, steps):
 Link = namedtuple(
     'Link',
     'objid id part nodeid cls step',
-    defaults=('pq', None, KInjlink, -1))
+    defaults=('pq', None, Injectionlink, -1))
 Link.__doc__ = """Logical connection between injection/terminal_of_branch
 and a factor.
 
@@ -440,12 +441,12 @@ id: str|iterable_of_str
 part: 'p'|'q'|iterable_of_two_char (default 'pq')
     identifies the attribute of the injection to multipy with factor
     ('p'/'q'- injected active/reactive power), the value is relevant
-    in case argument 'cls' is KInjlink only
+    in case argument 'cls' is Injectionlink only
 nodeid: str
     ID of connectivity node, the value is relevant
-    in case argument 'cls' is KTerminallink only
-cls: KInjlink|KTerminallink (default value KInjlink)
-    KInjlink - links an injection
+    in case argument 'cls' is Terminallink only
+cls: Injectionlink|Terminallink (default value Injectionlink)
+    Injectionlink - links an injection
     KBranchlink - links a branch
 step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
@@ -481,13 +482,13 @@ def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
 def _tocls(string):
-    if string==KTerminallink.__name__:
-        return KTerminallink
-    if string==KInjlink.__name__:
-        return KInjlink
+    if string==Terminallink.__name__:
+        return Terminallink
+    if string==Injectionlink.__name__:
+        return Injectionlink
     raise ValueError(
         f'name of class not accepted \'{string}\', '
-        'possible values are \'KTerminallink\', \'KInjlink\'')
+        'possible values are \'Terminallink\', \'Injectionlink\'')
 
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
@@ -514,12 +515,12 @@ _attribute_types = {
          [False, False, False, False, False, False,
           False, False, False, False]),
      #    injid, part, id, step
-     KInjlink:(
+     Injectionlink:(
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [False, False, False, False]),
      #    branchid, nodeid, id, step
-     KTerminallink:(
+     Terminallink:(
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [False, False, False, False]),
@@ -637,7 +638,7 @@ IVALUES = make_df(IValue)
 VVALUES = make_df(Vvalue)
 BRANCHTAPS = make_df(Branchtaps)
 FACTORS = make_df(Factor)
-KINJLINKS = make_df(KInjlink)
-KTERMINALLINKS = make_df(KTerminallink)
+INJLINKS = make_df(Injectionlink)
+TERMINALLINKS = make_df(Terminallink)
 TERMS = make_df(Term)
 MESSAGES = make_df(Message)

@@ -31,9 +31,9 @@ from functools import partial
 from itertools import chain
 from egrid._types import (
     df_astype,
-    Slacknode, Branch, Branchtaps, Factor, KInjlink, KTerminallink,
+    Slacknode, Branch, Branchtaps, Factor, Injectionlink, Terminallink,
     Injection, Output, IValue, PValue, QValue, Vvalue, Term, Message,
-    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, KINJLINKS, KTERMINALLINKS,
+    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, INJLINKS, TERMINALLINKS,
     INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
@@ -660,13 +660,13 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             * .is_discrete, bool
             * .m, float, increase of multiplier w.r.t. var/const
             * .n, float, multiplier if var/const is 0.
-        * 'KInjlink':
+        * 'Injectionlink':
             pandas.DataFrame
             * .step, int, index of estimation step
             * .injid, str, ID of injection
             * .part, 'p'|'q', active/reactive power
             * .id, str, ID of (Load)'Factor'
-        * 'KTerminallink':
+        * 'Terminallink':
             pandas.DataFrame
             * .step, int, index of estimation step
             * .branchid, str, ID of branch
@@ -773,13 +773,13 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         .set_index(['step', 'id']))
     # links of injection
     injassoc_ = (
-        _getframe(dataframes, KInjlink, KINJLINKS)
+        _getframe(dataframes, Injectionlink, INJLINKS)
         .set_index(['step', 'injid', 'part']))
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
     injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
     # links of terminals
     termassoc_ = (
-        _getframe(dataframes, KTerminallink, KTERMINALLINKS)
+        _getframe(dataframes, Terminallink, TERMINALLINKS)
         .set_index(['step', 'branchid', 'nodeid']))
     termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
