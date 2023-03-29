@@ -161,9 +161,15 @@ mnodeinj: scipy.sparse.csc_matrix
     ordered according to power flow calculation nodes (adding values of
     injections for each node) by calculating 'mnodeinj @ vector'
 
-injection_factor_associations: pandas.DataFrame (index: 'step','injid','part')
+injection_factor_associations: pandas.DataFrame 
+(index: 'step','id_of_injection','part')
 
     * .id, str, unique identifier of factor
+
+terminal_factor_associations: pandas.DataFrame
+(index: (step, id_of_branch, id_of_node))
+
+    * .id, str, ID of factor
 
 messages: pandas.DataFrame
 

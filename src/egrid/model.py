@@ -131,22 +131,22 @@ y_max: float
       a connection with inifinite admittance (no impedance), the connectivity
       nodes of both terminals are aggregated into one power-flow-calculation
       node
-factors: pandas.DataFrame 
+factors: pandas.DataFrame
     (index: (step, id))
     * .type, 'var'|'const', decision variable or parameter
     * .id_of_source, str, initialize with referenced factor of previous step
-    * .value, float, use this value for initialization 
+    * .value, float, use this value for initialization
       if no factor with 'id_of_source' in previous step
     * .min, float, smallest possible value
     * .max, float, greatest possible value
     * .is_discrete, bool, value shall be in, input for MINLP solver
     * .m, float, applied multiplier is 'mx + n' (x is var/const)
     * .n, float, applied multiplier is 'mx + n' (x is var/const)
-injection_factor_associations: pandas.DataFrame 
-    (index: (step, injid, part))
+injection_factor_associations: pandas.DataFrame
+    (index: (step, id_of_injection, part))
     * .id, str, ID of factor
-terminal_factor_associations: pandas.DataFrame 
-    (index: (step, branchid, nodeid))
+terminal_factor_associations: pandas.DataFrame
+    (index: (step, id_of_branch, id_of_node))
     * .id, str, ID of factor
 mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector
@@ -162,7 +162,8 @@ messages: pandas.DataFrame
     * .level, 0 - information, 1 - warning, 2 - error"""
 
 def _join_on(to_join, on_field, dataframe):
-    """Joins dataframe with to_join on on_field. Returns a new pandas.DataFrame.
+    """Joins dataframe with to_join on on_field. Returns a new
+    pandas.DataFrame.
 
     Parameters
     ----------
@@ -775,12 +776,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     injassoc_ = (
         _getframe(dataframes, Injectionlink, INJLINKS)
         .set_index(['step', 'injid', 'part']))
+    injassoc_.index.names = ['step', 'id_of_injection', 'part']
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
     injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
     # links of terminals
     termassoc_ = (
         _getframe(dataframes, Terminallink, TERMINALLINKS)
         .set_index(['step', 'branchid', 'nodeid']))
+    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
     termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
     # filter stepwise for intersection of injlinks+termlinks and factors
