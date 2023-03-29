@@ -261,14 +261,14 @@ def _get_branch_terminals(branches):
                 'id'               : 'id_of_branch',
                 'id_of_node_A'     : 'id_of_node',
                 'index_of_node_A'  : 'index_of_node',
-                'index_of_term_A'  : 'index_of_term',
+                'index_of_term_A'  : 'index_of_terminal',
                 'switch_flow_idx_A': 'switch_flow_index',
-                'index_of_term_B'  : 'index_of_other_term',
+                'index_of_term_B'  : 'index_of_other_terminal',
                 'id_of_node_B'     : 'id_of_other_node',
                 'index_of_node_B'  : 'index_of_other_node',
                 'index_of_taps_A'  : 'index_of_taps',
                 'index_of_taps_B'  : 'index_of_other_taps'})
-        .set_index('index_of_term')
+        .set_index('index_of_terminal')
         .drop('switch_flow_idx_B', axis=1))
     terms_a['side'] = 'A'
     terms_b = (
@@ -277,14 +277,14 @@ def _get_branch_terminals(branches):
                 'id'               : 'id_of_branch',
                 'id_of_node_B'     : 'id_of_node',
                 'index_of_node_B'  : 'index_of_node',
-                'index_of_term_B'  : 'index_of_term',
+                'index_of_term_B'  : 'index_of_terminal',
                 'switch_flow_idx_B': 'switch_flow_index',
-                'index_of_term_A'  : 'index_of_other_term',
+                'index_of_term_A'  : 'index_of_other_terminal',
                 'id_of_node_A'     : 'id_of_other_node',
                 'index_of_node_A'  : 'index_of_other_node',
                 'index_of_taps_B'  : 'index_of_taps',
                 'index_of_taps_A'  : 'index_of_other_taps'})
-        .set_index('index_of_term')
+        .set_index('index_of_terminal')
         .drop('switch_flow_idx_A', axis=1))
     terms_b['side'] = 'B'
     return pd.concat([terms_a, terms_b])
@@ -647,8 +647,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             * .index_of_node
             * ...
             * .index_of_branch
-            * .index_of_term
-            * .index_of_other_term
+            * .index_of_terminal
+            * .index_of_other_terminal
         * 'Factor':
             pandas.DataFrame
             * .step, int, index of estimation step
@@ -743,8 +743,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     branchterminals['at_slack'] = (
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
     termindex = pd.DataFrame(
-        {'index_of_term': branchterminals.index,
-         'index_of_other_term': branchterminals.index_of_other_term.array},
+        {'index_of_terminal': branchterminals.index,
+         'index_of_other_terminal': 
+             branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
     branchtaps = branchtaps_.join(
@@ -762,7 +763,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         _prepare_branch_outputs(
             add_idx_of_node, branches, outputs[is_branch_output])
         .join(
-            termindex['index_of_term'],
+            termindex['index_of_terminal'],
             on=['id_of_node', 'id_of_branch'],
             how='inner'))
     injectionoutputs = _prepare_injection_outputs(
