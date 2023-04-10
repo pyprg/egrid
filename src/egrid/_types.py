@@ -210,7 +210,7 @@ Factor = namedtuple(
     'id type id_of_source value min max is_discrete m n step',
     defaults=(
         'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., -1))
-Factor.__doc__ = """Data of a load scaling factor.
+Factor.__doc__ = """Data of a factor.
 
 Parameters
 ----------
@@ -266,7 +266,8 @@ def deff(id_, type_='var', id_of_source=None, value=1.0,
 
     Returns
     -------
-    pandas.DataFrame"""
+    list
+        Factor"""
     try:
         iter_steps = iter(step)
     except TypeError:

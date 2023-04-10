@@ -13,11 +13,11 @@ Function **make_model(\*args)** creates an instance of Model from  arguments
 of type
 
     - Slacknode
-    - Branch (line, series capacitor, transformer winding, transformer, 
+    - Branch (line, series capacitor, transformer winding, transformer,
       closed switch)
     - Injection (consumer, shunt capacitor, PQ/PV-generator, battery)
     - Branchtaps
-    - Output (indicates that measured flow (I, P or Q) or a part thereof 
+    - Output (indicates that measured flow (I, P or Q) or a part thereof
       flows through the referenced terminal (device or node+device))
     - PValue (measured active power)
     - QValue (measured reactive power)
@@ -134,42 +134,79 @@ count_of_slacks: int
 
     count_of_slacks
 
-factors: pandas.DataFrame (index: 'step','id')
+factors: egrid.factors.Factors (namedtuple)
 
-    * .type, 'var'|'const', type of factor decision variable or parameter
-    * .id_of_source, str, id of factor (previous optimization step)
-       for initialization
-    * .value, float, used by initialization if no source factor in previous
-       optimization step
-    * .min, float
-       smallest possible value
-    * .max, float
-       greatest possible value
-    * .is_discrete, bool
-       just 0 digits after decimal point if True, input for solver, accepted
-       by MINLP solvers
-    * .m, float
-       increase of multiplier with respect to change of var/const
-       the effective multiplier is a linear function of var/const (mx + n)
-    * .n, float
-       multiplier when var/const is 0.
-       the effective multiplier is a linear function of var/const (mx + n)
+    * .gen_factor_data, pandas.DataFrame (index: ('step','id'))
+
+        * .type, 'var'|'const', type of factor decision variable or parameter
+        * .id_of_source, str, id of factor (previous optimization step)
+           for initialization
+        * .value, float, used by initialization if no source factor in previous
+           optimization step
+        * .min, float
+           smallest possible value
+        * .max, float
+           greatest possible value
+        * .is_discrete, bool
+           just 0 digits after decimal point if True, input for solver,
+           accepted by MINLP solvers
+        * .m, float
+           increase of multiplier with respect to change of var/const
+           the effective multiplier is a linear function of var/const (mx + n)
+        * .n, float
+           multiplier when var/const is 0.
+           the effective multiplier is a linear function of var/const (mx + n)
+
+    * .gen_injfactor, pandas.DataFrame (index: ('id_of_injection', 'part'))
+
+        * .step, -1 (int)
+        * id, str, ID of factor
+
+    * .gen_termfactor, pandas.DataFrame (index: (id_of_branch, id_of_node))
+
+        * .step, int
+        * .id, str, ID of factor
+        * .index_of_symbol, int
+        * .index_of_terminal, int
+        * .index_of_other_terminal, int, index of terminal at other branch node
+
+    * .get_groups: function (iterable_of_int) -> (pandas.DataFrame)
+
+        pandas.DataFrame(index: ('step', 'id'))
+
+            * .type, 'var'|'const', type of factor decision
+               variable or parameter
+            * .id_of_source, str, id of factor (previous optimization step)
+               for initialization
+            * .value, float, used by initialization if no source factor
+               in previous optimization step
+            * .min, float
+               smallest possible value
+            * .max, float
+               greatest possible value
+            * .is_discrete, bool
+               just 0 digits after decimal point if True, input for solver,
+               accepted by MINLP solvers
+            * .m, float
+               increase of multiplier with respect to change of var/const
+               the effective multiplier is a linear
+               function of var/const (mx + n)
+            * .n, float
+               multiplier when var/const is 0.
+               the effective multiplier is a linear function of
+               var/const (mx + n)
+
+    * .get_injfactorgroups: function (iterable_of_int) -> (pandas.DataFrame)
+
+        pandas.DataFrame (index: ('step', 'id_of_injection', 'part'))
+
+            * .id, str, ID of factor
 
 mnodeinj: scipy.sparse.csc_matrix
 
     converts a vector ordered according to injection indices to a vector
     ordered according to power flow calculation nodes (adding values of
     injections for each node) by calculating 'mnodeinj @ vector'
-
-injection_factor_associations: pandas.DataFrame 
-(index: 'step','id_of_injection','part')
-
-    * .id, str, unique identifier of factor
-
-terminal_factor_associations: pandas.DataFrame
-(index: (step, id_of_branch, id_of_node))
-
-    * .id, str, ID of factor
 
 messages: pandas.DataFrame
 
@@ -202,7 +239,7 @@ Python code for example, suitable input for function **egrid.make_model**
 however, transformers/transformerwindings are modeled using class Branch too.):
 ```
 from egrid.builder import (
-    Slacknode, PValue, QValue, IValue, Output, Branch, Branchtaps, 
+    Slacknode, PValue, QValue, IValue, Output, Branch, Branchtaps,
     Injection, Deff, Link)
 
 example = [

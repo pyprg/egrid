@@ -37,6 +37,7 @@ from egrid._types import (
     INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
+from egrid.factors import make_factordefs
 
 _Y_LO_ABS_MAX = 1e5
 
@@ -45,7 +46,7 @@ Model = namedtuple(
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'branchtaps shape_of_Y count_of_slacks y_max '
-    'factors injection_factor_associations terminal_factor_associations '
+    'factors '
     'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network for
@@ -131,23 +132,42 @@ y_max: float
       a connection with inifinite admittance (no impedance), the connectivity
       nodes of both terminals are aggregated into one power-flow-calculation
       node
-factors: pandas.DataFrame
-    (index: (step, id))
-    * .type, 'var'|'const', decision variable or parameter
-    * .id_of_source, str, initialize with referenced factor of previous step
-    * .value, float, use this value for initialization
-      if no factor with 'id_of_source' in previous step
-    * .min, float, smallest possible value
-    * .max, float, greatest possible value
-    * .is_discrete, bool, value shall be in, input for MINLP solver
-    * .m, float, applied multiplier is 'mx + n' (x is var/const)
-    * .n, float, applied multiplier is 'mx + n' (x is var/const)
-injection_factor_associations: pandas.DataFrame
-    (index: (step, id_of_injection, part))
-    * .id, str, ID of factor
-terminal_factor_associations: pandas.DataFrame
-    (index: (step, id_of_branch, id_of_node))
-    * .id, str, ID of factor
+factors: factor.Factors
+    * .gen_factor_data, pandas.DataFrame (id (str, ID of factor)) ->
+        * .step, -1
+        * .type, 'const'|'var'
+        * .id_of_source, str
+        * .value, float
+        * .min, float
+        * .max, float
+        * .is_discrete, bool
+        * .m, float
+        * .n, float
+        * .index_of_symbol, int
+    * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
+        * .step, -1
+        * id, str, ID of factor
+    * .gen_termfactor, pandas.DataFrame (id_of_branch, id_of_node) ->
+        * .step
+        * .id
+        * .index_of_symbol
+        * .index_of_terminal
+        * .index_of_other_terminal
+    * .get_groups: function
+        (iterable_of_int) -> (pandas.DataFrame)
+        ('step', 'id') ->
+            * .type, 'var'|'const', decision variable|parameter
+            * .id_of_source, str
+            * .value, float
+            * .min, float
+            * .max, float
+            * .is_discrete, bool
+            * .m, float
+            * .n, float
+    * .get_injfactorgroups: function
+        (iterable_of_int)-> (pandas.DataFrame)
+        ('step', 'id_of_injection', 'part') ->
+            * .id, str, ID of factor
 mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector
     ordered according to power flow calculation nodes (adding entries of
@@ -699,8 +719,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .y_max, float, maximum admittance between two power-flow-calculation
             nodes
         * .factors
-        * .injection_factor_associations
-        * .terminal_factor_associations
         * .mnodeinj
         * .terms
         * .messages"""
@@ -744,7 +762,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
     termindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
-         'index_of_other_terminal': 
+         'index_of_other_terminal':
              branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
@@ -789,13 +807,13 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
     # filter stepwise for intersection of injlinks+termlinks and factors
     df_ = pd.DataFrame([], index=injindex_.union(termindex_))
-    factors = factors_.join(df_, how='inner')
+    factor_frame = factors_.join(df_, how='inner')
     # injection links
     is_valid_injassoc = (
         injassoc
         .reset_index(['step'])
         .set_index(['step', 'id'])
-        .join(factors.type, how='left')
+        .join(factor_frame.type, how='left')
         .isin(('const', 'var')))
     is_valid_injassoc.index = injassoc.index
     # terminal links
@@ -803,9 +821,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         termassoc
         .reset_index(['step'])
         .set_index(['step', 'id'])
-        .join(factors.type, how='left')
+        .join(factor_frame.type, how='left')
         .isin(('const', 'var')))
     is_valid_termassoc.index = termassoc.index
+    factors = make_factordefs(
+        factor_frame,
+        termassoc[is_valid_termassoc.type],
+        injassoc[is_valid_injassoc.type],
+    branchterminals)
     # math terms (parts) of objective function
     terms = _getframe(dataframes, Term, TERMS)
     return Model(
@@ -824,8 +847,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
         factors=factors,
-        injection_factor_associations=injassoc[is_valid_injassoc.type],
-        terminal_factor_associations=termassoc[is_valid_termassoc.type],
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))

@@ -93,8 +93,6 @@ class Make_model(unittest.TestCase):
             model.ivalues,
             model.vvalues,
             model.branchtaps,
-            model.factors,
-            model.injection_factor_associations,
             model.terms,
             model.messages]
         empty_dataframe = ((isinstance(df, DF) and df.empty) for df in frames)
@@ -109,6 +107,13 @@ class Make_model(unittest.TestCase):
             model.mnodeinj.shape,
             (0,0),
             'shape of mnodeinj is 0,0')
+        self.assertTrue(
+            model.factors.get_groups([-1,0]).empty,
+            "no generic factors, no factors for step 0")
+        self.assertTrue(
+            model.factors.get_injfactorgroups([-1,0]).empty,
+            "no generic injection to factor relation, "
+            "no injection to factor relation for step 0")
 
     def test_make_model_slack(self):
         model = make_model(Slacknode('n0'), Branch('b0', 'n0', 'n1'))
