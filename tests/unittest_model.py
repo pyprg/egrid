@@ -42,21 +42,22 @@ slack0 <------br0------> n1 <------br1------> n2 -->> inj2
 
 # >> FACTORS for INJECTIONS <<
 
-#.  Deff(id=Pinj1 m=2 type=const step(0 1 2))
-#.  Link(objid=inj1 id=Pinj1 part=p step(0 1 2))
-#.  Deff(id=Qinj1 type=var step(0 1 2))
-#.  Link(objid=inj1 id=Qinj1 part=q step(0 1 2))
+#.  Defk(id=Pinj1 m=2 type=const step(0 1 2))
+#.  Klink(objid=inj1 id=Pinj1 part=p step(0 1 2))
+#.  Defk(id=Qinj1 type=var step(0 1 2))
+#.  Klink(objid=inj1 id=Qinj1 part=q step(0 1 2))
 
 # >> FACTORS for BRANCHTERMINALS <<
 
-#.  Deff(
+#.  Deft(
 #.     id=br0_slack0 value=0 m=-.00625 n=1 min=-16 max=16
 #.     is_discrete=True type=const step(0 1 2))
-#.  Link(objid=br0 nodeid=slack0 id=br0_slack0 cls=Terminallink step(0 1 2))
-#.  Deff(
+#.  Tlink(id_of_branch=br0 id_of_node=slack0 id_of_factor=br0_slack0 
+#.     step(0 1 2))
+#.  Deft(
 #.     id=br1_n1 value=0 m=-.00625 n=1 min=-16 max=16
 #.     is_discrete=True type=var step(0 1 2))
-#.  Link(objid=br1 nodeid=n1 id=br1_n1 cls=Terminallink step(0 1 2))"""
+#.  Tlink(id_of_branch=br1 id_of_node=n1 id_of_factor=br1_n1 step(0 1 2))"""
 
 class Make_data_Frames(unittest.TestCase):
 
@@ -92,7 +93,6 @@ class Make_model(unittest.TestCase):
             model.qvalues,
             model.ivalues,
             model.vvalues,
-            model.branchtaps,
             model.terms,
             model.messages]
         empty_dataframe = ((isinstance(df, DF) and df.empty) for df in frames)
@@ -189,7 +189,7 @@ class Model_from_frames(unittest.TestCase):
     def test_model_from_frames(self):
         # line_2 is a bridge as admittance is to high
         string = """
-                y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
+               y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |                               |

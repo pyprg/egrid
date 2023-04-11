@@ -31,9 +31,9 @@ from functools import partial
 from itertools import chain
 from egrid._types import (
     df_astype,
-    Slacknode, Branch, Branchtaps, Factor, Injectionlink, Terminallink,
+    Slacknode, Branch, Factor, Injectionlink, Terminallink,
     Injection, Output, IValue, PValue, QValue, Vvalue, Term, Message,
-    SLACKNODES, BRANCHES, BRANCHTAPS, FACTORS, INJLINKS, TERMINALLINKS,
+    SLACKNODES, BRANCHES, FACTORS, INJLINKS, TERMINALLINKS,
     INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
     TERMS,
     MESSAGES)
@@ -45,7 +45,7 @@ Model = namedtuple(
     'Model',
     'nodes slacks injections branchterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
-    'branchtaps shape_of_Y count_of_slacks y_max '
+    'shape_of_Y count_of_slacks y_max '
     'factors '
     'mnodeinj terms '
     'messages')
@@ -113,15 +113,6 @@ vvalues: pandas.DataFrame
     * .id_of_node, unique identifier of node voltage is given for
     * .V, float, magnitude of voltage
     * .index_of_node, index of node voltage is given for
-branchtaps: pandas.DataFrame
-    * .id, str, IDs of taps
-    * .id_of_node, str, ID of associated node
-    * .id_of_branch, str, ID of associated branch
-    * .Vstep, float, magnitude of voltage difference per step, pu
-    * .positionmin, int, smallest tap position
-    * .positionneutral, int, tap with ratio 1:1
-    * .positionmax, int, position of greates tap
-    * .position, int, actual position
 shape_of_Y: tuple (int, int)
     shape of admittance matrix for power flow calculation
 count_of_slacks: int
@@ -401,10 +392,7 @@ def _prepare_branch_taps(add_idx_of_node, dfbranch, dfbranchtaps):
         .set_index('id'))
     return branchtaps.join(branchindex, on='id_of_branch')
 
-def _prepare_branches(branchtaps, branches, nodes):
-    branchtaps_view = (
-        branchtaps[['id_of_branch', 'id_of_node', 'index_of_taps']]
-        .set_index(['id_of_branch', 'id_of_node']))
+def _prepare_branches(branches, nodes):
     if not branches['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -418,13 +406,7 @@ def _prepare_branches(branchtaps, branches, nodes):
     branchcount = len(branches_)
     branches_['index_of_term_A'] = range(branchcount)
     branches_['index_of_term_B'] = range(branchcount, 2 * branchcount)
-    return (
-        branches_
-        .join(branchtaps_view, on=['id', 'id_of_node_A'], how='left')
-        .join(branchtaps_view, on=['id', 'id_of_node_B'], how='left',
-            lsuffix='_A',
-            rsuffix='_B')
-        .astype({'index_of_taps_A': 'Int64', 'index_of_taps_B': 'Int64'}))
+    return branches_
 
 def _prepare_branch_outputs(add_idx_of_node, branches, branchoutputs):
     _branchoutputs = (
@@ -591,7 +573,7 @@ def _getframe(frames, cls_, default):
     cls_: class
         class of predifined named tuples
     default: pandas.DataFrame
-        returned of frames does not provide a DataFrame with
+        returned if frames does not provide a DataFrame with
         key cls_.__name__
 
     Returns
@@ -654,21 +636,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
             pandas.DataFrame
             * .id_of_node, str
             * .V, float, magnitude of voltage, pu
-        * 'Branchtaps':
-            pandas.DataFrame
-            * .id, str, IDs of taps
-            * .id_of_node, str, ID of associated node
-            * .id_of_branch, str, ID of associated branch
-            * .Vstep, float, magnitude of voltage difference per step, pu
-            * .positionmin, int, smallest tap position
-            * .positionneutral, int, tap with ratio 1:1
-            * .positionmax, int, position of greates tap
-            * .position, int, actual position
-            * .index_of_node
-            * ...
-            * .index_of_branch
-            * .index_of_terminal
-            * .index_of_other_terminal
         * 'Factor':
             pandas.DataFrame
             * .step, int, index of estimation step
@@ -752,11 +719,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         head_tail(slack_groups.id_of_node.get_group(group_name))
         for group_name in super_slack_idxs]
     #
-    branchtaps_ = _prepare_branch_taps(
-        add_idx_of_node,
-        branches_,
-        _getframe(dataframes, Branchtaps, BRANCHTAPS))
-    branches = _prepare_branches(branchtaps_, branches_, pfc_nodes)
+    branches = _prepare_branches(branches_, pfc_nodes)
     branchterminals = _get_branch_terminals(_add_bg(branches))
     branchterminals['at_slack'] = (
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
@@ -766,8 +729,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
              branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
-    branchtaps = branchtaps_.join(
-        termindex, on=['id_of_node', 'id_of_branch'], how='inner')
     # injections
     injections = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
     if not injections['id'].is_unique:
@@ -842,7 +803,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         qvalues=_getframe(dataframes, QValue, QVALUES),
         ivalues=_getframe(dataframes, IValue, IVALUES),
         vvalues=add_idx_of_node(_getframe(dataframes, Vvalue, VVALUES)),
-        branchtaps=branchtaps,
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,

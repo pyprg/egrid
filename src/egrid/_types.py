@@ -177,32 +177,6 @@ id_of_node: str
 Vvalue: float (default value 1.0)
     magnitude of electric voltage"""
 
-Branchtaps = namedtuple(
-    'Branchtaps',
-    'id id_of_node id_of_branch Vstep '
-    'positionmin positionneutral positionmax position',
-    defaults=(10/16, 0, 0, 0, 0))
-Branchtaps.__doc__ = """Model of a set of taps.
-
-Parameters
-----------
-id: str
-    unique identifier of taps
-id_of_node: str
-    unique identifier of the connected node
-id_of_branch: str
-    unique identifier of the branch having taps
-Vstep: float (default value 10/16)
-    increment of voltage per tap step, positive or negative
-positionmin: int (default vaLue 0)
-    smallest posssible tap postion
-positionneutral:int (default vaLue 0)
-    position which the voltage is not affected
-positionmax: int (default vaLue 0)
-    greatest possible tap position
-position: int (default vaLue 0)
-    actual position"""
-
 DEFAULT_FACTOR_ID = '_default_'
 
 Factor = namedtuple(
@@ -238,53 +212,11 @@ n: float (default 0.)
 step: int (default value -1)
     index of optimization step, defined for each step if set to -1"""
 
-def deff(id_, type_='var', id_of_source=None, value=1.0,
-          min_=-np.inf, max_=np.inf, is_discrete=False, m=1., n=0., step=-1):
-    """Creates a factor definition for each step.
-
-    Parameters
-    ----------
-    id_: str
-        unique identifier
-    type_: 'var'|'const' (default value 'var')
-        type of factor decision variable/constant value
-    value: float (default value 1)
-        used for initialization when no valid given source
-    min_: float (default value -numpy.inf)
-        smallest possible value
-    max_: float (default value numpy.inf)
-        greatest possible value
-    is_discrete: bool (default values is False)
-        input for MINLP solver, indicates if factor shall be processed like int
-    m: float (default 1.)
-        dy/dx, effective multiplier is a linear function f(x) = mx + n,
-        m is the increase of that linear function
-    n: float (default 0.)
-        effective multiplier is a linear function f(x) = mx + n, n is f(0)
-    step: iterable
-        int
-
-    Returns
-    -------
-    list
-        Factor"""
-    try:
-        iter_steps = iter(step)
-    except TypeError:
-        iter_steps = iter([step])
-    ids = id_ if isinstance(id_, (list, tuple)) else [id_]
-    return [
-        Factor(
-            myid_, type_,
-            (myid_ if id_of_source is None else id_of_source),
-            value, min_, max_, is_discrete, m, n, step_)
-        for myid_, step_ in product(ids, iter_steps)]
-
-Deff = namedtuple(
-    'Deff',
+Defk = namedtuple(
+    'Defk',
     'id type id_of_source value min max is_discrete m n step',
     defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1))
-Deff.__doc__ = """Definition of a factor.
+Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
 ----------
@@ -308,33 +240,68 @@ is_discrete: bool (default values is False)
 m: float (default 1.)
     dy/dx, effective multiplier is a linear function f(x) = mx + n,
     m is the increase of that linear function
+    not used
 n: float (default 0.)
+    effective multiplier is a linear function f(x) = mx + n, n is f(0)
+    not used
+step: int (default value -1)
+    index of optimization step, for each step set to -1"""
+
+Deft = namedtuple(
+    'Deft',
+    'id type id_of_source value min max is_discrete m n step',
+    defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1))
+Deft.__doc__ = """Definition of a taps (terminal) factor.
+
+Parameters
+----------
+id: str|iterable_of_str
+    identifier of scaling factor, unique among factors of same step
+type: 'var'|'const' (default value 'const')
+    'var' - factor is a decision variable
+    'const' - factor is a parameter
+id_of_source: str (default value None)
+    identifies scaling factor of previous estimation step whose value
+    will be used for initialization
+value: float (default value 0)
+    used for initialization if 'id_of_source' does not reference a
+    scaling factor (of previous optimization step)
+min: float (default value -16)
+    smallest value allowed
+max: float (default 16)
+    greatest value allowed
+is_discrete: bool (default values is True)
+    input for MINLP solver, indicates if factor shall be processed like int
+m: float (default -.1/16)
+    dy/dx, effective multiplier is a linear function f(x) = mx + n,
+    m is the increase of that linear function
+n: float (default 1.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value -1)
     index of optimization step, for each step set to -1"""
 
-def expand_deff(deff_):
-    """Creates factor definitions for each step and id.
+def expand_def(mydef):
+    """Creates afactor definitions for each step and id.
 
     Parameters
     ----------
-    deff_: Deff
+    mydefk: Defk
 
     Returns
     -------
     iterator"""
     try:
-        iter_steps = iter(deff_.step)
+        iter_steps = iter(mydef.step)
     except TypeError:
-        iter_steps = iter([deff_.step])
-    ids = deff_.id if isinstance(deff_.id, (list, tuple)) else [deff_.id]
+        iter_steps = iter([mydef.step])
+    ids = mydef.id if isinstance(mydef.id, (list, tuple)) else [mydef.id]
     return (
         Factor(
-            id_, deff_.type,
-            (id_ if deff_.id_of_source is None else deff_.id_of_source),
-            deff_.value, deff_.min, deff_.max, deff_.is_discrete,
-            deff_.m, deff_.n, step_)
-        for id_, step_ in product(ids, iter_steps))
+            id_, mydef.type,
+            (id_ if mydef.id_of_source is None else mydef.id_of_source),
+            mydef.value, mydef.min, mydef.max, mydef.is_discrete,
+            mydef.m, mydef.n, step)
+        for id_, step in product(ids, iter_steps))
 
 Terminallink = namedtuple(
     'Terminallink', 'branchid nodeid id step', defaults=(-1,))
@@ -366,7 +333,7 @@ id: str
 step: int (default value -1)
     optimization step, defined for each step if -1"""
 
-def injlink_(objid, id_, part, _, cls_, steps):
+def injlink_(objid, id_, part, _, steps):
     """Creates instances of class cls.
 
     Parameters
@@ -380,8 +347,6 @@ def injlink_(objid, id_, part, _, cls_, steps):
         active power or reactive power
     _: str
         not used
-    cls_: Injectionlink
-        class of link
     steps: int, or list<int>, or tuple<int>
         index of step"""
     try:
@@ -390,47 +355,45 @@ def injlink_(objid, id_, part, _, cls_, steps):
         iter_steps = iter([steps])
     objids = objid if isinstance(objid, (list, tuple)) else [objid]
     ids = id_ if isinstance(id_, (list, tuple)) else [id_]
-    return [cls_(objid_, t[0], t[1], step_)
+    return [Injectionlink(objid_, t[0], t[1], step_)
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
-def termlink_(objid, id_, _, nodeid, cls_, steps):
+def termlink_(id_of_branch, id_, nodeid, steps):
     """Creates instances of class cls.
 
     Parameters
     ----------
-    objid: str, or list<str>, or tuple<str>
+    id_of_branch: str, or list<str>, or tuple<str>
         id of object to link
     id_: str, or list<str>, or tuple<str>
         id of linked factor, accepts number of parts ids
         (one for 'p' or 'q', two for 'pq')
-    _: str
-        not used
     nodeid: str, or list<str>, or tuple<str>
         ID of connectivity node
-    cls_: Injectionlink
-        class of link
     steps: int, or list<int>, or tuple<int>
         index of step"""
     try:
         iter_steps = iter(steps)
     except TypeError:
         iter_steps = iter([steps])
-    objids = objid if isinstance(objid, (list, tuple)) else [objid]
+    objids = (
+        id_of_branch 
+        if isinstance(id_of_branch, (list, tuple)) 
+        else [id_of_branch])
     nodeids = nodeid if isinstance(nodeid, (list, tuple)) else [nodeid]
     factorids = id_ if isinstance(id_, (list, tuple)) else [id_]
     if (len(factorids)==1) and (1 < len(nodeids)):
         factorids *= len(nodeids)
-    return [cls_(t[0], t[1], t[2], step_)
+    return [Terminallink(t[0], t[1], t[2], step_)
             for step_, t in
                 product(iter_steps, zip(objids, nodeids, factorids))]
 
-Link = namedtuple(
-    'Link',
-    'objid id part nodeid cls step',
-    defaults=('pq', None, Injectionlink, -1))
-Link.__doc__ = """Logical connection between injection/terminal_of_branch
-and a factor.
+Klink = namedtuple(
+    'Klink',
+    'objid id part nodeid step',
+    defaults=('pq', None, -1))
+Klink.__doc__ = """Logical connection between injection and a factor.
 
 Parameters
 ----------
@@ -446,9 +409,27 @@ part: 'p'|'q'|iterable_of_two_char (default 'pq')
 nodeid: str
     ID of connectivity node, the value is relevant
     in case argument 'cls' is Terminallink only
-cls: Injectionlink|Terminallink (default value Injectionlink)
-    Injectionlink - links an injection
-    KBranchlink - links a branch
+step: int (default value -1)|iterable_of_int
+    addresses the optimization step, first optimization step has index 0,
+    defined for each step if -1"""
+
+Tlink = namedtuple(
+    'Tlink',
+    'id_of_branch id_of_factor id_of_node step',
+    defaults=('pq', None, -1))
+Tlink.__doc__ = """Logical connection between a terminal of a branch
+and a factor.
+
+Parameters
+----------
+id_of_branch: str|iterable_of_str
+    identifier of branch
+id_of_factor: str|iterable_of_str
+    identifier of scaling factor to connect, one identifier for each
+    given value or argument 'part'
+id_of_node: str
+    ID of connectivity node, the value is relevant
+    in case argument 'cls' is Terminallink only
 step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
     defined for each step if -1"""
@@ -482,15 +463,6 @@ level: int
 def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
-def _tocls(string):
-    if string==Terminallink.__name__:
-        return Terminallink
-    if string==Injectionlink.__name__:
-        return Injectionlink
-    raise ValueError(
-        f'name of class not accepted \'{string}\', '
-        'possible values are \'Terminallink\', \'Injectionlink\'')
-
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
      #    message level
@@ -499,8 +471,16 @@ _attribute_types = {
          [_tostring, np.int16],
          [False, False]),
      #    id      type id_of_source value     min
-     #    max     is_discrete   m   n    step
-     Deff:(
+     #    max     is_discrete   step
+     Defk:(
+         [object, object, object, np.float64, np.float64,
+          np.float64, bool, np.float64, np.float64, np.int16],
+         [_tostring, _tostring, _tostring, np.float64, np.float64,
+          np.float64, bool, np.float64, np.float64, np.int16],
+         [True, False, False, False, False, False, False, False, False, True]),
+     #    id      type id_of_source value     min
+     #    max     is_discrete   m    n   step
+     Deft:(
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16],
          [_tostring, _tostring, _tostring, np.float64, np.float64,
@@ -525,11 +505,16 @@ _attribute_types = {
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [False, False, False, False]),
-     #    objid   id      part    nodeid  cls     step
-     Link:(
-         [object, object, object, object, object, np.int16],
-         [_tostring,  _tostring, _tostring, _tostring, _tocls, np.int16],
-         [True, True, True, True, False, True]),
+     #    objid   id      part    nodeid     step
+     Klink:(
+         [object, object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, _tostring, np.int16],
+         [True, True, True, True, True]),
+     #    objid   id      part    nodeid     step
+     Tlink:(
+         [object, object, object, np.int16],
+         [_tostring,  _tostring, _tostring, np.int16],
+         [True, True, True, True]),
      #    id       arg     fn      step
      Term:(
          [object,  object, object, np.int32],
@@ -560,14 +545,6 @@ _attribute_types = {
          [object, np.float64],
          [_tostring, np.float64],
          [False, False]),
-     Branchtaps:
-     #  id   id_of_node id_of_branch Vstep  positionmin positionneutral
-     # positionmax position
-      ([object, object, object, np.float64, np.int16, np.int16,
-        np.int16, np.int16],
-       [_tostring, _tostring, _tostring, np.float64, np.int16, np.int16,
-       np.int16, np.int16],
-       [False, False, False, False, False, False, False, False]),
      #    id      id_of_node_A id_of_node_B y_lo   y_tr
      Branch:(
          [object, object, object, np.complex128, np.complex128],
@@ -637,7 +614,6 @@ PVALUES = make_df(PValue)
 QVALUES = make_df(QValue)
 IVALUES = make_df(IValue)
 VVALUES = make_df(Vvalue)
-BRANCHTAPS = make_df(Branchtaps)
 FACTORS = make_df(Factor)
 INJLINKS = make_df(Injectionlink)
 TERMINALLINKS = make_df(Terminallink)

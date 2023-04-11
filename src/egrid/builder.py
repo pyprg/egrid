@@ -2,7 +2,7 @@
 """
 Builds egrid.gridmodel.Model
 
-Copyright (C) 2022 pyprg
+Copyright (C) 2022, 2023 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,8 +27,8 @@ import re
 from itertools import chain, tee
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-    Branchtaps, Factor, Deff, deff, expand_deff, DEFAULT_FACTOR_ID,
-    Link, injlink_, termlink_, Injectionlink, Terminallink,
+    Factor, Defk, Deft, expand_def, DEFAULT_FACTOR_ID,
+    Klink, Tlink, injlink_, termlink_, Injectionlink, Terminallink,
     Term, Message, meta_of_types)
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
@@ -72,9 +72,8 @@ def e3(string):
 MODEL_TYPES = (
     Branch, Slacknode, Injection,
     Output, PValue, QValue, IValue, Vvalue,
-    Branchtaps,
     Term, Message)
-SOURCE_TYPES = MODEL_TYPES + (Deff, Link)
+SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
 def _create_slack(e_id, attributes):
@@ -341,13 +340,13 @@ def make_model_objects(entities):
 def make_data_frames(devices=()):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
     of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue,
-    Vvalue, Branchtaps, Deff, Link, Message)
+    Vvalue, Branchtaps, Defk, Link, Message)
 
     Parameters
     ----------
     devices: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Deff, Link
+        Branchtaps, Defk, Link
 
     Returns
     -------
@@ -394,16 +393,6 @@ def make_data_frames(devices=()):
             pandas.DataFrame
             * .id_of_node, str
             * .V, float, magnitude of voltage, pu
-        * 'Branchtaps':
-            pandas.DataFrame
-            * .id, str, IDs of taps
-            * .id_of_node, str, ID of associated node
-            * .id_of_branch, str, ID of associated branch
-            * .Vstep, float, magnitude of voltage difference per step, pu
-            * .positionmin, int, smallest tap position
-            * .positionneutral, int, tap with ratio 1:1
-            * .positionmax, int, position of greates tap
-            * .position, int, actual position
         * 'Factor':
             pandas.DataFrame
             * .id, str, ID of load factor
@@ -412,18 +401,21 @@ def make_data_frames(devices=()):
             * .value, float, value if no valid initial load factor
             * .min, float, lower limit
             * .max, float, upper limit
+            * .is_discrete, bool
+            * .m, float
+            * .n, float
             * .step, int, index of estimation step
         * 'Injectionlink':
             pandas.DataFrame
             * .injid, str, ID of injection
             * .part, 'p'|'q', active/reactive power
-            * .id, str, ID of (Load)factor
+            * .id, str, ID of scaling factor
             * .step, int, index of estimation step
         * 'Terminallink':
             pandas.DataFrame
             * .branchid, str, ID of branch
             * .nodeid, str, ID of connectivity node
-            * .id, str, ID of factor
+            * .id, str, ID of taps (terminal) factor
             * .step, int, index of estimation step
         * 'Term': pandas.DataFrame
             * .id, str
@@ -434,41 +426,31 @@ def make_data_frames(devices=()):
             * .message, str, human readable text
             * .level, int 0 - information, 1 - warning, 2 - error"""
     # collect objects per type
-    _slack_and_devs = {src_type.__name__: [] for src_type in _ARG_TYPES}
+    sources = {src_type.__name__: [] for src_type in _ARG_TYPES}
     for dev in devices:
         if isinstance(dev, _ARG_TYPES):
-            _slack_and_devs[type(dev).__name__].append(dev)
+            sources[type(dev).__name__].append(dev)
         else:
-            _slack_and_devs[Message.__name__].append(
+            sources[Message.__name__].append(
                 Message(f'wrong type, ignored object: {str(dev)}', 1))
     dataframes = {
         model_type.__name__: pd.DataFrame(
-            _slack_and_devs[model_type.__name__],
+            sources[model_type.__name__],
             columns=model_type._fields)
         for model_type in MODEL_TYPES}
-    _factor_frame = pd.DataFrame(
-        chain.from_iterable(map(expand_deff, _slack_and_devs[Deff.__name__])),
+    factor_framek = pd.DataFrame(
+        chain.from_iterable(map(expand_def, sources[Defk.__name__])),
         columns=Factor._fields)
-    dataframes[Factor.__name__] = _factor_frame
-    _injlink_frame = pd.DataFrame(
-        chain.from_iterable(
-            # convert Link into Injectionlink
-            injlink_(*args) for args in _slack_and_devs[Link.__name__]
-            if args.cls == Injectionlink),
+    factor_framet = pd.DataFrame(
+        chain.from_iterable(map(expand_def, sources[Deft.__name__])),
+        columns=Factor._fields)
+    dataframes[Factor.__name__] = pd.concat([factor_framek, factor_framet])
+    dataframes[Injectionlink.__name__] = pd.DataFrame(
+        chain.from_iterable(injlink_(*args) for args in sources[Klink.__name__]),
         columns=Injectionlink._fields)
-    dataframes[Injectionlink.__name__] = _injlink_frame
-    _terminallink_frame = pd.DataFrame(
-        chain.from_iterable(
-            # convert Link into KBranchlink
-            termlink_(*args) for args in _slack_and_devs[Link.__name__]
-            if args.cls == Terminallink),
+    dataframes[Terminallink.__name__] = pd.DataFrame(
+        chain.from_iterable(termlink_(*args) for args in sources[Tlink.__name__]),
         columns=Terminallink._fields)
-    _slack_and_devs[Message.__name__].extend(
-        'error: attribute \'cls\' of Link has not accepted '
-        f'value \'{lnk.cls}\' ({str(lnk)})'
-        for lnk in _slack_and_devs[Link.__name__]
-        if lnk.cls not in (Injectionlink, Terminallink))
-    dataframes[Terminallink.__name__] = _terminallink_frame
     return dataframes
 
 def _flatten(args):
@@ -516,14 +498,14 @@ def create_objects(args=()):
     ----------
     args: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Deff, Link, Term, Message, str and iterables thereof;
+        Branchtaps, Defk, Link, Term, Message, str and iterables thereof;
         strings in args are processed with graphparser.parse
 
     Returns
     -------
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Deff, Link, Term, Message"""
+        Defk, Deft, Link, Term, Message"""
     t1, t2 = tee(_flatten(args))
     return chain(
         (t for t in t1 if not isinstance(t, str)),

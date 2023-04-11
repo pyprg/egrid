@@ -23,7 +23,7 @@ import unittest
 import context
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Deff, Link, Terminallink)
+    Message, Defk, Klink, Terminallink)
 
 _EMPTY_DICT = {}
 
@@ -386,49 +386,48 @@ class Create_objects(unittest.TestCase):
     def test_create_instruction(self):
         res = [*create_objects(
             ['#.   Message(message=hallo, level=0)',
-              '#.   Deff(id=kp)'])]
+              '#.   Defk(id=kp)'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-              Deff(id=('kp',))],
-            'create_objects creates instances of Message, Deff')
+              Defk(id=('kp',))],
+            'create_objects creates instances of Message, Defk')
 
     def test_create_instruction2(self):
         """remove quotes from strings"""
         res = [*create_objects(
             ['#.   Message(message="hallo", level=0)',
-              '#.   Deff(id="kp")'])]
+              '#.   Defk(id="kp")'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
             res,
             [Message(message='hallo', level=0),
-              Deff(id=('kp',))],
-            'create_objects creates instances of Message, Deff')
+              Defk(id=('kp',))],
+            'create_objects creates instances of Message, Defk')
 
     def test_create_injection(self):
-        res = [*create_objects(['#. Link(objid=hallo part=p id=myid)'])]
+        res = [*create_objects(['#. Klink(objid=hallo part=p id=myid)'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
             res,
-            [Link(objid=('hallo',), part=('p',), id=('myid',))],
+            [Klink(objid=('hallo',), part=('p',), id=('myid',))],
             'create_objects creates instances of Link')
 
     def test_create_terminallink(self):
         res = [*create_objects(
-            ['#. Link(objid=hallo nodeid=node0 id=myid cls=Terminallink '
+            ['#. Klink(objid=hallo nodeid=node0 id=myid '
               'step=(1 2))'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
             res,
-            [Link(
+            [Klink(
                 objid=('hallo',),
                 nodeid=('node0',),
-                cls=Terminallink,
                 id=('myid',),
                 step=(1,2))],
             'create_objects creates instances of Link')
@@ -439,7 +438,7 @@ class Make_data_frames(unittest.TestCase):
         import pandas as pd
         frames = make_data_frames()
         self.assertEqual(
-            len(frames), 14, 'make_data_frames creates 14 items')
+            len(frames), 13, 'make_data_frames creates 13 items')
         self.assertTrue(
             all(isinstance(df, pd.DataFrame)
                 for key, df in frames.items()),
@@ -450,7 +449,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_injlink(self):
         objs = create_objects(
-            ['#. Link(objid=hallo part=p id=f0 cls=Injectionlink',
+            ['#. Klink(objid=hallo part=p id=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -460,7 +459,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_injlink2(self):
         objs = create_objects(
-            ['#. Link(objid=hallo part=(p q) id=(f0 f1) cls=Injectionlink',
+            ['#. Klink(objid=hallo part=(p q) id=(f0 f1)',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -470,7 +469,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_terminallink(self):
         objs = create_objects(
-            ['#. Link(objid=hallo nodeid=node0 id=myid cls=Terminallink',
+            ['#. Tlink(objid=hallo nodeid=node0 id=myid',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -480,7 +479,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_terminallink2(self):
         objs = create_objects(
-            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0 cls=Terminallink',
+            ['#. Tlink(objid=(br0 br1) nodeid=(n0 n1) id=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -490,7 +489,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_wrong_class(self):
         objs = create_objects(
-            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0 cls=float',
+            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(

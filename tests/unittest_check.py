@@ -26,7 +26,7 @@ import context
 from egrid.builder import (make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Vvalue,
     Branch, Injection,
-    Deff, Link)
+    Defk, Klink)
 from egrid.check import (
     check_numbers, check_factor_links, check_batch_links, check_ids,
     get_first_error,
@@ -90,7 +90,7 @@ class Check_factors_links(unittest.TestCase):
         """Define a load factor and link the load to an injection.
         No messages."""
         frames = make_data_frames(
-            _elements + [Deff(id='k'), Link('load_0', 'k', 'p')])
+            _elements + [Defk(id='k'), Klink('load_0', 'k', 'p')])
         self.assertIsInstance(
             frames, dict, 'make_data_frames shall return an instance of dict')
         self.assertEqual(len(frames['Message']), 0, 'no error')
@@ -110,7 +110,7 @@ class Check_factors_links(unittest.TestCase):
 
     def test_deff_without_link(self):
         """Message for unlinked load factor."""
-        frames = make_data_frames([Deff('k')])
+        frames = make_data_frames([Defk('k')])
         self.assertIsInstance(
             frames,
             dict,
@@ -133,7 +133,7 @@ class Check_factors_links(unittest.TestCase):
     def test_deff_without_link2(self):
         """Message for unlinked load factor."""
         frames = make_data_frames(
-            _elements + [Deff(id='k')])
+            _elements + [Defk(id='k')])
         self.assertIsInstance(
             frames,
             dict,
@@ -156,7 +156,7 @@ class Check_factors_links(unittest.TestCase):
     def test_deff_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
-            _elements + [Deff(id='k'), Link('invalid_id', id='k', part='p')])
+            _elements + [Defk(id='k'), Klink('invalid_id', id='k', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -180,7 +180,7 @@ class Check_factors_links(unittest.TestCase):
         """Message for link with invalid reference to factor."""
         frames = make_data_frames(
             _elements
-            + [Deff(id='k'), Link('load_0', id='invalid_factor_id', part='p')])
+            +[Defk(id='k'), Klink('load_0', id='invalid_factor_id', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -203,7 +203,7 @@ class Check_factors_links(unittest.TestCase):
     def test_link_with_invalid_factor_reference(self):
         """link with invalid reference to load scaling factor"""
         frames = make_data_frames(
-            _elements + [Link('load_0', 'p', 'k')])
+            _elements + [Klink('load_0', 'p', 'k')])
         self.assertIsInstance(
             frames,
             dict,
@@ -236,11 +236,11 @@ class Check_factors_links(unittest.TestCase):
         """duplicate links"""
         frames = make_data_frames(
             _elements
-            + [Deff('k'),
-                Link('load_0', 'k', 'p'),
-                Link('load_0', 'k', 'p'), #duplicate
-                Link('load_0', 'kp', 'p'),#duplicate, invalid ref
-                Link('load_0', 'k', 'q')])
+            + [Defk('k'),
+                Klink('load_0', 'k', 'p'),
+                Klink('load_0', 'k', 'p'), #duplicate
+                Klink('load_0', 'kp', 'p'),#duplicate, invalid ref
+                Klink('load_0', 'k', 'q')])
         self.assertIsInstance(
             frames,
             dict,
