@@ -3,7 +3,7 @@
 Model of an electric distribution network for power flow calculation and
 state estimation.
 
-Copyright (C) 2022 pyprg
+Copyright (C) 2022, 2023 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -49,8 +49,10 @@ Model = namedtuple(
     'factors '
     'mnodeinj terms '
     'messages')
-Model.__doc__ = """Data of an electric distribution network for
-power flow calculation and state estimation.
+Model.__doc__ = """Data of an electric distribution network.
+
+
+Model is designed for power flow calculation and state estimation.
 
 Parameters
 ----------
@@ -300,74 +302,6 @@ def _get_branch_terminals(branches):
     terms_b['side'] = 'B'
     return pd.concat([terms_a, terms_b])
 
-def _get_branch_taps_data(branchterminals, tapsframe):
-    """Arranges data of taps.
-
-    Parameters
-    ----------
-    branchterminals: pandas.DataFrame
-        * .index_of_branch: str
-        * .id_of_branch: str
-        * .id_of_node: str
-        * .id_of_other_node: str
-        * .index_of_node: int
-        * .index_of_other_node: int
-        * .g_lo: float
-        * .b_lo: float
-        * .g_tr: float
-        * .b_tr: float
-        * .side: str
-    tapsframe: pandas.DataFrame
-        * .id_of_node: str
-        * .id_of_branch: str
-        * .Vstep: float
-        * .positionmin: int
-        * .positionneutral: int
-        * .positionmax: int
-        * .index_of_node: int
-
-    Returns
-    -------
-    pandas.DataFrame
-        * .id_of_node: str
-        * .id_of_branch: str
-        * .Vstep: float
-        * .positionmin: int
-        * .positionneutral: int
-        * .positionmax: int
-        * .index_of_node: int
-        * .index_of_terminal: int
-        * .side: int
-        * .index_of_other_taps: int"""
-    # taps of branches
-    terminal_indices = (
-        branchterminals[['id_of_node', 'id_of_branch', 'side']]
-        .reset_index()
-        .set_index(['id_of_node', 'id_of_branch'])
-        .rename(columns={'index': 'index_of_terminal'}))
-    _branchtaps = (
-        tapsframe.join(terminal_indices, on=['id_of_node', 'id_of_branch']))
-    is_a = _branchtaps.side == 'A'
-    _branchtaps_a = _branchtaps[is_a]
-    _branchtaps_b = _branchtaps[~is_a]
-    branchtaps_a = (
-        _branchtaps_a
-        .join(
-            _branchtaps_b['id_of_branch']
-            .reset_index()
-            .rename(columns={'index':'index_of_other_taps'})
-            .set_index('id_of_branch'),
-            on='id_of_branch'))
-    branchtaps_b = (
-        _branchtaps_b
-        .join(
-            _branchtaps_a['id_of_branch']
-            .reset_index()
-            .rename(columns={'index':'index_of_other_taps'})
-            .set_index('id_of_branch'),
-            on='id_of_branch'))
-    return pd.concat([branchtaps_a, branchtaps_b])
-
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
         _getframe(dataframes, Branch, BRANCHES)
@@ -378,19 +312,6 @@ def _prepare_nodes(dataframes):
     return pd.DataFrame(
         data={'idx': range(len(node_id_index))},
         index=node_id_index)
-
-def _prepare_branch_taps(add_idx_of_node, dfbranch, dfbranchtaps):
-    branchtaps_ = add_idx_of_node(dfbranchtaps)
-    valid = branchtaps_.id_of_branch.isin(dfbranch[~dfbranch.is_bridge].id)
-    branchtaps = branchtaps_[valid].reset_index(drop=True)
-    branchtaps.reset_index(inplace=True)
-    branchtaps.rename(columns={'index':'index_of_taps'}, inplace=True)
-    branchindex = (
-        dfbranch['id']
-        .reset_index()
-        .rename(columns={'index':'index_of_branch'})
-        .set_index('id'))
-    return branchtaps.join(branchindex, on='id_of_branch')
 
 def _prepare_branches(branches, nodes):
     if not branches['id'].is_unique:
@@ -639,10 +560,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * 'Factor':
             pandas.DataFrame
             * .step, int, index of estimation step
-            * .id, str, ID of load factor
+            * .id, str, ID of factor
             * .type, 'var'|'const', decision variable / constant
-            * .id_of_source, str, ID of ini load factor of previous step
-            * .value, float, value if no valid initial load factor
+            * .id_of_source, str, ID of factor of previous step
+            * .value, float, value if no valid initial factor
             * .min, float, lower limit
             * .max, float, upper limit
             * .is_discrete, bool
@@ -677,10 +598,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .injectionoutputs, pandas.DataFrame
         * .pvalues, pandas.DataFrame
         * .qvalues, pandas.DataFrame
-        * .pqvalues, pandas.DataFrame
         * .ivalues, pandas.DataFrame
         * .vvalues, pandas.DataFrame
-        * .branchtaps, pandas.DataFrame
         * .shape_of_Y, tuple of int, shape of admittance matrix
         * .count_of_slacks, int, number of slacks for power flow calculation
         * .y_max, float, maximum admittance between two power-flow-calculation
