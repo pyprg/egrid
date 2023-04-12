@@ -156,7 +156,7 @@ class Check_factors_links(unittest.TestCase):
     def test_deff_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
-            _elements + [Defk(id='k'), Klink('invalid_id', id='k', part='p')])
+            _elements + [Defk(id='k'), Klink('invalid_id', id_of_factor='k', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -180,7 +180,7 @@ class Check_factors_links(unittest.TestCase):
         """Message for link with invalid reference to factor."""
         frames = make_data_frames(
             _elements
-            +[Defk(id='k'), Klink('load_0', id='invalid_factor_id', part='p')])
+            +[Defk(id='k'), Klink('load_0', id_of_factor='invalid_factor_id', part='p')])
         self.assertIsInstance(
             frames,
             dict,

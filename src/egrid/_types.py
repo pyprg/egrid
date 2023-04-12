@@ -333,44 +333,48 @@ id: str
 step: int (default value -1)
     optimization step, defined for each step if -1"""
 
-def injlink_(objid, id_, part, _, steps):
-    """Creates instances of class cls.
+def expand_klink(id_of_injection, part, id_of_factor, steps):
+    """Creates instances of class Injectionlink.
 
     Parameters
     ----------
-    objid: str, or list<str>, or tuple<str>
+    id_of_injection: str, or list<str>, or tuple<str>
         id of object to link
-    id_: str, or list<str>, or tuple<str>
-        id of linked factor, accepts number of parts ids
-        (one for 'p' or 'q', two for 'pq')
     part: 'p'|'q'|'pq'
         active power or reactive power
-    _: str
-        not used
+    id_of_factor: str, or list<str>, or tuple<str>
+        id of linked factor, accepts number of parts ids
+        (one for 'p' or 'q', two for 'pq')
     steps: int, or list<int>, or tuple<int>
         index of step"""
     try:
         iter_steps = iter(steps)
     except TypeError:
         iter_steps = iter([steps])
-    objids = objid if isinstance(objid, (list, tuple)) else [objid]
-    ids = id_ if isinstance(id_, (list, tuple)) else [id_]
+    objids = (
+        id_of_injection 
+        if isinstance(id_of_injection, (list, tuple)) else 
+        [id_of_injection])
+    ids = (
+        id_of_factor 
+        if isinstance(id_of_factor, (list, tuple)) else 
+        [id_of_factor])
     return [Injectionlink(objid_, t[0], t[1], step_)
             for step_, objid_, t in
                 product(iter_steps, objids, zip(part, ids))]
 
-def termlink_(id_of_branch, id_, nodeid, steps):
-    """Creates instances of class cls.
+def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
+    """Creates instances of class Terminallink.
 
     Parameters
     ----------
+    id_of_node: str, or list<str>, or tuple<str>
+        ID of connectivity node
     id_of_branch: str, or list<str>, or tuple<str>
         id of object to link
-    id_: str, or list<str>, or tuple<str>
+    id_of_factor: str, or list<str>, or tuple<str>
         id of linked factor, accepts number of parts ids
         (one for 'p' or 'q', two for 'pq')
-    nodeid: str, or list<str>, or tuple<str>
-        ID of connectivity node
     steps: int, or list<int>, or tuple<int>
         index of step"""
     try:
@@ -381,8 +385,14 @@ def termlink_(id_of_branch, id_, nodeid, steps):
         id_of_branch 
         if isinstance(id_of_branch, (list, tuple)) 
         else [id_of_branch])
-    nodeids = nodeid if isinstance(nodeid, (list, tuple)) else [nodeid]
-    factorids = id_ if isinstance(id_, (list, tuple)) else [id_]
+    nodeids = (
+        id_of_node 
+        if isinstance(id_of_node, (list, tuple)) else 
+        [id_of_node])
+    factorids = (
+        id_of_factor 
+        if isinstance(id_of_factor, (list, tuple)) else 
+        [id_of_factor])
     if (len(factorids)==1) and (1 < len(nodeids)):
         factorids *= len(nodeids)
     return [Terminallink(t[0], t[1], t[2], step_)
@@ -391,45 +401,41 @@ def termlink_(id_of_branch, id_, nodeid, steps):
 
 Klink = namedtuple(
     'Klink',
-    'objid id part nodeid step',
-    defaults=('pq', None, -1))
+    'id_of_injection part id_of_factor step',
+    defaults=('pq', -1))
 Klink.__doc__ = """Logical connection between injection and a factor.
 
 Parameters
 ----------
-objiid: str|iterable_of_str
-    identifier of injection/branch
-id: str|iterable_of_str
-    identifier of scaling factor to connect, one identifier for each
-    given value or argument 'part'
+id_of_injection: str|iterable_of_str
+    identifier of injection
 part: 'p'|'q'|iterable_of_two_char (default 'pq')
-    identifies the attribute of the injection to multipy with factor
-    ('p'/'q'- injected active/reactive power), the value is relevant
-    in case argument 'cls' is Injectionlink only
-nodeid: str
-    ID of connectivity node, the value is relevant
-    in case argument 'cls' is Terminallink only
+    identifies the attribute of the injection to multipy with
+    ('p'/'q'- injected active/reactive power)
+id_of_factor: str|iterable_of_str
+    identifier of scaling factor to connect to, one identifier for each
+    given value of argument 'part'
 step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
     defined for each step if -1"""
 
 Tlink = namedtuple(
     'Tlink',
-    'id_of_branch id_of_factor id_of_node step',
-    defaults=('pq', None, -1))
+    'id_of_node id_of_branch id_of_factor step',
+    defaults=(-1,))
 Tlink.__doc__ = """Logical connection between a terminal of a branch
 and a factor.
 
 Parameters
 ----------
+id_of_node: str|iterable_of_str
+    ID of connectivity node
 id_of_branch: str|iterable_of_str
     identifier of branch
 id_of_factor: str|iterable_of_str
-    identifier of scaling factor to connect, one identifier for each
-    given value or argument 'part'
-id_of_node: str
-    ID of connectivity node, the value is relevant
-    in case argument 'cls' is Terminallink only
+    identifier of taps (terminal) factor to connect, 
+    id_of_node, id_of_branch, id_of_factor shall have the same lenght 
+    if iterable
 step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
     defined for each step if -1"""
@@ -567,8 +573,7 @@ meta_of_types = [
 _EMPTY_TUPLE = ()
 
 def df_astype(df, cls_):
-    """Casts types of pandas.DataFrame columns to types according
-    to _attribute_types.
+    """Casts types of pandas.DataFrame columns to _attribute_types.
 
     Parameters
     ----------
@@ -586,8 +591,9 @@ def df_astype(df, cls_):
     return df.astype(dict(zip(cls_._fields, _attribute_types[cls_][0])))
 
 def make_df(cls_, content=_EMPTY_TUPLE):
-    """Creates a pandas.DataFrame instance with column types set according
-    to _attribute_types.
+    """Creates a pandas.DataFrame instance. 
+    
+    Types of columns are according to _attribute_types.
 
     Parameters
     ----------

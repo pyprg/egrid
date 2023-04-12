@@ -28,7 +28,7 @@ from itertools import chain, tee
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Factor, Defk, Deft, expand_def, DEFAULT_FACTOR_ID,
-    Klink, Tlink, injlink_, termlink_, Injectionlink, Terminallink,
+    Klink, Tlink, expand_klink, expand_tlink, Injectionlink, Terminallink,
     Term, Message, meta_of_types)
 
 _e3_pattern = re.compile(r'[nuµmkMG]')
@@ -196,40 +196,34 @@ def _is_connectivity_node(string):
     bool"""
     return string.startswith('n') or string.startswith('slack')
 
-def _create_pvalue(id_of_node, id_of_device, attributes):
+def _create_pvalue(id_of_node, id_of_device, val):
     try:
         return True, PValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}',
-            P=float(e3(attributes['P'])))
+            id_of_batch=f'{id_of_node}_{id_of_device}', P=float(e3(val)))
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-             "value of attribute 'P' must be of type float, "
-            f"following attributes are provided: {attributes} "
+            f"value {val} of attribute 'P' must be of type float, "
             f"(error: {str(e)})")
 
-def _create_qvalue(id_of_node, id_of_device, attributes):
+def _create_qvalue(id_of_node, id_of_device, val):
     try:
         return True, QValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}',
-            Q=float(e3(attributes['Q'])))
+            id_of_batch=f'{id_of_node}_{id_of_device}', Q=float(e3(val)))
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-             "value of attribute 'Q' must be of type float, "
-            f"following attributes are provided: {attributes} "
+            f"value {val} of attribute 'Q' must be of type float, "
             f"(error: {str(e)})")
 
-def _create_ivalue(id_of_node, id_of_device, attributes):
+def _create_ivalue(id_of_node, id_of_device, val):
     try:
         return True, IValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}',
-            I=float(e3(attributes['I'])))
+            id_of_batch=f'{id_of_node}_{id_of_device}', I=float(e3(val)))
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-             "value of attribute 'I' must be of type float, "
-            f"following attributes are provided: {attributes} "
+            f"value {val} of attribute 'I' must be of type float, "
             f"(error: {str(e)})")
 
 def _make_edge_objects(data):
@@ -258,17 +252,21 @@ def _make_edge_objects(data):
         return
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
     create_output = False
-    has_p, has_q, has_I = (key in attributes for key in ('P', 'Q', 'I'))
+    has_p, has_q, has_I, has_Tl = (
+        key in attributes for key in ('P', 'Q', 'I', 'Tl'))
     if has_p:
-        success, val = _create_pvalue(id_of_node, id_of_device, attributes)
+        success, val = _create_pvalue(
+            id_of_node, id_of_device, attributes['P'])
         yield val
         create_output |= success
     if has_q:
-        success, val = _create_qvalue(id_of_node, id_of_device, attributes)
+        success, val = _create_qvalue(
+            id_of_node, id_of_device, attributes['Q'])
         yield val
         create_output |= success
     if has_I:
-        success, val = _create_ivalue(id_of_node, id_of_device, attributes)
+        success, val = _create_ivalue(
+            id_of_node, id_of_device, attributes['I'])
         yield val
         create_output |= success
     if create_output:
@@ -276,6 +274,9 @@ def _make_edge_objects(data):
             id_of_batch=f'{id_of_node}_{id_of_device}',
             id_of_node=id_of_node,
             id_of_device=id_of_device)
+    if has_Tl:
+        yield Terminallink(
+            branchid=id_of_device, nodeid=id_of_node, id=attributes['Tl'])
 
 def _make_node_objects(data):
     _, e_id, neighbours, attributes = data
@@ -446,10 +447,12 @@ def make_data_frames(devices=()):
         columns=Factor._fields)
     dataframes[Factor.__name__] = pd.concat([factor_framek, factor_framet])
     dataframes[Injectionlink.__name__] = pd.DataFrame(
-        chain.from_iterable(injlink_(*args) for args in sources[Klink.__name__]),
+        chain.from_iterable(
+            expand_klink(*args) for args in sources[Klink.__name__]),
         columns=Injectionlink._fields)
     dataframes[Terminallink.__name__] = pd.DataFrame(
-        chain.from_iterable(termlink_(*args) for args in sources[Tlink.__name__]),
+        chain.from_iterable(
+            expand_tlink(*args) for args in sources[Tlink.__name__]),
         columns=Terminallink._fields)
     return dataframes
 

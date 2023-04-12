@@ -43,16 +43,16 @@ slack0 <------br0------> n1 <------br1------> n2 -->> inj2
 # >> FACTORS for INJECTIONS <<
 
 #.  Defk(id=Pinj1 m=2 type=const step(0 1 2))
-#.  Klink(objid=inj1 id=Pinj1 part=p step(0 1 2))
+#.  Klink(id_of_injection=inj1 id_of_factor=Pinj1 part=p step(0 1 2))
 #.  Defk(id=Qinj1 type=var step(0 1 2))
-#.  Klink(objid=inj1 id=Qinj1 part=q step(0 1 2))
+#.  Klink(id_of_injection=inj1 id_of_factor=Qinj1 part=q step(0 1 2))
 
 # >> FACTORS for BRANCHTERMINALS <<
 
 #.  Deft(
 #.     id=br0_slack0 value=0 m=-.00625 n=1 min=-16 max=16
 #.     is_discrete=True type=const step(0 1 2))
-#.  Tlink(id_of_branch=br0 id_of_node=slack0 id_of_factor=br0_slack0 
+#.  Tlink(id_of_branch=br0 id_of_node=slack0 id_of_factor=br0_slack0
 #.     step(0 1 2))
 #.  Deft(
 #.     id=br1_n1 value=0 m=-.00625 n=1 min=-16 max=16

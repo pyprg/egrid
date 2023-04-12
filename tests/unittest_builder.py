@@ -23,7 +23,7 @@ import unittest
 import context
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Klink, Terminallink)
+    Message, Defk, Klink, Tlink)
 
 _EMPTY_DICT = {}
 
@@ -409,28 +409,28 @@ class Create_objects(unittest.TestCase):
             'create_objects creates instances of Message, Defk')
 
     def test_create_injection(self):
-        res = [*create_objects(['#. Klink(objid=hallo part=p id=myid)'])]
+        res = [*create_objects(['#. Klink(id_of_injection=hallo part=p id_of_factor=myid)'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
             res,
-            [Klink(objid=('hallo',), part=('p',), id=('myid',))],
+            [Klink(id_of_injection=('hallo',), part=('p',), id_of_factor=('myid',))],
             'create_objects creates instances of Link')
 
     def test_create_terminallink(self):
         res = [*create_objects(
-            ['#. Klink(objid=hallo nodeid=node0 id=myid '
-              'step=(1 2))'])]
+            ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=myid '
+             'step=(1 2))'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
             res,
-            [Klink(
-                objid=('hallo',),
-                nodeid=('node0',),
-                id=('myid',),
+            [Tlink(
+                id_of_branch=('hallo',),
+                id_of_node=('node0',),
+                id_of_factor=('myid',),
                 step=(1,2))],
-            'create_objects creates instances of Link')
+            'create_objects creates instances of Tlink')
 
 class Make_data_frames(unittest.TestCase):
 
@@ -449,7 +449,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_injlink(self):
         objs = create_objects(
-            ['#. Klink(objid=hallo part=p id=f0',
+            ['#. Klink(id_of_injection=hallo part=p id_of_factor=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -459,7 +459,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_injlink2(self):
         objs = create_objects(
-            ['#. Klink(objid=hallo part=(p q) id=(f0 f1)',
+            ['#. Klink(id_of_injection=hallo part=(p q) id_of_factor=(f0 f1)',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -469,7 +469,7 @@ class Make_data_frames(unittest.TestCase):
 
     def test_terminallink(self):
         objs = create_objects(
-            ['#. Tlink(objid=hallo nodeid=node0 id=myid',
+            ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
@@ -479,8 +479,8 @@ class Make_data_frames(unittest.TestCase):
 
     def test_terminallink2(self):
         objs = create_objects(
-            ['#. Tlink(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-             '#.      step=(1 2))'])
+            ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
+             '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']),
