@@ -399,7 +399,7 @@ class Create_objects(unittest.TestCase):
         """remove quotes from strings"""
         res = [*create_objects(
             ['#.   Message(message="hallo", level=0)',
-              '#.   Defk(id="kp")'])]
+             '#.   Defk(id="kp")'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
@@ -409,12 +409,16 @@ class Create_objects(unittest.TestCase):
             'create_objects creates instances of Message, Defk')
 
     def test_create_injection(self):
-        res = [*create_objects(['#. Klink(id_of_injection=hallo part=p id_of_factor=myid)'])]
+        res = [*create_objects(
+            ['#. Klink(id_of_injection=hallo part=p id_of_factor=myid)'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
             res,
-            [Klink(id_of_injection=('hallo',), part=('p',), id_of_factor=('myid',))],
+            [Klink(
+                part=('p',), 
+                id_of_injection=('hallo',), 
+                id_of_factor=('myid',))],
             'create_objects creates instances of Link')
 
     def test_create_terminallink(self):

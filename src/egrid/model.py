@@ -669,8 +669,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
     # factors
     factors_ = (
-        _getframe(dataframes, Factor, FACTORS)
-        .set_index(['step', 'id']))
+        _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
     # links of injection
     injassoc_ = (
         _getframe(dataframes, Injectionlink, INJLINKS)
@@ -708,7 +707,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         factor_frame,
         termassoc[is_valid_termassoc.type],
         injassoc[is_valid_injassoc.type],
-    branchterminals)
+        branchterminals)
     # math terms (parts) of objective function
     terms = _getframe(dataframes, Term, TERMS)
     return Model(
