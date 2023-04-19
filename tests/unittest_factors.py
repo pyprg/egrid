@@ -21,15 +21,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import unittest
+import context
 import pandas as pd
+import numpy as np
 from numpy.testing import assert_array_equal
+from itertools import repeat
 from egrid.model import (
-    _get_pfc_nodes, _prepare_branches, _get_branch_terminals, _add_bg)
+    _get_pfc_nodes, _prepare_branches, _get_branch_terminals, _add_bg,
+    model_from_frames)
 from egrid.builder import (
-    Factor, Injectionlink, Terminallink, Branch)
+    Factor, Injectionlink, Terminallink, Branch, make_data_frames)
 from egrid._types import (
-    FACTORS, TERMINALLINKS, INJLINKS, BRANCHES)
-from egrid.factors import make_factordefs
+    FACTORS, TERMINALLINKS, INJLINKS, BRANCHES, Injection, DEFAULT_FACTOR_ID,
+    Slacknode, Defk, Deft, Klink, Tlink, )
+from egrid.factors import (
+    make_factordefs, _get_scaling_factor_data, make_factor_meta,
+    _get_taps_factor_data)
 
 def _terminallink_frame(termlinks):
     terminallinks = (
@@ -54,6 +61,477 @@ def _branchterminal_frame(branches, id_of_slacknodes):
 
 class Make_factordefs(unittest.TestCase):
 
+    def test_no_data(self):
+        model = model_from_frames(
+            make_data_frames())
+        factordefs = model.factors
+        self.assertTrue(
+            factordefs.gen_factor_data.empty, 'no generic factors')
+        self.assertTrue(
+            factordefs.gen_injfactor.empty, 'no generic injection factors')
+        self.assertTrue(
+            factordefs.gen_termfactor.empty, 'no generic terminal factors')
+
+    def test_generic_injection_factor(self):
+        """basic test with one generic injection factor"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                # link scaling factors to active power of consumer
+                #   factor for each step (generic, step=-1)
+                Klink(
+                    id_of_injection='consumer',
+                    part='p',
+                    id_of_factor='kp',
+                    step=-1)]))
+        factordefs = model.factors
+        self.assertEqual(
+            dict(
+                zip(factordefs.gen_factor_data.columns,
+                    factordefs.gen_factor_data.iloc[0].to_numpy())),
+            {'step': -1, 'type': 'var', 'id_of_source': 'kp', 'value': 1.0,
+              'min': -np.inf, 'max': np.inf, 'is_discrete': False, 'm': 1.0,
+              'n': 0.0, 'index_of_symbol': 0})
+        self.assertEqual(
+            factordefs.gen_factor_data.index[0],
+            'kp',
+            "generic factor has name 'kp'")
+        assert_array_equal(
+            factordefs.gen_injfactor.to_numpy(),
+            np.array([[-1, 'kp']], dtype=object),
+            err_msg="expected one generic factor (-1) with id 'kp'")
+        assert_array_equal(
+            factordefs.gen_injfactor.index.to_numpy()[0],
+            ('consumer', 'p'),
+            err_msg="expected index is ('consumer', 'p')")
+        assert_array_equal(
+            factordefs.gen_termfactor,
+            np.zeros((0,5), dtype=object),
+            err_msg="no taps (terminal) factor"),
+        self.assertEqual(
+            len(factordefs.get_groups([-1])),
+            1,
+            "one generic factor")
+        self.assertEqual(
+            len(factordefs.get_injfactorgroups([-1])),
+            1,
+            "one generic injection_factor relation")
+
+    def test_taps_injection_factor(self):
+        """basic test with one generic taps (terminal) factor"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                # scaling, define scaling factors
+                Deft(
+                    id='taps', value=0., type='const', is_discrete=True,
+                    m=-0.00625, n=1., step=-1),
+                # link scaling factors to active power of consumer
+                #   factor for each step (generic, step=-1)
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1)]))
+        factordefs = model.factors
+        self.assertEqual(
+            dict(
+                zip(factordefs.gen_factor_data.columns,
+                    factordefs.gen_factor_data.iloc[0].to_numpy())),
+            {'step': -1, 'type': 'const', 'id_of_source': 'taps', 'value': 0.,
+              'min': -16, 'max': 16, 'is_discrete': True, 'm': -0.00625,
+              'n': 1.0, 'index_of_symbol': 0})
+        self.assertEqual(
+            factordefs.gen_factor_data.index[0],
+            'taps',
+            "generic factor has name 'taps'")
+        assert_array_equal(
+            factordefs.gen_injfactor,
+            np.zeros((0,2), dtype=object),
+            err_msg="expected no generic injection_factor relation")
+        assert_array_equal(
+            factordefs.gen_termfactor.to_numpy(),
+            np.array([[-1, 'taps', 0, 0, 1]], dtype=object),
+            err_msg="expected taps (terminal) factor [-1, 'taps', 0, 0, 1]"),
+        assert_array_equal(
+            factordefs.gen_termfactor.index.to_numpy()[0],
+            ('branch', 'n_0'),
+            err_msg="expected index is ('branch', 'n_0')")
+        self.assertEqual(
+            len(model.factors.get_groups([-1])),
+            1,
+            "one generic factor")
+
+class Make_factor_meta(unittest.TestCase):
+
+    def test_no_data(self):
+        model = model_from_frames(make_data_frames())
+        factor_meta = make_factor_meta(model, 1, np.zeros((0,1), dtype=float))
+        self.assertEqual(
+            factor_meta.id_of_step_symbol.shape,
+            (0,),
+            "no symbols specific for step 1")
+        self.assertEqual(
+            factor_meta.index_of_kpq_symbol.shape,
+            (0,2),
+            "no scaling factors")
+        self.assertEqual(
+            factor_meta.index_of_var_symbol.shape,
+            (0,),
+            "no decision variables")
+        self.assertEqual(
+            factor_meta.index_of_const_symbol.shape,
+            (0,),
+            "no values for decision variables")
+        self.assertEqual(
+            factor_meta.values_of_vars.shape,
+            (0,),
+            "no paramters")
+        self.assertEqual(
+            factor_meta.var_min.shape,
+            (0,),
+            "no minimum values for decision variables")
+        self.assertEqual(
+            factor_meta.var_max.shape,
+            (0,),
+            "no maximum values for decision variables")
+        self.assertEqual(
+            factor_meta.values_of_consts.shape,
+            (0,),
+            "no values for paramters")
+        assert_array_equal(
+            factor_meta.var_const_to_factor,
+            [],
+            err_msg="no var_const crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_kp,
+            [],
+            err_msg="no active power scaling factor crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_kq,
+            [],
+            err_msg="no reactive power scaling factor crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_ftaps,
+            [],
+            err_msg="no taps factor crossreference")
+
+    def test_generic_specific_factor(self):
+        """
+        one generic injection factor 'kp',
+        one generic terminal factor'taps',
+        default scaling factors,
+        scaling factor 'kq' is specific for step 0
+        """
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                Injection('consumer2', 'n_1'),
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                Defk(id='kq', step=0),
+                # link scaling factors to active and reactive power of consumer
+                #   factor for each step (generic, step=-1)
+                Klink(
+                    id_of_injection='consumer',
+                    part='p',
+                    id_of_factor='kp',
+                    step=-1),
+                #   factor for step 0 (specific, step=0)
+                Klink(
+                    id_of_injection='consumer',
+                    part='q',
+                    id_of_factor='kq',
+                    step=0),
+                # tap factor, for each step (generic, step=-1)
+                Deft(id='taps', is_discrete=True, step=-1),
+                # tap factor, for step 1
+                Deft(id='taps', type='const', is_discrete=True, step=1),
+                # link generic tap factor to terminal
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1),
+                Tlink(
+                    id_of_node='n_1',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1),
+                # # link step specific tap factor to terminal
+                # grid.Link(
+                #     objid='branch',
+                #     id='taps',
+                #     nodeid='n_0',
+                #     cls=grid.Terminallink,
+                #     step=1)
+            ]))
+        assert_array_equal(
+            model.factors.gen_factor_data.index,
+            ['kp', 'taps'],
+            err_msg="IDs of generic factors shall be ['kp', 'taps']")
+        assert_array_equal(
+            model.factors.gen_factor_data.index_of_symbol,
+            [0, 1],
+            err_msg="indices of generic factor symbols shall be [0, 1]")
+        # factor_meta = make_factor_meta(model, 0, np.zeros((0,1), dtype=float))
+        # print(factor_meta)
+        # print()
+
+class Get_taps_factor_data(unittest.TestCase):
+
+    def test_empty_model(self):
+        model = model_from_frames(make_data_frames())
+        factors, termfactor_crossref = _get_taps_factor_data(
+            model.factors, [0, 1])
+        self.assertTrue(factors.empty)
+        self.assertTrue(termfactor_crossref.empty)
+
+    def test_generic_specific_factor(self):
+        """
+        one generic injection factor 'kp',
+        one generic terminal factor'taps',
+        default scaling factors,
+        scaling factor 'kq' is specific for step 0
+        """
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                Injection('consumer2', 'n_1'),
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                Defk(id='kq', step=0),
+                # link scaling factors to active and reactive power of consumer
+                #   factor for each step (generic, step=-1)
+                Klink(
+                    id_of_injection='consumer',
+                    id_of_factor='kp',
+                    part='p',
+                    step=-1),
+                #   factor for step 0 (specific, step=0)
+                Klink(
+                    id_of_injection='consumer',
+                    id_of_factor='kq',
+                    part='q',
+                    step=0),
+                # tap factor, for each step (generic, step=-1)
+                Deft(id='taps', is_discrete=True, step=-1),
+                # tap factor, for step 1
+                Deft(id='taps', type='const', is_discrete=True, step=1),
+                # link generic tap factor to terminal
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1),
+                Tlink(
+                    id_of_node='n_1',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1),
+                # # link step specific tap factor to terminal
+                # grid.Link(
+                #     objid='branch',
+                #     id='taps',
+                #     nodeid='n_0',
+                #     cls=grid.Terminallink,
+                #     step=1)
+                ]))
+        assert_array_equal(
+            model.factors.gen_factor_data.index,
+            ['kp', 'taps'],
+            err_msg="IDs of generic factors shall be ['kp', 'taps']")
+        assert_array_equal(
+            model.factors.gen_factor_data.index_of_symbol,
+            [0, 1],
+            err_msg="indices of generic factor symbols shall be [0, 1]")
+        factors, termfactor_crossref = _get_taps_factor_data(
+            model.factors, [0,1])
+        print('add tests')
+
+class Get_scaling_factor_data(unittest.TestCase):
+
+    def test_no_data(self):
+        """well, """
+        model = model_from_frames(make_data_frames())
+        factors, injfactor_crossref = _get_scaling_factor_data(
+            model.factors, model.injections, [0, 1],
+            repeat(len(model.factors.gen_factor_data)))
+        self.assertTrue(factors.empty)
+        self.assertTrue(injfactor_crossref.empty)
+
+    def test_default_scaling_factors(self):
+        """
+        one generic injection factor 'kp',
+        one generic terminal factor'taps',
+        default scaling factors,
+        scaling factor 'kq' is specific for step 0
+        """
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                Injection('consumer2', 'n_1'),
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                Defk(id='kq', step=0),
+                # link scaling factors to active and reactive power of consumer
+                #   factor for each step (generic, step=-1)
+                Klink(
+                    id_of_injection='consumer',
+                    id_of_factor='kp',
+                    part='p',
+                    step=-1),
+                #   factor for step 0 (specific, step=0)
+                Klink(
+                    id_of_injection='consumer',
+                    id_of_factor='kq',
+                    part='q',
+                    step=0),
+                # tap factor, for each step (generic, step=-1)
+                Deft(id='taps', is_discrete=True, step=-1),
+                # link scaling factors to active and reactive power of consumer
+                Tlink(
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    id_of_node='n_0',
+                    step=-1)]))
+        assert_array_equal(
+            model.factors.gen_factor_data.index,
+            ['kp', 'taps'],
+            err_msg="IDs of generic factors shall be ['kp', 'taps']")
+        assert_array_equal(
+            model.factors.gen_factor_data.index_of_symbol,
+            [0, 1],
+            err_msg="indices of generic factor symbols shall be [0, 1]")
+        factors, crossref = _get_scaling_factor_data(
+            model.factors, model.injections, [0, 1],
+            repeat(len(model.factors.gen_factor_data)))
+        assert_array_equal(
+            factors.loc[0].index.get_level_values('id').sort_values(),
+            ['_default_', 'kp', 'kq'],
+            err_msg="factor ids of step 0 are ['_default_', 'kp', 'kq']")
+        assert_array_equal(
+            factors.loc[0].index_of_symbol,
+            [2, 0, 3],
+            err_msg="indices of symbols for step 0 are [2, 0, 3]")
+        assert_array_equal(
+            factors.loc[0].index_of_source,
+            [-1, -1, -1],
+            err_msg="indices of symbols for step 0 are [-1, -1, -1]")
+        assert_array_equal(
+            factors.loc[1].index.get_level_values('id').sort_values(),
+            ['_default_', 'kp'],
+            err_msg="factor ids of step 1 are ['_default_', 'kp']")
+        assert_array_equal(
+            factors.loc[1].index_of_symbol,
+            [2, 0],
+            err_msg="indices of symbols for step 1 are [2, 0]")
+        assert_array_equal(
+            factors.loc[1].index_of_source,
+            [2, 0],
+            err_msg="indices of symbols for step 1 are [2, 0]")
+
+    def test_missing_generic_links(self):
+        """
+        no generic injection factor 'kp' as link is missing,
+        one generic terminal factor'taps',
+        default scaling factors,
+        scaling factor 'kq' is specific for step 0
+        """
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('consumer', 'n_1'),
+                Injection('consumer2', 'n_1'),
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                Defk(id='kq', step=0),
+                # link scaling factors to active and reactive power of consumer
+                #   factor for each step (generic, step=-1)
+                # grid.Klink(id_of_injection='consumer', id_of_factor='kp', part='p', step=-1),
+                #   factor for step 0 (specific, step=0)
+                Klink(
+                    id_of_injection='consumer',
+                    part='q',
+                    id_of_factor='kq',
+                    step=0),
+                # tap factor, for each step (generic, step=-1)
+                Deft(id='taps', is_discrete=True, step=-1),
+                # link scaling factors to active and reactive power of consumer
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1)]))
+        assert_array_equal(
+            model.factors.gen_factor_data.index,
+            ['taps'],
+            err_msg="IDs of generic factors shall be ['taps']")
+        assert_array_equal(
+            model.factors.gen_factor_data.index_of_symbol,
+            [0],
+            err_msg="indices of generic factor symbols shall be [0]")
+        factors, crossref = _get_scaling_factor_data(
+            model.factors, model.injections, [0, 1],
+            repeat(len(model.factors.gen_factor_data)))
+        assert_array_equal(
+            factors.loc[0].index.get_level_values('id').sort_values(),
+            ['_default_', 'kq'],
+            err_msg="factor ids of step 0 are ['_default_', 'kq']")
+        assert_array_equal(
+            factors.loc[0].index_of_symbol,
+            [1, 2],
+            err_msg="indices of symbols for step 0 are [1, 2]")
+        assert_array_equal(
+            factors.loc[0].index_of_source,
+            [-1, -1],
+            err_msg="indices of symbols for step 0 are [-1, -1]")
+        assert_array_equal(
+            factors.loc[1].index.get_level_values('id').sort_values(),
+            ['_default_'],
+            err_msg="factor ids of step 1 are ['_default_']")
+        assert_array_equal(
+            factors.loc[1].index_of_symbol,
+            [1],
+            err_msg="indices of symbols for step 1 are [1]")
+        assert_array_equal(
+            factors.loc[1].index_of_source,
+            [1],
+            err_msg="indices of symbols for step 1 are [1]")
+
+class Make_factordefs2(unittest.TestCase):
+
     # prepare empty pandas.DataFrame instances
     no_terminallinks = _terminallink_frame(TERMINALLINKS.copy())
     no_injectionlinks = _injectionlink_frame(INJLINKS.copy())
@@ -62,7 +540,7 @@ class Make_factordefs(unittest.TestCase):
     no_factors = FACTORS.copy()
 
     def test_empty(self):
-        """without data"""
+        """without data, no factors at all"""
         factordefs = make_factordefs(
             self.no_factors,
             self.no_terminallinks,
@@ -88,7 +566,7 @@ class Make_factordefs(unittest.TestCase):
             "from injection to factor for any step")
 
     def test_generic_scaling_factor(self):
-        """one generic scaling factor"""
+        """one generic scaling factor (part 'p')"""
         factors = pd.DataFrame([Factor(id='kp')])
         injectionlinks = _injectionlink_frame(
             pd.DataFrame([Injectionlink(injid='i_0', part='p', id='kp')]))
@@ -120,12 +598,55 @@ class Make_factordefs(unittest.TestCase):
             "make_factordefs shall not return any link "
             "from injection to factor for any step")
 
-    def test_scaling_factor_step0(self):
-        """one scaling factor for step 0"""
-        factors = pd.DataFrame([Factor(id='kp', step=0)])
+    def test_generic_scaling_factor2(self):
+        """3 generic scaling factors"""
+        factors = pd.DataFrame(
+            [Factor(id='kp0'),
+             Factor(id='kq0'),
+             Factor(id='kp1')])
         injectionlinks = _injectionlink_frame(
             pd.DataFrame(
-                [Injectionlink(injid='i_0', part='p', id='kp', step=0)]))
+                [Injectionlink(injid='i_0', part='p', id='kp0'),
+                 Injectionlink(injid='i_0', part='q', id='kq0'),
+                 Injectionlink(injid='i_1', part='p', id='kp1')]))
+        factordefs = make_factordefs(
+            factors,
+            self.no_terminallinks,
+            injectionlinks,
+            self.no_branchterminals)
+        self.assertEqual(
+            len(factordefs.gen_factor_data),
+            3,
+            "make_factordefs shall return 3 generic factors")
+        self.assertEqual(
+            set(factordefs.gen_factor_data.index),
+            {'kp1', 'kp0', 'kq0'},
+            "make_factordefs shall return factors 'kp1', 'kp0', 'kq0'")
+        self.assertEqual(
+            len(factordefs.gen_injfactor),
+            3,
+            "make_factordefs shall return "
+            "3 links: injection -> generic factor")
+        self.assertTrue(
+            factordefs.gen_termfactor.empty,
+            "make_factordefs shall not return "
+            "any link: terminal -> generic factor")
+        self.assertTrue(
+            all(factordefs.get_groups([idx]).empty
+                for idx in range(5)),
+            "make_factordefs shall not return any factor for any step")
+        self.assertTrue(
+            all(factordefs.get_injfactorgroups([idx]).empty
+                for idx in range(5)),
+            "make_factordefs shall not return any link "
+            "from injection to factor for any step")
+
+    def test_scaling_factor_step0(self):
+        """one scaling factor (part 'q') for step 0"""
+        factors = pd.DataFrame([Factor(id='kq', step=0)])
+        injectionlinks = _injectionlink_frame(
+            pd.DataFrame(
+                [Injectionlink(injid='i_0', part='q', id='kq', step=0)]))
         factordefs = make_factordefs(
             factors,
             self.no_terminallinks,
@@ -152,6 +673,88 @@ class Make_factordefs(unittest.TestCase):
             err_msg="make_factordefs shall return one link injection->factor "
             "for step 0")
 
+    def test_scaling_factor_step02(self):
+        """one scaling factor (part 'q') for step 0, 2"""
+        factors = pd.DataFrame(
+            [Factor(id='kq', step=0),
+             Factor(id='kq', step=2)])
+        injectionlinks = _injectionlink_frame(
+            pd.DataFrame(
+                [Injectionlink(injid='i_0', part='q', id='kq', step=0),
+                 Injectionlink(injid='i_0', part='q', id='kq', step=2)]))
+        factordefs = make_factordefs(
+            factors,
+            self.no_terminallinks,
+            injectionlinks,
+            self.no_branchterminals)
+        self.assertTrue(
+            factordefs.gen_factor_data.empty,
+            "make_factordefs shall not return any generic factor")
+        self.assertTrue(
+            factordefs.gen_injfactor.empty,
+            "no links from injections to generic factors")
+        self.assertTrue(
+            factordefs.gen_termfactor.empty,
+            "make_factordefs shall not return "
+            "any link from terminal to generic factor")
+        assert_array_equal(
+            [len(factordefs.get_groups([idx])) for idx in range(-1, 5)],
+            [0, 1, 0, 1, 0, 0],
+            err_msg="make_factordefs shall return one factor for steps 0, 2")
+        assert_array_equal(
+            [len(factordefs.get_injfactorgroups([idx]))
+             for idx in range(-1, 5)],
+            [0, 1, 0, 1, 0, 0],
+            err_msg="make_factordefs shall return one link injection->factor "
+            "for steps 0, 2")
+
+    def test_scaling_factor_step01(self):
+        """two scaling factors (part 'pq') for step 0, one (part 'q')
+        for step 1"""
+        factors = pd.DataFrame(
+            [Factor(id='kp', step=0),
+             Factor(id='kq', step=0),
+             Factor(id='kq', step=1)])
+        injectionlinks = _injectionlink_frame(
+            pd.DataFrame(
+                [Injectionlink(injid='i_0', part='p', id='kp', step=0),
+                 Injectionlink(injid='i_0', part='q', id='kq', step=0),
+                 Injectionlink(injid='i_0', part='q', id='kq', step=1)]))
+        factordefs = make_factordefs(
+            factors,
+            self.no_terminallinks,
+            injectionlinks,
+            self.no_branchterminals)
+        self.assertTrue(
+            factordefs.gen_factor_data.empty,
+            "make_factordefs shall not return any generic factor")
+        self.assertTrue(
+            factordefs.gen_injfactor.empty,
+            "no links from injections to generic factors")
+        self.assertTrue(
+            factordefs.gen_termfactor.empty,
+            "make_factordefs shall not return "
+            "any link from terminal to generic factor")
+        assert_array_equal(
+            [len(factordefs.get_groups([idx])) for idx in range(-1, 5)],
+            [0, 2, 1, 0, 0, 0],
+            err_msg="make_factordefs shall return two factors for steps 0"
+            "and one for step 1")
+        self.assertEqual(
+            set(factordefs.get_groups([0]).index.levels[1]),
+            {'kq', 'kp'},
+            "make_factordefs shall return factors 'kp' and 'kq' for step 0")
+        self.assertEqual(
+            set(factordefs.get_groups([1]).index.levels[1]),
+            {'kq'},
+            "make_factordefs shall return factor 'kq' for step 1")
+        assert_array_equal(
+            [len(factordefs.get_injfactorgroups([idx]))
+             for idx in range(-1, 5)],
+            [0, 2, 1, 0, 0, 0],
+            err_msg="make_factordefs shall return two links injection->factor "
+            "for steps 0 and one for step 1")
+
     def test_generic_taps_factor(self):
         """one generic taps (terminal) factor"""
         factors = pd.DataFrame([Factor(id='taps')])
@@ -173,7 +776,7 @@ class Make_factordefs(unittest.TestCase):
             "make_factordefs shall return one generic factor")
         self.assertTrue(
             factordefs.gen_injfactor.empty,
-            "make_factordefs shall not return return "
+            "make_factordefs shall not return "
             "any link: injection -> generic factor")
         self.assertEqual(
             len(factordefs.gen_termfactor),
@@ -189,6 +792,181 @@ class Make_factordefs(unittest.TestCase):
                 for idx in range(5)),
             "make_factordefs shall not return any link "
             "from injection to factor for any step")
+
+class Get_scaling_factor_data2(unittest.TestCase):
+
+    def test_no_data(self):
+        """'get_scaling_factor_data' processes empty input"""
+        model = model_from_frames(make_data_frames())
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, [2, 3], None)
+        self.assertTrue(
+            factors.empty,
+            "get_scaling_factor_data returns no data for factors")
+        self.assertTrue(
+            injection_factor.empty,
+            "get_scaling_factor_data returns no data for association "
+            "injection_factor")
+
+    def test_default_scaling_factors(self):
+        """'get_scaling_factor_data' creates default scaling factors
+        if factors are not given explicitely"""
+        model = model_from_frames(
+            make_data_frames([Injection(id='injid0', id_of_node='n_0')]))
+        index_of_step = 3
+        steps = [index_of_step-1, index_of_step]
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, steps, None)
+        assert_array_equal(
+            [idx[0] for idx in factors.index],
+            steps,
+            err_msg="one factor per step")
+        self.assertTrue(
+            all(idx[1]=='const' for idx in factors.index),
+            "all factors are const parameters")
+        self.assertTrue(
+            all(idx[2]==DEFAULT_FACTOR_ID for idx in factors.index),
+            f"all factors are '{DEFAULT_FACTOR_ID}'")
+
+    def test_step1_without_scaling_factordef(self):
+        """'get_scaling_factor_data' creates default scaling factors
+        if factors are not given explicitely"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Injection('consumer', 'n_0'),
+                # scaling, define scaling factors
+                Defk(id=('kp', 'kq'), step=0),
+                # link scaling factors to active and reactive power of consumer
+                Klink(
+                    id_of_injection='consumer',
+                    part='pq',
+                    id_of_factor=('kp', 'kq'),
+                    step=0)]))
+        index_of_step = 1
+        steps = [index_of_step-1, index_of_step]
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, steps, None)
+        self.assertEqual(
+            factors.loc[0].shape[0],
+            2,
+            "two factors for step 0")
+        self.assertTrue(
+            all(factors.loc[0].reset_index().type == 'var'),
+            "all factors of step 0 are decision variables ('var')")
+        self.assertEqual(
+            factors.loc[1].shape[0],
+            1,
+            "one factors for step 1")
+        self.assertTrue(
+            all(factors.loc[1].reset_index().type == 'const'),
+            "all factors of step 1 are parameters ('const')")
+        self.assertTrue(
+            all(factors.loc[1].reset_index().id == DEFAULT_FACTOR_ID),
+            f"id of factor for step 1 is '{DEFAULT_FACTOR_ID}'")
+        self.assertTrue(
+            all(factors.index_of_source == -1),
+            "there are no source factors")
+
+    def test_generic_scaling_factor(self):
+        """'get_scaling_factor_data' creates default factors if factors are not
+        given explicitely"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Injection('consumer', 'n_0'),
+                # scaling, define scaling factors
+                Defk(id=('kp', 'kq'), step=-1),
+                # link scaling factors to active and reactive power of consumer
+                Klink(
+                    id_of_injection='consumer',
+                    part='pq',
+                    id_of_factor=('kp', 'kq'),
+                    step=-1)]))
+        index_of_step = 1
+        steps = [index_of_step-1, index_of_step]
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, steps, None)
+        factors_step_0 = factors.loc[0]
+        self.assertEqual(
+            len(factors_step_0),
+            2,
+            "two factors for step 0")
+        factors_step_1 = factors.loc[1]
+        self.assertEqual(
+            len(factors_step_1),
+            2,
+            "two factors for step 1")
+
+    def test_scaling_factor_with_terminallink(self):
+        """'get_scaling_factor_data' creates factors for injections
+        if linked with Injectionlink only"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Injection('consumer', 'n_0'),
+                # scaling, define scaling factors
+                Defk(id=('kp', 'kq'), step=-1),
+                # link scaling factors to active and reactive power of consumer
+                Tlink(
+                    id_of_branch='consumer',
+                    id_of_node='n_0',
+                    id_of_factor=('kp', 'kq'),
+                    step=-1)]))
+        index_of_step = 0
+        steps = [index_of_step]
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, steps, None)
+        self.assertEqual(
+            len(factors),
+            1,
+            "one factor")
+        self.assertEqual(
+            factors.index[0][2],
+            DEFAULT_FACTOR_ID,
+            "'get_scaling_factor_data' creates a scaling factor with ID "
+            f"{DEFAULT_FACTOR_ID} as link is a Terminallink")
+
+class Get_taps_factor_data2(unittest.TestCase):
+
+    def test_terminal_factor(self):
+        """"""
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(
+                    id='branch',
+                    id_of_node_A='n_0',
+                    id_of_node_B='n_1'),
+                Injection('injection', 'n_1'),
+                # scaling, define scaling factors
+                Deft(id='taps', step=-1),
+                # link scaling factors to active and reactive power of consumer
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='taps',
+                    step=-1)]))
+        index_of_step = 1
+        steps = [index_of_step-1, index_of_step]
+        factors, injection_factor = _get_scaling_factor_data(
+            model.factors, model.injections, steps, start=[3, 5])
+        self.assertEqual(
+            len(factors.loc[0]),
+            1,
+            "one factor for step 0")
+        self.assertEqual(
+            factors.loc[0].index_of_symbol[0],
+            3,
+            "step-0 symbol has index 3")
+        self.assertEqual(
+            len(factors.loc[1]),
+            1,
+            "one factor for step 1")
+        self.assertEqual(
+            factors.loc[1].index_of_symbol[0],
+            5,
+            "step-1 symbol has index 5")
 
 if __name__ == '__main__':
     unittest.main()

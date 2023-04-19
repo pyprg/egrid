@@ -416,8 +416,8 @@ class Create_objects(unittest.TestCase):
         self.assertEqual(
             res,
             [Klink(
-                part=('p',), 
-                id_of_injection=('hallo',), 
+                part=('p',),
+                id_of_injection=('hallo',),
                 id_of_factor=('myid',))],
             'create_objects creates instances of Link')
 
