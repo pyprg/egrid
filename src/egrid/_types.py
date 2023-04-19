@@ -352,12 +352,12 @@ def expand_klink(id_of_injection, part, id_of_factor, steps):
     except TypeError:
         iter_steps = iter([steps])
     objids = (
-        id_of_injection 
-        if isinstance(id_of_injection, (list, tuple)) else 
+        id_of_injection
+        if isinstance(id_of_injection, (list, tuple)) else
         [id_of_injection])
     ids = (
-        id_of_factor 
-        if isinstance(id_of_factor, (list, tuple)) else 
+        id_of_factor
+        if isinstance(id_of_factor, (list, tuple)) else
         [id_of_factor])
     return [Injectionlink(objid_, t[0], t[1], step_)
             for step_, objid_, t in
@@ -382,16 +382,16 @@ def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
     except TypeError:
         iter_steps = iter([steps])
     objids = (
-        id_of_branch 
-        if isinstance(id_of_branch, (list, tuple)) 
+        id_of_branch
+        if isinstance(id_of_branch, (list, tuple))
         else [id_of_branch])
     nodeids = (
-        id_of_node 
-        if isinstance(id_of_node, (list, tuple)) else 
+        id_of_node
+        if isinstance(id_of_node, (list, tuple)) else
         [id_of_node])
     factorids = (
-        id_of_factor 
-        if isinstance(id_of_factor, (list, tuple)) else 
+        id_of_factor
+        if isinstance(id_of_factor, (list, tuple)) else
         [id_of_factor])
     if (len(factorids)==1) and (1 < len(nodeids)):
         factorids *= len(nodeids)
@@ -433,8 +433,8 @@ id_of_node: str|iterable_of_str
 id_of_branch: str|iterable_of_str
     identifier of branch
 id_of_factor: str|iterable_of_str
-    identifier of taps (terminal) factor to connect, 
-    id_of_node, id_of_branch, id_of_factor shall have the same lenght 
+    identifier of taps (terminal) factor to connect,
+    id_of_node, id_of_branch, id_of_factor shall have the same lenght
     if iterable
 step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
@@ -591,8 +591,8 @@ def df_astype(df, cls_):
     return df.astype(dict(zip(cls_._fields, _attribute_types[cls_][0])))
 
 def make_df(cls_, content=_EMPTY_TUPLE):
-    """Creates a pandas.DataFrame instance. 
-    
+    """Creates a pandas.DataFrame instance.
+
     Types of columns are according to _attribute_types.
 
     Parameters
