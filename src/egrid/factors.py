@@ -206,7 +206,7 @@ def make_factordefs(
     termassoc = (
         pd.merge(
             left=termassoc_,
-            right=factors[['id','index_of_symbol', 'm', 'n']],
+            right=factors[['id','index_of_symbol']],
             left_on='id',
             right_on='id'))
     gen_termfactor=(

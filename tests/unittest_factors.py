@@ -113,7 +113,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
             factordefs.gen_termfactor,
-            np.zeros((0,7), dtype=object),
+            np.zeros((0,5), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -163,7 +163,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected no generic injection_factor relation")
         assert_array_equal(
             factordefs.gen_termfactor.to_numpy(),
-            np.array([[-1, 'taps', 0, -0.00625, 1.0, 0, 1]], dtype=object),
+            np.array([[-1, 'taps', 0, 0, 1]], dtype=object),
             err_msg="expected taps (terminal) factor "
             "[-1, 'taps', 0, -0.00625, 1.0, 0, 1]"),
         assert_array_equal(
@@ -1001,8 +1001,7 @@ class Make_factor_meta(unittest.TestCase):
         factor_ids2 = var_const[fm.var_const_to_factor]
         # method for creating a terminal-factor for each terminal
         #   tfactors = np.ones((len(model.branchterminals)), dtype=float)
-        #   tfdata = model.factors.gen_termfactor
-        #   tfactors[tfdata.index_of_terminal] = tfdata.m * ftaps + tfdata.n
+        #   tfactors[tfdata.index_of_terminal] = ftaps
         # for test we use numpy.empty with dtype='<U4'
         terminal_factors = np.empty((len(model.branchterminals),), dtype='<U4')
         idxs = model.factors.gen_termfactor.index_of_terminal
