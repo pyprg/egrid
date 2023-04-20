@@ -113,7 +113,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
             factordefs.gen_termfactor,
-            np.zeros((0,5), dtype=object),
+            np.zeros((0,7), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -163,8 +163,9 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected no generic injection_factor relation")
         assert_array_equal(
             factordefs.gen_termfactor.to_numpy(),
-            np.array([[-1, 'taps', 0, 0, 1]], dtype=object),
-            err_msg="expected taps (terminal) factor [-1, 'taps', 0, 0, 1]"),
+            np.array([[-1, 'taps', 0, -0.00625, 1.0, 0, 1]], dtype=object),
+            err_msg="expected taps (terminal) factor "
+            "[-1, 'taps', 0, -0.00625, 1.0, 0, 1]"),
         assert_array_equal(
             factordefs.gen_termfactor.index.to_numpy()[0],
             ('branch', 'n_0'),
@@ -173,127 +174,6 @@ class Make_factordefs(unittest.TestCase):
             len(model.factors.get_groups([-1])),
             1,
             "one generic factor")
-
-class Make_factor_meta(unittest.TestCase):
-
-    def test_no_data(self):
-        model = model_from_frames(make_data_frames())
-        factor_meta = make_factor_meta(model, 1, np.zeros((0,1), dtype=float))
-        self.assertEqual(
-            factor_meta.id_of_step_symbol.shape,
-            (0,),
-            "no symbols specific for step 1")
-        self.assertEqual(
-            factor_meta.index_of_kpq_symbol.shape,
-            (0,2),
-            "no scaling factors")
-        self.assertEqual(
-            factor_meta.index_of_var_symbol.shape,
-            (0,),
-            "no decision variables")
-        self.assertEqual(
-            factor_meta.index_of_const_symbol.shape,
-            (0,),
-            "no values for decision variables")
-        self.assertEqual(
-            factor_meta.values_of_vars.shape,
-            (0,),
-            "no paramters")
-        self.assertEqual(
-            factor_meta.var_min.shape,
-            (0,),
-            "no minimum values for decision variables")
-        self.assertEqual(
-            factor_meta.var_max.shape,
-            (0,),
-            "no maximum values for decision variables")
-        self.assertEqual(
-            factor_meta.values_of_consts.shape,
-            (0,),
-            "no values for paramters")
-        assert_array_equal(
-            factor_meta.var_const_to_factor,
-            [],
-            err_msg="no var_const crossreference")
-        assert_array_equal(
-            factor_meta.var_const_to_kp,
-            [],
-            err_msg="no active power scaling factor crossreference")
-        assert_array_equal(
-            factor_meta.var_const_to_kq,
-            [],
-            err_msg="no reactive power scaling factor crossreference")
-        assert_array_equal(
-            factor_meta.var_const_to_ftaps,
-            [],
-            err_msg="no taps factor crossreference")
-
-    def test_generic_specific_factor(self):
-        """
-        one generic injection factor 'kp',
-        one generic terminal factor'taps',
-        default scaling factors,
-        scaling factor 'kq' is specific for step 0
-        """
-        model = model_from_frames(
-            make_data_frames([
-                Slacknode('n_0'),
-                Branch(
-                    id='branch',
-                    id_of_node_A='n_0',
-                    id_of_node_B='n_1'),
-                Injection('consumer', 'n_1'),
-                Injection('consumer2', 'n_1'),
-                # scaling, define scaling factors
-                Defk(id='kp', step=-1),
-                Defk(id='kq', step=0),
-                # link scaling factors to active and reactive power of consumer
-                #   factor for each step (generic, step=-1)
-                Klink(
-                    id_of_injection='consumer',
-                    part='p',
-                    id_of_factor='kp',
-                    step=-1),
-                #   factor for step 0 (specific, step=0)
-                Klink(
-                    id_of_injection='consumer',
-                    part='q',
-                    id_of_factor='kq',
-                    step=0),
-                # tap factor, for each step (generic, step=-1)
-                Deft(id='taps', is_discrete=True, step=-1),
-                # tap factor, for step 1
-                Deft(id='taps', type='const', is_discrete=True, step=1),
-                # link generic tap factor to terminal
-                Tlink(
-                    id_of_node='n_0',
-                    id_of_branch='branch',
-                    id_of_factor='taps',
-                    step=-1),
-                Tlink(
-                    id_of_node='n_1',
-                    id_of_branch='branch',
-                    id_of_factor='taps',
-                    step=-1),
-                # # link step specific tap factor to terminal
-                # grid.Link(
-                #     objid='branch',
-                #     id='taps',
-                #     nodeid='n_0',
-                #     cls=grid.Terminallink,
-                #     step=1)
-            ]))
-        assert_array_equal(
-            model.factors.gen_factor_data.index,
-            ['kp', 'taps'],
-            err_msg="IDs of generic factors shall be ['kp', 'taps']")
-        assert_array_equal(
-            model.factors.gen_factor_data.index_of_symbol,
-            [0, 1],
-            err_msg="indices of generic factor symbols shall be [0, 1]")
-        # factor_meta = make_factor_meta(model, 0, np.zeros((0,1), dtype=float))
-        # print(factor_meta)
-        # print()
 
 class Get_taps_factor_data(unittest.TestCase):
 
@@ -602,13 +482,13 @@ class Make_factordefs2(unittest.TestCase):
         """3 generic scaling factors"""
         factors = pd.DataFrame(
             [Factor(id='kp0'),
-             Factor(id='kq0'),
-             Factor(id='kp1')])
+              Factor(id='kq0'),
+              Factor(id='kp1')])
         injectionlinks = _injectionlink_frame(
             pd.DataFrame(
                 [Injectionlink(injid='i_0', part='p', id='kp0'),
-                 Injectionlink(injid='i_0', part='q', id='kq0'),
-                 Injectionlink(injid='i_1', part='p', id='kp1')]))
+                  Injectionlink(injid='i_0', part='q', id='kq0'),
+                  Injectionlink(injid='i_1', part='p', id='kp1')]))
         factordefs = make_factordefs(
             factors,
             self.no_terminallinks,
@@ -668,7 +548,7 @@ class Make_factordefs2(unittest.TestCase):
             err_msg="make_factordefs shall return one factor for step 0")
         assert_array_equal(
             [len(factordefs.get_injfactorgroups([idx]))
-             for idx in range(-1, 5)],
+              for idx in range(-1, 5)],
             [0, 1, 0, 0, 0, 0],
             err_msg="make_factordefs shall return one link injection->factor "
             "for step 0")
@@ -677,11 +557,11 @@ class Make_factordefs2(unittest.TestCase):
         """one scaling factor (part 'q') for step 0, 2"""
         factors = pd.DataFrame(
             [Factor(id='kq', step=0),
-             Factor(id='kq', step=2)])
+              Factor(id='kq', step=2)])
         injectionlinks = _injectionlink_frame(
             pd.DataFrame(
                 [Injectionlink(injid='i_0', part='q', id='kq', step=0),
-                 Injectionlink(injid='i_0', part='q', id='kq', step=2)]))
+                  Injectionlink(injid='i_0', part='q', id='kq', step=2)]))
         factordefs = make_factordefs(
             factors,
             self.no_terminallinks,
@@ -703,7 +583,7 @@ class Make_factordefs2(unittest.TestCase):
             err_msg="make_factordefs shall return one factor for steps 0, 2")
         assert_array_equal(
             [len(factordefs.get_injfactorgroups([idx]))
-             for idx in range(-1, 5)],
+              for idx in range(-1, 5)],
             [0, 1, 0, 1, 0, 0],
             err_msg="make_factordefs shall return one link injection->factor "
             "for steps 0, 2")
@@ -713,13 +593,13 @@ class Make_factordefs2(unittest.TestCase):
         for step 1"""
         factors = pd.DataFrame(
             [Factor(id='kp', step=0),
-             Factor(id='kq', step=0),
-             Factor(id='kq', step=1)])
+              Factor(id='kq', step=0),
+              Factor(id='kq', step=1)])
         injectionlinks = _injectionlink_frame(
             pd.DataFrame(
                 [Injectionlink(injid='i_0', part='p', id='kp', step=0),
-                 Injectionlink(injid='i_0', part='q', id='kq', step=0),
-                 Injectionlink(injid='i_0', part='q', id='kq', step=1)]))
+                  Injectionlink(injid='i_0', part='q', id='kq', step=0),
+                  Injectionlink(injid='i_0', part='q', id='kq', step=1)]))
         factordefs = make_factordefs(
             factors,
             self.no_terminallinks,
@@ -750,7 +630,7 @@ class Make_factordefs2(unittest.TestCase):
             "make_factordefs shall return factor 'kq' for step 1")
         assert_array_equal(
             [len(factordefs.get_injfactorgroups([idx]))
-             for idx in range(-1, 5)],
+              for idx in range(-1, 5)],
             [0, 2, 1, 0, 0, 0],
             err_msg="make_factordefs shall return two links injection->factor "
             "for steps 0 and one for step 1")
@@ -967,6 +847,180 @@ class Get_taps_factor_data2(unittest.TestCase):
             factors.loc[1].index_of_symbol[0],
             5,
             "step-1 symbol has index 5")
+
+class Make_factor_meta(unittest.TestCase):
+
+    def test_no_data(self):
+        model = model_from_frames(make_data_frames())
+        factor_meta = make_factor_meta(model, 1, np.zeros((0,1), dtype=float))
+        self.assertEqual(
+            factor_meta.id_of_step_symbol.shape,
+            (0,),
+            "no symbols specific for step 1")
+        self.assertEqual(
+            factor_meta.index_of_kpq_symbol.shape,
+            (0,2),
+            "no scaling factors")
+        self.assertEqual(
+            factor_meta.index_of_var_symbol.shape,
+            (0,),
+            "no decision variables")
+        self.assertEqual(
+            factor_meta.index_of_const_symbol.shape,
+            (0,),
+            "no values for decision variables")
+        self.assertEqual(
+            factor_meta.values_of_vars.shape,
+            (0,),
+            "no paramters")
+        self.assertEqual(
+            factor_meta.var_min.shape,
+            (0,),
+            "no minimum values for decision variables")
+        self.assertEqual(
+            factor_meta.var_max.shape,
+            (0,),
+            "no maximum values for decision variables")
+        self.assertEqual(
+            factor_meta.values_of_consts.shape,
+            (0,),
+            "no values for paramters")
+        assert_array_equal(
+            factor_meta.var_const_to_factor,
+            [],
+            err_msg="no var_const crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_kp,
+            [],
+            err_msg="no active power scaling factor crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_kq,
+            [],
+            err_msg="no reactive power scaling factor crossreference")
+        assert_array_equal(
+            factor_meta.var_const_to_ftaps,
+            [],
+            err_msg="no taps factor crossreference")
+
+    def test_generic_specific_factor(self):
+        """
+        one generic injection factors 'kp'
+        generic terminal factor'tap_', 'taps2'
+        default scaling factors,
+        scaling factor 'kq' is specific for step 0
+        """
+        model = model_from_frames(
+            make_data_frames([
+                Slacknode('n_0'),
+                Branch(id='branch', id_of_node_A='n_0', id_of_node_B='n_1'),
+                Branch(id='branch2', id_of_node_A='n_1', id_of_node_B='n_2'),
+                Injection('consumer', 'n_1'), # has kp and kq
+                Injection('consumer2', 'n_1'),# has _default_ factor for P, Q
+                # scaling, define scaling factors
+                Defk(id='kp', step=-1),
+                Defk(id='kq', step=0),
+                # link scaling factors to active and reactive power of consumer
+                #   factor for each step (generic, step=-1)
+                Klink(
+                    id_of_injection='consumer',
+                    part='p',
+                    id_of_factor='kp',
+                    step=-1),
+                #   factor for step 0 (specific, step=0)
+                Klink(
+                    id_of_injection='consumer',
+                    part='q',
+                    id_of_factor='kq',
+                    step=0),
+                # tap factor, for each step (generic, step=-1)
+                Deft(id='tap_', is_discrete=True, step=-1),
+                Deft(id='tap2', is_discrete=True, step=-1),
+                # link the same generic tap factor to both terminals
+                Tlink(
+                    id_of_node='n_0',
+                    id_of_branch='branch',
+                    id_of_factor='tap_',
+                    step=-1),
+                Tlink(
+                    id_of_node='n_1',
+                    id_of_branch='branch',
+                    id_of_factor='tap2',
+                    step=-1)]))
+        assert_array_equal(
+            model.factors.gen_factor_data.index,
+            ['kp', 'tap2', 'tap_'],
+            err_msg="IDs of generic factors shall be ['kp', 'tap2', 'tap_']")
+        assert_array_equal(
+            model.factors.gen_factor_data.index_of_symbol,
+            [0, 1, 2],
+            err_msg="indices of generic factor symbols shall be [0, 1]")
+        fm = make_factor_meta(model, 0, np.zeros((0,1), dtype=float))
+        # prepare generic factors
+        generic_factors = (
+            model
+            .factors
+            .gen_factor_data
+            .reset_index()
+            .sort_values(by='index_of_symbol'))
+        # use 'factor_ids' as a substitute for symbols during this test
+        # symbols of generic factors can be created before optimization and
+        #   can be made available for each step,
+        #   first index of generic factor is 0
+        # step-specific can be created before a specific step,
+        #     symbols start with index len(generic_factors)
+        # elements of 'factor_ids' are in reference order with increasing
+        #   index, starting with 0, independent of type 'var'|'const'
+        # method for arranging symbols in reference order
+        #   'generic_factors.id' and 'fm.id_of_step_symbol' are in correct
+        #   order having an increasing index without gap, all methodes using
+        #   index-sequences 'index_of_kpq_symbol', 'index_of_var_symbol'
+        #   and 'index_of_const_symbol' for ordering of values rely on this
+        #   order
+        factor_ids = (
+            pd.concat([generic_factors.id, fm.id_of_step_symbol]).to_numpy())
+        # method for arranging kp and kq for each injection
+        kpq=pd.DataFrame(
+            {'kp': factor_ids[fm.index_of_kpq_symbol[:,0]],
+             'kq': factor_ids[fm.index_of_kpq_symbol[:,1]]}).to_numpy()
+        # method for extracting all decision variable symbols
+        vars=factor_ids[fm.index_of_var_symbol]
+        # method for extracting all parameter symbols
+        consts=factor_ids[fm.index_of_const_symbol]
+        # vars are ordered in the way the solver returns the values
+        #  use var_const as substitute for values returned by a solver during
+        #  this test
+        var_const = np.concatenate([vars, consts])
+        # extract scaling factors for active power from solver results
+        kp = var_const[fm.var_const_to_kp]
+        # extract scaling factors for reactive power from solver results
+        kq = var_const[fm.var_const_to_kq]
+        # extracting terminal factors from solver result values
+        ftaps = var_const[fm.var_const_to_ftaps]
+        # reordering of solver result values, this is necessary before passing
+        #   as initial values for next step
+        factor_ids2 = var_const[fm.var_const_to_factor]
+        # method for creating a terminal-factor for each terminal
+        #   tfactors = np.ones((len(model.branchterminals)), dtype=float)
+        #   tfdata = model.factors.gen_termfactor
+        #   tfactors[tfdata.index_of_terminal] = tfdata.m * ftaps + tfdata.n
+        # for test we use numpy.empty with dtype='<U4'
+        terminal_factors = np.empty((len(model.branchterminals),), dtype='<U4')
+        idxs = model.factors.gen_termfactor.index_of_terminal
+        terminal_factors[idxs] = ftaps
+        # check
+        assert_array_equal(
+            kpq, [['kp', 'kq'], [DEFAULT_FACTOR_ID, DEFAULT_FACTOR_ID]])
+        assert_array_equal(vars, ['kp', 'kq'])
+        assert_array_equal(consts, ['tap2', 'tap_', DEFAULT_FACTOR_ID])
+        assert_array_equal(kp, ['kp', DEFAULT_FACTOR_ID])
+        assert_array_equal(kq, ['kq', DEFAULT_FACTOR_ID])
+        assert_array_equal(ftaps, ['tap_', 'tap2'])
+        assert_array_equal(
+            factor_ids,
+            factor_ids2,
+            err_msg="results shall be ordered according to concatenation of "
+            "generic factors and step-specific factors")
+        assert_array_equal(terminal_factors, ['tap_', '', 'tap2', ''])
 
 if __name__ == '__main__':
     unittest.main()
