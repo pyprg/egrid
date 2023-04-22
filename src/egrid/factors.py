@@ -40,7 +40,7 @@ template: pandas.DataFrame
 
 Factors = namedtuple(
     'Factors',
-    'gen_factor_data gen_injfactor gen_termfactor '
+    'gen_factor_data gen_injfactor terminalfactors '
     'get_groups get_injfactorgroups')
 Factors.__doc__ ="""
 Data of generic factors (step == -1),
@@ -66,12 +66,20 @@ Parameters
 * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
     * .step, -1
     * .id, str, ID of factor
-* .gen_termfactor, pandas.DataFrame (id_of_branch, id_of_node) ->
-    * .step
-    * .id
-    * .index_of_symbol
-    * .index_of_terminal
-    * .index_of_other_terminal
+* .terminalfactors, pandas.DataFrame (id_of_branch, id_of_node) ->
+    * .id, str
+    * .index_of_terminal, int
+    * .index_of_other_terminal, int
+    * .step, -1
+    * .type, 'var'|'const'
+    * .id_of_source, str
+    * .value, float
+    * .min, float
+    * .max, float
+    * .is_discrete, bool
+    * .m, float
+    * .n, float
+    * .index_of_symbol, int
 * .get_groups: function
     (iterable_of_int)-> (pandas.DataFrame)
     ('step', 'id') ->
@@ -223,10 +231,15 @@ def make_factordefs(
     get_injfactorgroups = lambda steps: (
         _selectgroups(injfactorgroups, steps)
         .set_index(['step', 'id_of_injection', 'part']))
+    gen_factordata = factors.set_index('id')
+    terminalfactors = (
+        gen_termfactor[['id', 'index_of_terminal', 'index_of_other_terminal']]
+        .set_index('id')
+        .join(gen_factordata.drop(columns=['step']), how='inner'))
     return Factors(
-        gen_factor_data=factors.set_index('id'),
+        gen_factor_data=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
-        gen_termfactor=gen_termfactor,
+        terminalfactors=terminalfactors,
         get_groups=get_groups,
         get_injfactorgroups=get_injfactorgroups)
 
@@ -668,7 +681,8 @@ def  _get_taps_factor_data(factordefs, steps):
           * .index_of_symbol, int
           * .index_of_terminal, int"""
     generic_termfactor_steps = _add_step_index(
-        factordefs.gen_termfactor, steps)
+        factordefs.terminalfactors,
+        steps)
     # get generic_assocs which are not in assocs of step, this allows
     #   overriding the linkage of factors
     term_factor = generic_termfactor_steps[
@@ -679,12 +693,7 @@ def  _get_taps_factor_data(factordefs, steps):
     #   copy generic_factors and add step indices
     generic_factor_steps = _add_step_index(factordefs.gen_factor_data, steps)
     # filter for linked taps-factors step-to-factor index
-    step_factor = (
-        pd.MultiIndex.from_arrays(
-            [term_factor.index.get_level_values('step'),
-             term_factor.id],
-            names=['step', 'id'])
-        .unique())
+    step_factor = term_factor.index.unique()
     factors_ = generic_factor_steps.reindex(step_factor)
     factors_.sort_index(inplace=True)
     # retrieve step specific factors
@@ -907,7 +916,7 @@ def _make_factor_meta(
             terminal_factor.index_of_symbol])
 
 def make_factor_meta(model, step, k_prev):
-    """Prepares data of factors for one step.
+    """Prepares data of decision variables and paramters for one step.
 
     Arguments for solver call:
 

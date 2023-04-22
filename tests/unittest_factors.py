@@ -70,7 +70,7 @@ class Make_factordefs(unittest.TestCase):
         self.assertTrue(
             factordefs.gen_injfactor.empty, 'no generic injection factors')
         self.assertTrue(
-            factordefs.gen_termfactor.empty, 'no generic terminal factors')
+            factordefs.terminalfactors.empty, 'no generic terminal factors')
 
     def test_generic_injection_factor(self):
         """basic test with one generic injection factor"""
@@ -112,8 +112,8 @@ class Make_factordefs(unittest.TestCase):
             ('consumer', 'p'),
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
-            factordefs.gen_termfactor,
-            np.zeros((0,5), dtype=object),
+            factordefs.terminalfactors,
+            np.zeros((0,11), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -162,13 +162,16 @@ class Make_factordefs(unittest.TestCase):
             np.zeros((0,2), dtype=object),
             err_msg="expected no generic injection_factor relation")
         assert_array_equal(
-            factordefs.gen_termfactor.to_numpy(),
-            np.array([[-1, 'taps', 0, 0, 1]], dtype=object),
+            factordefs.terminalfactors.to_numpy(),
+            np.array(
+                [[0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True, -0.00625,
+                  1.0, 0]],
+                dtype=object),
             err_msg="expected taps (terminal) factor "
             "[-1, 'taps', 0, -0.00625, 1.0, 0, 1]"),
         assert_array_equal(
-            factordefs.gen_termfactor.index.to_numpy()[0],
-            ('branch', 'n_0'),
+            factordefs.terminalfactors.index.to_numpy()[0],
+            ['taps'],
             err_msg="expected index is ('branch', 'n_0')")
         self.assertEqual(
             len(model.factors.get_groups([-1])),
@@ -433,7 +436,7 @@ class Make_factordefs2(unittest.TestCase):
             factordefs.gen_injfactor.empty,
             "no links from injections to generic factors")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "no links from terminal to generic factors")
         self.assertTrue(
             all(factordefs.get_groups([idx]).empty
@@ -465,7 +468,7 @@ class Make_factordefs2(unittest.TestCase):
             "make_factordefs shall return "
             "one link: injection -> generic factor")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "make_factordefs shall not return "
             "any link: terminal -> generic factor")
         self.assertTrue(
@@ -508,7 +511,7 @@ class Make_factordefs2(unittest.TestCase):
             "make_factordefs shall return "
             "3 links: injection -> generic factor")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "make_factordefs shall not return "
             "any link: terminal -> generic factor")
         self.assertTrue(
@@ -539,7 +542,7 @@ class Make_factordefs2(unittest.TestCase):
             factordefs.gen_injfactor.empty,
             "no links from injections to generic factors")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "make_factordefs shall not return "
             "any link from terminal to generic factor")
         assert_array_equal(
@@ -574,7 +577,7 @@ class Make_factordefs2(unittest.TestCase):
             factordefs.gen_injfactor.empty,
             "no links from injections to generic factors")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "make_factordefs shall not return "
             "any link from terminal to generic factor")
         assert_array_equal(
@@ -612,7 +615,7 @@ class Make_factordefs2(unittest.TestCase):
             factordefs.gen_injfactor.empty,
             "no links from injections to generic factors")
         self.assertTrue(
-            factordefs.gen_termfactor.empty,
+            factordefs.terminalfactors.empty,
             "make_factordefs shall not return "
             "any link from terminal to generic factor")
         assert_array_equal(
@@ -659,7 +662,7 @@ class Make_factordefs2(unittest.TestCase):
             "make_factordefs shall not return "
             "any link: injection -> generic factor")
         self.assertEqual(
-            len(factordefs.gen_termfactor),
+            len(factordefs.terminalfactors),
             1,
             "make_factordefs shall return "
             "one link: terminal -> generic factor")
@@ -1004,7 +1007,7 @@ class Make_factor_meta(unittest.TestCase):
         #   tfactors[tfdata.index_of_terminal] = ftaps
         # for test we use numpy.empty with dtype='<U4'
         terminal_factors = np.empty((len(model.branchterminals),), dtype='<U4')
-        idxs = model.factors.gen_termfactor.index_of_terminal
+        idxs = model.factors.terminalfactors.index_of_terminal
         terminal_factors[idxs] = ftaps
         # check
         assert_array_equal(
