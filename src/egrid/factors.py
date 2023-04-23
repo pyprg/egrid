@@ -430,7 +430,7 @@ def _factor_index_per_step(factors, start):
         name='index_of_symbol',
         dtype=np.int64)
 
-def _get_values_of_symbols(factor_data, value_of_previous_step):
+def _get_values_of_symbols(factordata, value_of_previous_step):
     """Returns values for symbols.
 
     When a symbol is a variable the value
@@ -439,7 +439,7 @@ def _get_values_of_symbols(factor_data, value_of_previous_step):
 
     Parameters
     ----------
-    factor_data: pandas.DataFrame (sorted according to index_of_symbol)
+    factordata: pandas.DataFrame (sorted according to index_of_symbol)
         * .index_of_symbol, int
         * .value, float
         * .index_of_source, int
@@ -450,14 +450,14 @@ def _get_values_of_symbols(factor_data, value_of_previous_step):
     -------
     numpy.array (ordered according to index_of_symbol)
         column vector of float"""
-    values = np.zeros((len(factor_data),1), dtype=float)
+    values = np.zeros((len(factordata),1), dtype=float)
     # explicitely given values not calculated in previous step
-    is_given = factor_data.index_of_source < 0
-    given = factor_data[is_given]
+    is_given = factordata.index_of_source < 0
+    given = factordata[is_given]
     if len(given):
         values[given.index_of_symbol] = given.value.to_numpy().reshape(-1,1)
     # values calculated in previous step
-    calc = factor_data[~is_given]
+    calc = factordata[~is_given]
     if len(calc):
         assert len(value_of_previous_step), 'missing value_of_previous_step'
         values[calc.index_of_symbol] = (
@@ -890,7 +890,7 @@ def _make_factor_meta(
         .astype(np.int64))
     var_const_to_factor = np.zeros_like(var_const_idxs)
     var_const_to_factor[var_const_idxs] = factors.index_of_symbol
-    # creat step-specific symbols
+    # step-specific symbols
     id_of_step_symbol = (
         factors.id[count_of_generic_factors <= factors.index_of_symbol])
     return Factormeta(
