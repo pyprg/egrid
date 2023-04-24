@@ -235,7 +235,8 @@ def make_factordefs(
     terminalfactors = (
         gen_termfactor[['id', 'index_of_terminal', 'index_of_other_terminal']]
         .set_index('id')
-        .join(gen_factordata.drop(columns=['step']), how='inner'))
+        .join(gen_factordata.drop(columns=['step']), how='inner')
+        .reset_index())
     return Factors(
         gen_factor_data=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
@@ -681,7 +682,7 @@ def  _get_taps_factor_data(factordefs, steps):
           * .index_of_symbol, int
           * .index_of_terminal, int"""
     generic_termfactor_steps = _add_step_index(
-        factordefs.terminalfactors,
+        factordefs.terminalfactors.set_index('id'),
         steps)
     # get generic_assocs which are not in assocs of step, this allows
     #   overriding the linkage of factors

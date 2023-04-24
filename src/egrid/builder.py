@@ -253,7 +253,7 @@ def _make_edge_objects(data):
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
     create_output = False
     has_p, has_q, has_I, has_Tl = (
-        key in attributes for key in ('P', 'Q', 'I', 'Tl'))
+        key in attributes for key in ('P', 'Q', 'I', 'Tlink'))
     if has_p:
         success, val = _create_pvalue(
             id_of_node, id_of_device, attributes['P'])
@@ -275,8 +275,10 @@ def _make_edge_objects(data):
             id_of_node=id_of_node,
             id_of_device=id_of_device)
     if has_Tl:
-        yield Terminallink(
-            branchid=id_of_device, nodeid=id_of_node, id=attributes['Tl'])
+        yield Tlink(
+            id_of_node=id_of_node,
+            id_of_branch=id_of_device,
+            id_of_factor=attributes['Tlink'])
 
 def _make_node_objects(data):
     _, e_id, neighbours, attributes = data

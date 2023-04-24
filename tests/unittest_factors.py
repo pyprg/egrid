@@ -113,7 +113,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
             factordefs.terminalfactors,
-            np.zeros((0,11), dtype=object),
+            np.zeros((0,12), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -164,15 +164,16 @@ class Make_factordefs(unittest.TestCase):
         assert_array_equal(
             factordefs.terminalfactors.to_numpy(),
             np.array(
-                [[0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True, -0.00625,
-                  1.0, 0]],
+                [['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True,
+                  -0.00625, 1.0, 0]],
                 dtype=object),
             err_msg="expected taps (terminal) factor "
-            "[-1, 'taps', 0, -0.00625, 1.0, 0, 1]"),
+            "['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True, "
+            "-0.00625, 1.0, 0]"),
         assert_array_equal(
-            factordefs.terminalfactors.index.to_numpy()[0],
+            factordefs.terminalfactors.id.to_numpy()[0],
             ['taps'],
-            err_msg="expected index is ('branch', 'n_0')")
+            err_msg="expected id is 'taps'")
         self.assertEqual(
             len(model.factors.get_groups([-1])),
             1,
