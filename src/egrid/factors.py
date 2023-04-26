@@ -40,7 +40,7 @@ template: pandas.DataFrame
 
 Factors = namedtuple(
     'Factors',
-    'gen_factor_data gen_injfactor terminalfactors '
+    'gen_factordata gen_injfactor terminalfactors '
     'get_groups get_injfactorgroups')
 Factors.__doc__ ="""
 Data of generic factors (step == -1),
@@ -51,7 +51,7 @@ Functions to retrieve factors and relations by optimization-steps.
 
 Parameters
 ----------
-* .gen_factor_data, pandas.DataFrame (id (str, ID of factor)) ->
+* .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
     * .index, int, index of factor
     * .type, 'const'|'var'
     * .id_of_source, str
@@ -183,7 +183,7 @@ def make_factordefs(
     Returns
     -------
     Factordefs
-        * .gen_factor_data, pandas.DataFrame
+        * .gen_factordata, pandas.DataFrame
         * .gen_injfactor, pandas.DataFrame
         * .gen_termfactor, pandas.DataFrame
         * .get_groups: function
@@ -238,7 +238,7 @@ def make_factordefs(
         .join(gen_factordata.drop(columns=['step']), how='inner')
         .reset_index())
     return Factors(
-        gen_factor_data=gen_factordata,
+        gen_factordata=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
         terminalfactors=terminalfactors,
         get_groups=get_groups,
@@ -588,7 +588,7 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
     #   generate factors from those with -1 step setting for given steps
     # step, inj, part => factor
     #   copy generic_factors and add step indices
-    generic_factor_steps = _add_step_index(factordefs.gen_factor_data, steps)
+    generic_factor_steps = _add_step_index(factordefs.gen_factordata, steps)
     # retrieve step specific factors
     factors_steps = factordefs.get_groups(steps)
     # select generic factors only if not part of specific factors
@@ -692,7 +692,7 @@ def  _get_taps_factor_data(factordefs, steps):
     #   generate factors for given steps
     # step, branch, node => factor
     #   copy generic_factors and add step indices
-    generic_factor_steps = _add_step_index(factordefs.gen_factor_data, steps)
+    generic_factor_steps = _add_step_index(factordefs.gen_factordata, steps)
     # filter for linked taps-factors step-to-factor index
     step_factor = term_factor.index.unique()
     factors_ = generic_factor_steps.reindex(step_factor)
@@ -766,7 +766,7 @@ def get_factordata_for_step(model, step):
     taps_factors, terminal_factor = _get_taps_factor_data(
         model_factors, steps)
     # scaling factors for injections
-    count_of_generic_factors = len(model_factors.gen_factor_data)
+    count_of_generic_factors = len(model_factors.gen_factordata)
     start = repeat(count_of_generic_factors)
     scaling_factors, injection_factors = _get_scaling_factor_data(
         model.factors, model.injections, steps, start)

@@ -66,7 +66,7 @@ class Make_factordefs(unittest.TestCase):
             make_data_frames())
         factordefs = model.factors
         self.assertTrue(
-            factordefs.gen_factor_data.empty, 'no generic factors')
+            factordefs.gen_factordata.empty, 'no generic factors')
         self.assertTrue(
             factordefs.gen_injfactor.empty, 'no generic injection factors')
         self.assertTrue(
@@ -94,13 +94,13 @@ class Make_factordefs(unittest.TestCase):
         factordefs = model.factors
         self.assertEqual(
             dict(
-                zip(factordefs.gen_factor_data.columns,
-                    factordefs.gen_factor_data.iloc[0].to_numpy())),
+                zip(factordefs.gen_factordata.columns,
+                    factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'var', 'id_of_source': 'kp', 'value': 1.0,
               'min': -np.inf, 'max': np.inf, 'is_discrete': False, 'm': 1.0,
               'n': 0.0, 'index_of_symbol': 0})
         self.assertEqual(
-            factordefs.gen_factor_data.index[0],
+            factordefs.gen_factordata.index[0],
             'kp',
             "generic factor has name 'kp'")
         assert_array_equal(
@@ -148,13 +148,13 @@ class Make_factordefs(unittest.TestCase):
         factordefs = model.factors
         self.assertEqual(
             dict(
-                zip(factordefs.gen_factor_data.columns,
-                    factordefs.gen_factor_data.iloc[0].to_numpy())),
+                zip(factordefs.gen_factordata.columns,
+                    factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'const', 'id_of_source': 'taps', 'value': 0.,
               'min': -16, 'max': 16, 'is_discrete': True, 'm': -0.00625,
               'n': 1.0, 'index_of_symbol': 0})
         self.assertEqual(
-            factordefs.gen_factor_data.index[0],
+            factordefs.gen_factordata.index[0],
             'taps',
             "generic factor has name 'taps'")
         assert_array_equal(
@@ -244,11 +244,11 @@ class Get_taps_factor_data(unittest.TestCase):
                 #     step=1)
                 ]))
         assert_array_equal(
-            model.factors.gen_factor_data.index,
+            model.factors.gen_factordata.index,
             ['kp', 'taps'],
             err_msg="IDs of generic factors shall be ['kp', 'taps']")
         assert_array_equal(
-            model.factors.gen_factor_data.index_of_symbol,
+            model.factors.gen_factordata.index_of_symbol,
             [0, 1],
             err_msg="indices of generic factor symbols shall be [0, 1]")
         factors, termfactor_crossref = _get_taps_factor_data(
@@ -262,7 +262,7 @@ class Get_scaling_factor_data(unittest.TestCase):
         model = model_from_frames(make_data_frames())
         factors, injfactor_crossref = _get_scaling_factor_data(
             model.factors, model.injections, [0, 1],
-            repeat(len(model.factors.gen_factor_data)))
+            repeat(len(model.factors.gen_factordata)))
         self.assertTrue(factors.empty)
         self.assertTrue(injfactor_crossref.empty)
 
@@ -307,16 +307,16 @@ class Get_scaling_factor_data(unittest.TestCase):
                     id_of_node='n_0',
                     step=-1)]))
         assert_array_equal(
-            model.factors.gen_factor_data.index,
+            model.factors.gen_factordata.index,
             ['kp', 'taps'],
             err_msg="IDs of generic factors shall be ['kp', 'taps']")
         assert_array_equal(
-            model.factors.gen_factor_data.index_of_symbol,
+            model.factors.gen_factordata.index_of_symbol,
             [0, 1],
             err_msg="indices of generic factor symbols shall be [0, 1]")
         factors, crossref = _get_scaling_factor_data(
             model.factors, model.injections, [0, 1],
-            repeat(len(model.factors.gen_factor_data)))
+            repeat(len(model.factors.gen_factordata)))
         assert_array_equal(
             factors.loc[0].index.get_level_values('id').sort_values(),
             ['_default_', 'kp', 'kq'],
@@ -379,16 +379,16 @@ class Get_scaling_factor_data(unittest.TestCase):
                     id_of_factor='taps',
                     step=-1)]))
         assert_array_equal(
-            model.factors.gen_factor_data.index,
+            model.factors.gen_factordata.index,
             ['taps'],
             err_msg="IDs of generic factors shall be ['taps']")
         assert_array_equal(
-            model.factors.gen_factor_data.index_of_symbol,
+            model.factors.gen_factordata.index_of_symbol,
             [0],
             err_msg="indices of generic factor symbols shall be [0]")
         factors, crossref = _get_scaling_factor_data(
             model.factors, model.injections, [0, 1],
-            repeat(len(model.factors.gen_factor_data)))
+            repeat(len(model.factors.gen_factordata)))
         assert_array_equal(
             factors.loc[0].index.get_level_values('id').sort_values(),
             ['_default_', 'kq'],
@@ -431,7 +431,7 @@ class Make_factordefs2(unittest.TestCase):
             self.no_injectionlinks,
             self.no_branchterminals)
         self.assertTrue(
-            factordefs.gen_factor_data.empty,
+            factordefs.gen_factordata.empty,
             "no generic factors")
         self.assertTrue(
             factordefs.gen_injfactor.empty,
@@ -460,7 +460,7 @@ class Make_factordefs2(unittest.TestCase):
             injectionlinks,
             self.no_branchterminals)
         self.assertEqual(
-            len(factordefs.gen_factor_data),
+            len(factordefs.gen_factordata),
             1,
             "make_factordefs shall return one generic factor")
         self.assertEqual(
@@ -499,11 +499,11 @@ class Make_factordefs2(unittest.TestCase):
             injectionlinks,
             self.no_branchterminals)
         self.assertEqual(
-            len(factordefs.gen_factor_data),
+            len(factordefs.gen_factordata),
             3,
             "make_factordefs shall return 3 generic factors")
         self.assertEqual(
-            set(factordefs.gen_factor_data.index),
+            set(factordefs.gen_factordata.index),
             {'kp1', 'kp0', 'kq0'},
             "make_factordefs shall return factors 'kp1', 'kp0', 'kq0'")
         self.assertEqual(
@@ -537,7 +537,7 @@ class Make_factordefs2(unittest.TestCase):
             injectionlinks,
             self.no_branchterminals)
         self.assertTrue(
-            factordefs.gen_factor_data.empty,
+            factordefs.gen_factordata.empty,
             "make_factordefs shall not return any generic factor")
         self.assertTrue(
             factordefs.gen_injfactor.empty,
@@ -572,7 +572,7 @@ class Make_factordefs2(unittest.TestCase):
             injectionlinks,
             self.no_branchterminals)
         self.assertTrue(
-            factordefs.gen_factor_data.empty,
+            factordefs.gen_factordata.empty,
             "make_factordefs shall not return any generic factor")
         self.assertTrue(
             factordefs.gen_injfactor.empty,
@@ -610,7 +610,7 @@ class Make_factordefs2(unittest.TestCase):
             injectionlinks,
             self.no_branchterminals)
         self.assertTrue(
-            factordefs.gen_factor_data.empty,
+            factordefs.gen_factordata.empty,
             "make_factordefs shall not return any generic factor")
         self.assertTrue(
             factordefs.gen_injfactor.empty,
@@ -655,7 +655,7 @@ class Make_factordefs2(unittest.TestCase):
             self.no_injectionlinks,
             branchterminals)
         self.assertEqual(
-            len(factordefs.gen_factor_data),
+            len(factordefs.gen_factordata),
             1,
             "make_factordefs shall return one generic factor")
         self.assertTrue(
@@ -951,11 +951,11 @@ class Make_factor_meta(unittest.TestCase):
                     id_of_factor='tap2',
                     step=-1)]))
         assert_array_equal(
-            model.factors.gen_factor_data.index,
+            model.factors.gen_factordata.index,
             ['kp', 'tap2', 'tap_'],
             err_msg="IDs of generic factors shall be ['kp', 'tap2', 'tap_']")
         assert_array_equal(
-            model.factors.gen_factor_data.index_of_symbol,
+            model.factors.gen_factordata.index_of_symbol,
             [0, 1, 2],
             err_msg="indices of generic factor symbols shall be [0, 1]")
         fm = make_factor_meta(model, 0, np.zeros((0,1), dtype=float))
@@ -963,7 +963,7 @@ class Make_factor_meta(unittest.TestCase):
         generic_factors = (
             model
             .factors
-            .gen_factor_data
+            .gen_factordata
             .reset_index()
             .sort_values(by='index_of_symbol'))
         # use 'factor_ids' as a substitute for symbols during this test

@@ -136,7 +136,7 @@ count_of_slacks: int
 
 factors: egrid.factors.Factors (namedtuple)
 
-    * .gen_factor_data, pandas.DataFrame (index: ('step','id'))
+    * .gen_factordata, pandas.DataFrame (index: ('step','id'))
 
         * .type, 'var'|'const', type of factor decision variable or parameter
         * .id_of_source, str, id of factor (previous optimization step)

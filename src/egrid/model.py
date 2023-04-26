@@ -126,7 +126,7 @@ y_max: float
       nodes of both terminals are aggregated into one power-flow-calculation
       node
 factors: factor.Factors
-    * .gen_factor_data, pandas.DataFrame (id (str, ID of factor)) ->
+    * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
         * .step, -1
         * .type, 'const'|'var'
         * .id_of_source, str
