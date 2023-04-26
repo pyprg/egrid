@@ -128,14 +128,25 @@ y_max: float
 factors: factor.Factors
     * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
         * .step, -1
-        * .type, 'const'|'var'
-        * .id_of_source, str
-        * .value, float
+        * .type, 'var'|'const', type of factor decision variable or parameter
+        * .id_of_source, str, id of factor (previous optimization step)
+           for initialization
+        * .value, float, used by initialization if no source factor in previous
+           optimization step
         * .min, float
+           smallest possible value
         * .max, float
+           greatest possible value
         * .is_discrete, bool
+           just 0 digits after decimal point if True, input for solver,
+           accepted by MINLP solvers
         * .m, float
+           increase of multiplier with respect to change of var/const
+           the effective multiplier is a linear function of var/const (mx + n)
         * .n, float
+           multiplier when var/const is 0.
+           the effective multiplier is a linear function of var/const (mx + n)
+        * .objecttype, 'injection'|'terminal'
         * .index_of_symbol, int
     * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
         * .step, -1
@@ -692,8 +703,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
     # filter stepwise for intersection of injlinks+termlinks and factors
-    df_ = pd.DataFrame([], index=injindex_.union(termindex_))
-    factor_frame = factors_.join(df_, how='inner')
+    df_ = pd.concat(
+        [pd.DataFrame({'objecttype':'injection'}, index=injindex_),
+         pd.DataFrame({'objecttype':'terminal'}, index=termindex_)])
+    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
     # injection links
     is_valid_injassoc = (
         injassoc

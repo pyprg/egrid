@@ -98,7 +98,7 @@ class Make_factordefs(unittest.TestCase):
                     factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'var', 'id_of_source': 'kp', 'value': 1.0,
               'min': -np.inf, 'max': np.inf, 'is_discrete': False, 'm': 1.0,
-              'n': 0.0, 'index_of_symbol': 0})
+              'n': 0.0, 'objecttype': 'injection', 'index_of_symbol': 0})
         self.assertEqual(
             factordefs.gen_factordata.index[0],
             'kp',
@@ -113,7 +113,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
             factordefs.terminalfactors,
-            np.zeros((0,12), dtype=object),
+            np.zeros((0,13), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -152,7 +152,7 @@ class Make_factordefs(unittest.TestCase):
                     factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'const', 'id_of_source': 'taps', 'value': 0.,
               'min': -16, 'max': 16, 'is_discrete': True, 'm': -0.00625,
-              'n': 1.0, 'index_of_symbol': 0})
+              'n': 1.0, 'objecttype': 'terminal', 'index_of_symbol': 0})
         self.assertEqual(
             factordefs.gen_factordata.index[0],
             'taps',
@@ -165,11 +165,11 @@ class Make_factordefs(unittest.TestCase):
             factordefs.terminalfactors.to_numpy(),
             np.array(
                 [['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True,
-                  -0.00625, 1.0, 0]],
+                  -0.00625, 1.0, 'terminal', 0]],
                 dtype=object),
             err_msg="expected taps (terminal) factor "
             "['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True, "
-            "-0.00625, 1.0, 0]"),
+            "-0.00625, 1.0, 'terminal', 0]"),
         assert_array_equal(
             factordefs.terminalfactors.id.to_numpy()[0],
             ['taps'],

@@ -52,16 +52,26 @@ Functions to retrieve factors and relations by optimization-steps.
 Parameters
 ----------
 * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
-    * .index, int, index of factor
-    * .type, 'const'|'var'
-    * .id_of_source, str
-    * .value, float
-    * .min, float
-    * .max, float
-    * .is_discrete, bool
-    * .m, float
-    * .n, float
     * .step, -1
+    * .type, 'var'|'const', type of factor decision variable or parameter
+    * .id_of_source, str, id of factor (previous optimization step)
+       for initialization
+    * .value, float, used by initialization if no source factor in previous
+       optimization step
+    * .min, float
+       smallest possible value
+    * .max, float
+       greatest possible value
+    * .is_discrete, bool
+       just 0 digits after decimal point if True, input for solver,
+       accepted by MINLP solvers
+    * .m, float
+       increase of multiplier with respect to change of var/const
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .n, float
+       multiplier when var/const is 0.
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .objecttype, 'injection'|'terminal'
     * .index_of_symbol, int
 * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
     * .step, -1

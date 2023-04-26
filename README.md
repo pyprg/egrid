@@ -126,7 +126,7 @@ count_of_slacks: int
 factors: egrid.factors.Factors (namedtuple)
 
     * .gen_factordata, pandas.DataFrame (index: ('step','id'))
-
+        * .step, -1
         * .type, 'var'|'const', type of factor decision variable or parameter
         * .id_of_source, str, id of factor (previous optimization step)
            for initialization
@@ -145,6 +145,8 @@ factors: egrid.factors.Factors (namedtuple)
         * .n, float
            multiplier when var/const is 0.
            the effective multiplier is a linear function of var/const (mx + n)
+        * .objecttype, 'injection'|'terminal'
+        * .index_of_symbol, int
 
     * .gen_injfactor, pandas.DataFrame (index: ('id_of_injection', 'part'))
 
