@@ -113,7 +113,7 @@ class Make_factordefs(unittest.TestCase):
             err_msg="expected index is ('consumer', 'p')")
         assert_array_equal(
             factordefs.terminalfactors,
-            np.zeros((0,13), dtype=object),
+            np.zeros((0,7), dtype=object),
             err_msg="no taps (terminal) factor"),
         self.assertEqual(
             len(factordefs.get_groups([-1])),
@@ -164,12 +164,10 @@ class Make_factordefs(unittest.TestCase):
         assert_array_equal(
             factordefs.terminalfactors.to_numpy(),
             np.array(
-                [['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True,
-                  -0.00625, 1.0, 'terminal', 0]],
+                [['taps', 0, 1, 0.0, -0.00625, 1.0, 0]],
                 dtype=object),
             err_msg="expected taps (terminal) factor "
-            "['taps', 0, 1, 'const', 'taps', 0.0, -16.0, 16.0, True, "
-            "-0.00625, 1.0, 'terminal', 0]"),
+            "['taps', 0, 1, 0.0, -0.00625, 1.0, 0]"),
         assert_array_equal(
             factordefs.terminalfactors.id.to_numpy()[0],
             ['taps'],
@@ -181,12 +179,12 @@ class Make_factordefs(unittest.TestCase):
 
 class Get_taps_factor_data(unittest.TestCase):
 
-    # def test_empty_model(self):
-    #     model = model_from_frames(make_data_frames())
-    #     factors, termfactor_crossref = _get_taps_factor_data(
-    #         model.factors, [0, 1])
-    #     self.assertTrue(factors.empty)
-    #     self.assertTrue(termfactor_crossref.empty)
+    def test_empty_model(self):
+        model = model_from_frames(make_data_frames())
+        factors, termfactor_crossref = _get_taps_factor_data(
+            model.factors, [0, 1])
+        self.assertTrue(factors.empty)
+        self.assertTrue(termfactor_crossref.empty)
 
     def test_generic_specific_factor(self):
         """
