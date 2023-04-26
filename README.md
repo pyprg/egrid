@@ -115,17 +115,6 @@ vvalues: pandas.DataFrame
     * .V, float, magnitude of voltage
     * .index_of_node, index of node voltage is given for
 
-branchtaps: pandas.DataFrame
-
-    * .id, str, unique identifier of branchtaps
-    * .id_of_node, str, unique identifier of associated node
-    * .id_of_branch, str, unique identifier of associated branch
-    * .Vstep, float, magnitude of voltage difference per step, pu
-    * .positionmin, int, smallest tap position
-    * .positionneutral, int, tap with ratio 1:1
-    * .positionmax, int, position of greates tap
-    * .position, int, actual position
-
 shape_of_Y: tuple (int, int)
 
     shape of admittance matrix for power flow calculation
@@ -162,13 +151,20 @@ factors: egrid.factors.Factors (namedtuple)
         * .step, -1 (int)
         * id, str, ID of factor
 
-    * .gen_termfactor, pandas.DataFrame (index: (id_of_branch, id_of_node))
+    * .terminalfactors, pandas.DataFrame
 
-        * .step, int
-        * .id, str, ID of factor
-        * .index_of_symbol, int
+        * .id, str, identifier of factor
         * .index_of_terminal, int
-        * .index_of_other_terminal, int, index of terminal at other branch node
+        * .index_of_other_terminal, int
+        * .type, 'var'|'const'
+        * .id_of_source, str
+        * .value, float
+        * .min, float
+        * .max, float
+        * .is_discrete, bool
+        * .m, float
+        * .n, float
+        * .index_of_symbol, int
 
     * .get_groups: function (iterable_of_int) -> (pandas.DataFrame)
 

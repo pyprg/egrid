@@ -66,11 +66,10 @@ Parameters
 * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
     * .step, -1
     * .id, str, ID of factor
-* .terminalfactors, pandas.DataFrame (id_of_branch, id_of_node) ->
+* .terminalfactors, pandas.DataFrame
     * .id, str
     * .index_of_terminal, int
     * .index_of_other_terminal, int
-    * .step, -1
     * .type, 'var'|'const'
     * .id_of_source, str
     * .value, float
@@ -192,9 +191,9 @@ def make_factordefs(
             (iterable_of_int)-> (pandas.DataFrame)"""
     factorgroups = _create_stepgroups(factor_frame)
     # factors with attribute step == -1
-    termfactorgroups = _create_stepgroups(terminal_factor_associations)
     gen_factors = _selectgroup(-1, factorgroups)
     # terminal-factor association with step attribute == -1
+    termfactorgroups = _create_stepgroups(terminal_factor_associations)
     gen_termassoc = _selectgroup(-1, termfactorgroups)
     valid_termassoc = gen_termassoc.id.isin(gen_factors.id)
     termassoc_ = gen_termassoc[valid_termassoc]
@@ -704,7 +703,8 @@ def  _get_taps_factor_data(factordefs, steps):
     override_index = factors_.index.intersection(factors_steps.index)
     cols = [
         'type', 'id_of_source', 'value', 'min', 'max', 'is_discrete', 'm', 'n']
-    factors_.loc[override_index, cols] = factors_steps.loc[override_index, cols]
+    factors_.loc[override_index, cols] = (
+        factors_steps.loc[override_index, cols])
     # add data for initialization
     factors_['index_of_source'] = _get_factor_ini_values(factors_)
     return (
@@ -824,14 +824,20 @@ def _make_factor_meta(
         * .kp
         * .kq
         * .index_of_injection
-    terminal_factor: pandas.DataFrame
-        (just terminals having a linked factor ordered by index_of_terminal)
-        * .id_of_branch
-        * .id_of_node
-        * .id
-        * .index_of_symbol
-        * .index_of_terminal
-        * .index_of_other_terminal
+    terminalfactors: pandas.DataFrame
+        * .id, str
+        * .index_of_terminal, int
+        * .index_of_other_terminal, int
+        * .step, -1
+        * .type, 'var'|'const'
+        * .id_of_source, str
+        * .value, float
+        * .min, float
+        * .max, float
+        * .is_discrete, bool
+        * .m, float
+        * .n, float
+        * .index_of_symbol, int
     k_prev: numpy.array
         float, values of scaling factors from previous step,
         variables and constants

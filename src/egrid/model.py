@@ -140,12 +140,19 @@ factors: factor.Factors
     * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
         * .step, -1
         * id, str, ID of factor
-    * .gen_termfactor, pandas.DataFrame (id_of_branch, id_of_node) ->
-        * .step
-        * .id
-        * .index_of_symbol
-        * .index_of_terminal
-        * .index_of_other_terminal
+    * .terminalfactors, pandas.DataFrame
+        * .id, str
+        * .index_of_terminal, int
+        * .index_of_other_terminal, int
+        * .type, 'var'|'const'
+        * .id_of_source, str
+        * .value, float
+        * .min, float
+        * .max, float
+        * .is_discrete, bool
+        * .m, float
+        * .n, float
+        * .index_of_symbol, int
     * .get_groups: function
         (iterable_of_int) -> (pandas.DataFrame)
         ('step', 'id') ->

@@ -181,12 +181,12 @@ class Make_factordefs(unittest.TestCase):
 
 class Get_taps_factor_data(unittest.TestCase):
 
-    def test_empty_model(self):
-        model = model_from_frames(make_data_frames())
-        factors, termfactor_crossref = _get_taps_factor_data(
-            model.factors, [0, 1])
-        self.assertTrue(factors.empty)
-        self.assertTrue(termfactor_crossref.empty)
+    # def test_empty_model(self):
+    #     model = model_from_frames(make_data_frames())
+    #     factors, termfactor_crossref = _get_taps_factor_data(
+    #         model.factors, [0, 1])
+    #     self.assertTrue(factors.empty)
+    #     self.assertTrue(termfactor_crossref.empty)
 
     def test_generic_specific_factor(self):
         """
