@@ -244,7 +244,9 @@ def make_factordefs(
     terminalfactors = (
         gen_termfactor[['id', 'index_of_terminal', 'index_of_other_terminal']]
         .set_index('id')
-        .join(gen_factordata.drop(columns=['step']), how='inner')
+        .join(
+            gen_factordata[['value', 'm', 'n', 'index_of_symbol']],
+            how='inner')
         .reset_index())
     return Factors(
         gen_factordata=gen_factordata,
