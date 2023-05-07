@@ -40,7 +40,7 @@ template: pandas.DataFrame
 
 Factors = namedtuple(
     'Factors',
-    'gen_factordata gen_injfactor terminalfactors '
+    'gen_factordata gen_injfactor terminalfactors gen_termfactor '
     'get_groups get_injfactorgroups')
 Factors.__doc__ ="""
 Data of generic factors (step == -1),
@@ -76,6 +76,8 @@ Parameters
 * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
     * .step, -1
     * .id, str, ID of factor
+* .gen_termfactor, pandas.DataFrame
+
 * .terminalfactors, pandas.DataFrame
     * .id, str
     * .index_of_terminal, int
@@ -135,8 +137,7 @@ def _create_stepgroups(df):
     Returns
     -------
     Stepgroups"""
-    df_ = df.reset_index()
-    return Stepgroups(df_.groupby('step'), empty_like(df_))
+    return Stepgroups(df.groupby('step'), empty_like(df))
 
 def _selectgroup(step, stepgroups):
     """Selects a group with index step from stepgroups. Returns a copy of
@@ -199,16 +200,38 @@ def make_factordefs(
             (iterable_of_int)-> (pandas.DataFrame)
         * .get_injfactorgroups: function
             (iterable_of_int)-> (pandas.DataFrame)"""
-    factorgroups = _create_stepgroups(factor_frame)
+    factorgroups = _create_stepgroups(
+        factor_frame.reset_index())
     # factors with attribute step == -1
-    gen_factors = _selectgroup(-1, factorgroups)
+    gen_factors = _selectgroup(-1, factorgroups).reset_index(drop=True)
+
+    gen_factorid_to_index = pd.Series(
+        gen_factors.index, index=gen_factors.id, name='index_of_factor')
+
+
     # terminal-factor association with step attribute == -1
-    termfactorgroups = _create_stepgroups(terminal_factor_associations)
+    termfactorgroups = _create_stepgroups(
+        terminal_factor_associations.reset_index())
     gen_termassoc = _selectgroup(-1, termfactorgroups)
+
+    term_to_factor_ = (
+        gen_termassoc.drop(columns=['step'])
+        .rename(columns={'id': 'id_of_factor'}))
+    term_to_factor = pd.merge(
+        left=term_to_factor_,
+        right=branchterminals.reset_index()[
+            ['id_of_node', 'id_of_branch', 'index_of_terminal']],
+        left_on=['id_of_node', 'id_of_branch'],
+        right_on=['id_of_node', 'id_of_branch'],
+        how='inner')
+    term_to_factor['index_of_factor'] = (
+        gen_factorid_to_index.loc[term_to_factor.id_of_factor].array)
+
     valid_termassoc = gen_termassoc.id.isin(gen_factors.id)
     termassoc_ = gen_termassoc[valid_termassoc]
     # injection-factor association with step attribute == -1
-    injfactorgroups = _create_stepgroups(injection_factor_associations)
+    injfactorgroups = _create_stepgroups(
+        injection_factor_associations.reset_index())
     gen_injassoc = _selectgroup(-1, injfactorgroups)
     valid_incassoc = gen_injassoc.id.isin(gen_factors.id)
     injassoc = gen_injassoc[valid_incassoc]
@@ -251,6 +274,7 @@ def make_factordefs(
     return Factors(
         gen_factordata=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
+        gen_termfactor=term_to_factor,
         terminalfactors=terminalfactors,
         get_groups=get_groups,
         get_injfactorgroups=get_injfactorgroups)
@@ -296,7 +320,8 @@ var_const_to_kq: array_like
     for each injection (var_const[var_const_to_kq])
 var_const_to_ftaps: array_like
     int, converts var_const to ftaps, factor assigned to
-    (selected) terminals (var_const[var_const_to_ftaps])"""
+    (selected) terminals (var_const[var_const_to_ftaps] selects ftaps
+    in the order of model.factors.terminalfactors)"""
 
 def _select_rows(vecs, row_index):
     """Selects rows from vectors.
@@ -492,14 +517,13 @@ def _add_step_index(df, step_indices):
     -------
     pandas.DataFrame (extended copy of df)"""
     if df.empty:
-        return df.copy().assign(step=0).set_index(['step', df.index])
-    def _new_index(index_of_step):
-        cp = df.copy()
-        # adds a column 'step', adds value 'index_of_step' in each row of
-        #   column 'step', then adds the colum 'step' to the index
-        #   (column 'step' is added to the old index in the left most position)
-        return cp.assign(step=index_of_step).set_index(['step', cp.index])
-    return pd.concat([_new_index(idx) for idx in step_indices])
+        return df.assign(step=0).set_index(['step', df.index])
+    # adds a column 'step', adds value 'index_of_step' in each row of
+    #   column 'step', then adds the colum 'step' to the index
+    #   (column 'step' is added to the old index in the left most position)
+    return pd.concat(
+        [df.assign(step=idx).set_index(['step', df.index])
+         for idx in step_indices])
 
 def _get_injection_factors(step_factor_injection_part, factors):
     """Creates crossreference from injection to scaling factors.
@@ -659,12 +683,12 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
     factors.set_index(['step', 'type', 'id'], inplace=True)
     return factors.assign(devtype='injection'), injection_factors
 
-def  _get_taps_factor_data(factordefs, steps):
+def  _get_taps_factor_data2(model_factors, steps):
     """Arranges data of taps factors and values for their initialization.
 
     Parameters
     ----------
-    factordefs: egrid.factors.Factors
+    model_factors: egrid.factors.Factors
 
     steps: iterable
         int, indices of optimization steps, first step has index 0
@@ -688,13 +712,64 @@ def  _get_taps_factor_data(factordefs, steps):
           * .index_of_source, int, index in 1d-vector of previous step
           * .devtype, 'terminal'
         * pandas.DataFrame, terminals with taps factors
-          (int (step), str (id_of_branch), str (id_of_node))
-          * .id, str, ID of factor
-          * .index_of_symbol, int
-          * .index_of_terminal, int"""
+          (int (step), str (id_of_factor))
+          * .index_of_terminal, int
+          * .index_of_other_terminal, int
+          * .value, float, value of var/const
+          * .m, float
+          * .n, float
+          * .index_of_symbol, int"""
+
+    df = model_factors.terminalfactors
+    if df.empty:
+        df.assign(step=0)
+    else:
+        pd.concat([df.assign(step=idx) for idx in steps])
+
+    return 1, 2
+
+def  _get_taps_factor_data(model_factors, steps):
+    """Arranges data of taps factors and values for their initialization.
+
+    Parameters
+    ----------
+    model_factors: egrid.factors.Factors
+
+    steps: iterable
+        int, indices of optimization steps, first step has index 0
+
+    Returns
+    -------
+    tuple
+        * pandas.DataFrame, all taps factors
+          (str (step), 'const'|'var', str (id of factor)) ->
+          * .id_of_source, str, source of initial value,
+            factor of previous step
+          * .value, float, initial value if no valid source reference
+          * .min, float, smallest possible value
+          * .max, float, greatest possible value
+          * .is_discrete, bool, no digits after decimal point if True
+            (input for MINLP solver), True for taps model
+          * .m, float, -Vdiff per tap-step in case of taps
+          * .n, float, n = 1 - (Vdiff * index_of_neutral_position) for taps,
+            e.g. when index_of_neutral_position=0 --> n=1
+          * .index_of_symbol, int, index in 1d-vector of var/const
+          * .index_of_source, int, index in 1d-vector of previous step
+          * .devtype, 'terminal'
+        * pandas.DataFrame, terminals with taps factors
+          (int (step), str (id_of_factor))
+          * .index_of_terminal, int
+          * .index_of_other_terminal, int
+          * .value, float, value of var/const
+          * .m, float
+          * .n, float
+          * .index_of_symbol, int"""
+
+    a, b = _get_taps_factor_data2(model_factors, steps)
+
     generic_termfactor_steps = _add_step_index(
-        factordefs.terminalfactors.set_index('id'),
-        steps)
+        # 'id' is identifier of symbol
+        model_factors.terminalfactors.set_index('id'), steps)
     # get generic_assocs which are not in assocs of step, this allows
     #   overriding the linkage of factors
     term_factor = generic_termfactor_steps[
@@ -703,7 +778,7 @@ def  _get_taps_factor_data(factordefs, steps):
     #   generate factors for given steps
     # step, branch, node => factor
     #   copy generic_factors and add step indices
-    generic_factor_steps = _add_step_index(factordefs.gen_factordata, steps)
+    generic_factor_steps = _add_step_index(model_factors.gen_factordata, steps)
     # filter for linked taps-factors step-to-factor index
     step_factor = term_factor.index.unique()
     factors_ = generic_factor_steps.reindex(step_factor)
@@ -711,7 +786,7 @@ def  _get_taps_factor_data(factordefs, steps):
     # retrieve step specific factors
     # step specific factors cannot introduce new taps-factors just
     #   modify generic taps-factors
-    factors_steps = factordefs.get_groups(steps)
+    factors_steps = model_factors.get_groups(steps)
     override_index = factors_.index.intersection(factors_steps.index)
     cols = [
         'type', 'id_of_source', 'value', 'min', 'max', 'is_discrete', 'm', 'n']
@@ -791,7 +866,7 @@ def get_factordata_for_step(model, step):
         _loc(terminal_factor, step).reset_index())
 
 def _make_factor_meta(
-        count_of_generic_factors, factors, injection_factors, terminal_factor,
+        count_of_generic_factors, factors, injection_factors, terminalfactors,
         k_prev):
     """Prepares data of factors for one step.
 
@@ -891,7 +966,8 @@ def _make_factor_meta(
             for each injection (var_const[var_const_to_kq])
         var_const_to_ftaps: array_like
             int, converts var_const to ftaps, factor assigned to
-            (selected) terminals (var_const[var_const_to_ftaps])"""
+            (selected) terminals (var_const[var_const_to_ftaps] selects ftaps
+            in the order of argument terminalfactor)"""
     # inital for vars, value for parameters (consts)
     #   values are ordered by index_of_symbol
     values = _get_values_of_symbols(factors, k_prev)
@@ -932,7 +1008,7 @@ def _make_factor_meta(
         var_const_to_kp=var_const_to_factor[injection_factors.kp],
         var_const_to_kq=var_const_to_factor[injection_factors.kq],
         var_const_to_ftaps=var_const_to_factor[
-            terminal_factor.index_of_symbol])
+            terminalfactors.index_of_symbol])
 
 def make_factor_meta(model, step, k_prev):
     """Prepares data of decision variables and paramters for one step.
