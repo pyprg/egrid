@@ -146,7 +146,6 @@ factors: factor.Factors
         * .n, float
            multiplier when var/const is 0.
            the effective multiplier is a linear function of var/const (mx + n)
-        * .objecttype, 'injection'|'terminal'
         * .index_of_symbol, int
     * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
         * .step, -1
@@ -704,8 +703,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
     # filter stepwise for intersection of injlinks+termlinks and factors
     df_ = pd.concat(
-        [pd.DataFrame({'objecttype':'injection'}, index=injindex_),
-         pd.DataFrame({'objecttype':'terminal'}, index=termindex_)])
+        [pd.DataFrame([], index=injindex_),
+         pd.DataFrame([], index=termindex_)])
     factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
     # injection links
     is_valid_injassoc = (

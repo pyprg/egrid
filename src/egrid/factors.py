@@ -40,7 +40,7 @@ template: pandas.DataFrame
 
 Factors = namedtuple(
     'Factors',
-    'gen_factordata gen_injfactor terminalfactors gen_termfactor '
+    'gen_factordata gen_injfactor terminalfactors '
     'get_groups get_injfactorgroups')
 Factors.__doc__ ="""
 Data of generic factors (step == -1),
@@ -71,13 +71,16 @@ Parameters
     * .n, float
        multiplier when var/const is 0.
        the effective multiplier is a linear function of var/const (mx + n)
-    * .objecttype, 'injection'|'terminal'
     * .index_of_symbol, int
 * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
     * .step, -1
     * .id, str, ID of factor
 * .gen_termfactor, pandas.DataFrame
-
+    * .id_of_branch
+    * .id_of_node
+    * .id_of_factor
+    * .index_of_terminal
+    * .index_of_factor
 * .terminalfactors, pandas.DataFrame
     * .id, str
     * .index_of_terminal, int
@@ -274,7 +277,6 @@ def make_factordefs(
     return Factors(
         gen_factordata=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
-        gen_termfactor=term_to_factor,
         terminalfactors=terminalfactors,
         get_groups=get_groups,
         get_injfactorgroups=get_injfactorgroups)
@@ -603,7 +605,6 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
           * .n, float, not used for scaling factors
           * .index_of_symbol, int, index in 1d-vector of var/const
           * .index_of_source, int, index in 1d-vector of previous step
-          * .devtype, 'injection'
         * pandas.DataFrame, injections with scaling factors
           (int (step), str (id_of_injection))
           * .id_p, str, ID for scaling factor of active power
@@ -755,7 +756,6 @@ def  _get_taps_factor_data(model_factors, steps):
             e.g. when index_of_neutral_position=0 --> n=1
           * .index_of_symbol, int, index in 1d-vector of var/const
           * .index_of_source, int, index in 1d-vector of previous step
-          * .devtype, 'terminal'
         * pandas.DataFrame, terminals with taps factors
           (int (step), str (id_of_factor))
           * .index_of_terminal, int
@@ -831,7 +831,6 @@ def get_factordata_for_step(model, step):
               e.g. when index_of_neutral_position=0 --> n=1
             * .index_of_symbol, int, index in 1d-vector of var/const
             * .index_of_source, int, index in 1d-vector of previous step
-            * .devtype, 'terminal'|'injection'
         * injection_factors: pandas.DataFrame (for each injection)
             * .id_of_injection, str, ID of injection
             * .id_p, str, ID of scaling factor for active power
@@ -902,7 +901,6 @@ def _make_factor_meta(
         * .n, float
         * .index_of_symbol, int
         * .index_of_source, int
-        * .devtype, 'injection'|'terminal'
     injection_factors: pandas.DataFrame
         (each injection, ordered by index_of_injection)
         * .id_of_injection

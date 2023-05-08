@@ -145,7 +145,6 @@ factors: egrid.factors.Factors (namedtuple)
         * .n, float
            multiplier when var/const is 0.
            the effective multiplier is a linear function of var/const (mx + n)
-        * .objecttype, 'injection'|'terminal'
         * .index_of_symbol, int
 
     * .gen_injfactor, pandas.DataFrame (index: ('id_of_injection', 'part'))
