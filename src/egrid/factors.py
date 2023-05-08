@@ -657,59 +657,6 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
     factors.set_index(['step', 'type', 'id'], inplace=True)
     return factors, injection_factors
 
-def  _get_taps_factor_data2(model_factors, steps):
-    """Arranges data of taps factors and values for their initialization.
-
-    Parameters
-    ----------
-    model_factors: egrid.factors.Factors
-
-    steps: iterable
-        int, indices of optimization steps, first step has index 0
-
-    Returns
-    -------
-    tuple
-        * pandas.DataFrame, all taps factors
-          (str (step), 'const'|'var', str (id of factor)) ->
-          * .id_of_source, str, source of initial value,
-            factor of previous step
-          * .value, float, initial value if no valid source reference
-          * .min, float, smallest possible value
-          * .max, float, greatest possible value
-          * .is_discrete, bool, no digits after decimal point if True
-            (input for MINLP solver), True for taps model
-          * .m, float, -Vdiff per tap-step in case of taps
-          * .n, float, n = 1 - (Vdiff * index_of_neutral_position) for taps,
-            e.g. when index_of_neutral_position=0 --> n=1
-          * .index_of_symbol, int, index in 1d-vector of var/const
-          * .index_of_source, int, index in 1d-vector of previous step
-        * pandas.DataFrame, terminals with taps factors
-          (int (step), str (id_of_factor))
-          * .index_of_terminal, int
-          * .index_of_other_terminal, int
-          * .value, float, value of var/const
-          * .m, float
-          * .n, float
-          * .index_of_symbol, int"""
-    gen_factordata = model_factors.gen_factordata.drop(columns=['step'])
-    is_termfactor = gen_factordata.index.isin(model_factors.terminalfactors.id)
-    term_factordata = _add_step_index(gen_factordata[is_termfactor], steps)
-    # retrieve step specific factors
-    # step specific factors cannot introduce new taps-factors just
-    #   modify generic taps-factors
-    factors_of_steps = model_factors.get_groups(steps)
-    override_index = term_factordata.index.intersection(factors_of_steps.index)
-    cols = [
-        'type', 'id_of_source', 'value', 'min', 'max', 'is_discrete', 'm', 'n']
-    term_factordata.loc[override_index, cols] = (
-        factors_of_steps.loc[override_index, cols])
-    term_factor = _add_step_index(
-        model_factors.terminalfactors.set_index('id'), steps)
-    return (
-        term_factordata.reset_index().set_index(['step', 'type', 'id']),
-        term_factor)
-
 def  _get_taps_factor_data(model_factors, steps):
     """Arranges data of taps factors and values for their initialization.
 
@@ -745,39 +692,28 @@ def  _get_taps_factor_data(model_factors, steps):
           * .m, float
           * .n, float
           * .index_of_symbol, int"""
-
-    a, b = _get_taps_factor_data2(model_factors, steps)
-
-    generic_termfactor_steps = _add_step_index(
-        # 'id' is identifier of symbol
-        model_factors.terminalfactors.set_index('id'), steps)
-    # get generic_assocs which are not in assocs of step, this allows
-    #   overriding the linkage of factors
-    term_factor = generic_termfactor_steps[
-        ~generic_termfactor_steps.index.duplicated()]
-    # given factors are generic with step -1
-    #   generate factors for given steps
-    # step, branch, node => factor
-    #   copy generic_factors and add step indices
-    generic_factor_steps = _add_step_index(model_factors.gen_factordata, steps)
-    # filter for linked taps-factors step-to-factor index
-    step_factor = term_factor.index.unique()
-    factors_ = generic_factor_steps.reindex(step_factor)
-    factors_.sort_index(inplace=True)
-    # retrieve step specific factors
-    # step specific factors cannot introduce new taps-factors just
+    # filter terminal factors from generic factors
+    gen_factordata = model_factors.gen_factordata.drop(columns=['step'])
+    is_termfactor = gen_factordata.index.isin(model_factors.terminalfactors.id)
+    term_factordata = _add_step_index(gen_factordata[is_termfactor], steps)
+    # update factors
+    #   retrieve step specific factors
+    #   step specific factors cannot introduce new taps-factors just
     #   modify generic taps-factors
-    factors_steps = model_factors.get_groups(steps)
-    override_index = factors_.index.intersection(factors_steps.index)
+    factors_of_steps = model_factors.get_groups(steps)
+    override_index = term_factordata.index.intersection(factors_of_steps.index)
     cols = [
         'type', 'id_of_source', 'value', 'min', 'max', 'is_discrete', 'm', 'n']
-    factors_.loc[override_index, cols] = (
-        factors_steps.loc[override_index, cols])
+    term_factordata.loc[override_index, cols] = (
+        factors_of_steps.loc[override_index, cols])
     # add data for initialization
-    factors_['index_of_source'] = _get_factor_ini_values(factors_)
+    term_factordata['index_of_source'] = (
+        _get_factor_ini_values(term_factordata))
+    terminalfactors = _add_step_index(
+        model_factors.terminalfactors.set_index('id'), steps)
     return (
-        factors_.reset_index().set_index(['step', 'type', 'id']),
-        term_factor)
+        term_factordata.reset_index().set_index(['step', 'type', 'id']),
+        terminalfactors)
 
 def get_factordata_for_step(model, step):
     """Returns data of decision variables and of parameters for a given step.
@@ -817,7 +753,7 @@ def get_factordata_for_step(model, step):
             * .kp, int, index of symbol
             * .kq, int, index of symbol
             * .index_of_injection, int
-        * terminal_factors: pandas.DataFrame (only terminals having a factor)
+        * terminal_factors: pandas.DataFrame (just terminals having a factor)
             * .id_of_branch, str, ID of branch
             * .id_of_node, str, ID of node
             * .id, str, ID of factor
@@ -828,7 +764,7 @@ def get_factordata_for_step(model, step):
     steps = [step - 1, step] if 0 < step else [0]
     model_factors = model.factors
     # factors assigned to terminals
-    taps_factors, terminal_factor = _get_taps_factor_data(
+    taps_factors, terminalfactor = _get_taps_factor_data(
         model_factors, steps)
     # scaling factors for injections
     count_of_generic_factors = len(model_factors.gen_factordata)
@@ -841,7 +777,7 @@ def get_factordata_for_step(model, step):
         count_of_generic_factors,
         _loc(factors, step).reset_index(),
         _loc(injection_factors, step).reset_index(),
-        _loc(terminal_factor, step).reset_index())
+        _loc(terminalfactor, step).reset_index())
 
 def _make_factor_meta(
         count_of_generic_factors, factors, injection_factors, terminalfactors,
@@ -966,7 +902,7 @@ def _make_factor_meta(
     id_of_step_symbol = (
         factors.id[count_of_generic_factors <= factors.index_of_symbol])
     return Factormeta(
-        id_of_step_symbol=id_of_step_symbol,
+        id_of_step_symbol=id_of_step_symbol, # per optimization step
         index_of_var_symbol = factors_var.index_of_symbol,
         index_of_const_symbol = factors_consts.index_of_symbol,
         index_of_kpq_symbol = injection_factors[['kp', 'kq']].to_numpy(),
@@ -996,7 +932,7 @@ def make_factor_meta(model, step, k_prev):
     vectors of minimum and of maximum values, vectors of initial values for
     decision variables and values for paramters.
 
-    Data to reorder the solver result:
+    Data for reordering solver result:
 
     Sequences of indices for converting the vector of var/const into the order
     of factors (symbols), into the order of active power scaling factors,
