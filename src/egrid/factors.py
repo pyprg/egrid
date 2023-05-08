@@ -203,33 +203,24 @@ def make_factordefs(
             (iterable_of_int)-> (pandas.DataFrame)
         * .get_injfactorgroups: function
             (iterable_of_int)-> (pandas.DataFrame)"""
-    factorgroups = _create_stepgroups(
-        factor_frame.reset_index())
+    factorgroups = _create_stepgroups(factor_frame.reset_index())
     # factors with attribute step == -1
     gen_factors = _selectgroup(-1, factorgroups).reset_index(drop=True)
-
-    gen_factorid_to_index = pd.Series(
-        gen_factors.index, index=gen_factors.id, name='index_of_factor')
-
-
     # terminal-factor association with step attribute == -1
     termfactorgroups = _create_stepgroups(
         terminal_factor_associations.reset_index())
     gen_termassoc = _selectgroup(-1, termfactorgroups)
-
-    term_to_factor_ = (
-        gen_termassoc.drop(columns=['step'])
-        .rename(columns={'id': 'id_of_factor'}))
-    term_to_factor = pd.merge(
-        left=term_to_factor_,
-        right=branchterminals.reset_index()[
-            ['id_of_node', 'id_of_branch', 'index_of_terminal']],
-        left_on=['id_of_node', 'id_of_branch'],
-        right_on=['id_of_node', 'id_of_branch'],
-        how='inner')
-    term_to_factor['index_of_factor'] = (
-        gen_factorid_to_index.loc[term_to_factor.id_of_factor].array)
-
+    term_to_factor_ = gen_termassoc.drop(columns=['step'])
+    term_to_factor = (
+        pd.merge(
+            left=term_to_factor_,
+            right=branchterminals.reset_index()[
+                ['id_of_node', 'id_of_branch', 'index_of_terminal',
+                 'index_of_other_terminal']],
+            left_on=['id_of_node', 'id_of_branch'],
+            right_on=['id_of_node', 'id_of_branch'],
+            how='inner')
+        [['id', 'index_of_terminal', 'index_of_other_terminal']])
     valid_termassoc = gen_termassoc.id.isin(gen_factors.id)
     termassoc_ = gen_termassoc[valid_termassoc]
     # injection-factor association with step attribute == -1
@@ -246,20 +237,6 @@ def make_factordefs(
     #symbols = _create_symbols_with_ids(factors.id)
     # add index of symbol to termassoc,
     #   terminal factors are NEVER step-specific
-    termassoc = (
-        pd.merge(
-            left=termassoc_,
-            right=factors[['id','index_of_symbol']],
-            left_on='id',
-            right_on='id'))
-    gen_termfactor=(
-        pd.merge(
-            termassoc,
-            branchterminals[
-                ['id_of_branch', 'id_of_node', 'index_of_other_terminal']]
-                .reset_index(), left_on=['id_of_branch', 'id_of_node'],
-            right_on=['id_of_branch', 'id_of_node'])
-        .set_index(['id_of_branch', 'id_of_node']))
     get_groups = lambda steps: (
         _selectgroups(factorgroups, steps)
         .set_index(['step', 'id']))
@@ -268,12 +245,8 @@ def make_factordefs(
         .set_index(['step', 'id_of_injection', 'part']))
     gen_factordata = factors.set_index('id')
     terminalfactors = (
-        gen_termfactor[['id', 'index_of_terminal', 'index_of_other_terminal']]
-        .set_index('id')
-        .join(
-            gen_factordata[['value', 'm', 'n', 'index_of_symbol']],
-            how='inner')
-        .reset_index())
+        term_to_factor
+        .join(gen_factordata[['value', 'm', 'n', 'index_of_symbol']], on='id'))
     return Factors(
         gen_factordata=gen_factordata,
         gen_injfactor=injassoc.set_index(['id_of_injection', 'part']),
@@ -682,7 +655,7 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
     injection_factors['index_of_injection'] = index_of_injection
     factors.reset_index(inplace=True)
     factors.set_index(['step', 'type', 'id'], inplace=True)
-    return factors.assign(devtype='injection'), injection_factors
+    return factors, injection_factors
 
 def  _get_taps_factor_data2(model_factors, steps):
     """Arranges data of taps factors and values for their initialization.
