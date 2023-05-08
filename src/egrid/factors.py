@@ -684,7 +684,6 @@ def  _get_taps_factor_data2(model_factors, steps):
             e.g. when index_of_neutral_position=0 --> n=1
           * .index_of_symbol, int, index in 1d-vector of var/const
           * .index_of_source, int, index in 1d-vector of previous step
-          * .devtype, 'terminal'
         * pandas.DataFrame, terminals with taps factors
           (int (step), str (id_of_factor))
           * .index_of_terminal, int
@@ -693,14 +692,23 @@ def  _get_taps_factor_data2(model_factors, steps):
           * .m, float
           * .n, float
           * .index_of_symbol, int"""
-
-    df = model_factors.terminalfactors
-    if df.empty:
-        df.assign(step=0)
-    else:
-        pd.concat([df.assign(step=idx) for idx in steps])
-
-    return 1, 2
+    gen_factordata = model_factors.gen_factordata.drop(columns=['step'])
+    is_termfactor = gen_factordata.index.isin(model_factors.terminalfactors.id)
+    term_factordata = _add_step_index(gen_factordata[is_termfactor], steps)
+    # retrieve step specific factors
+    # step specific factors cannot introduce new taps-factors just
+    #   modify generic taps-factors
+    factors_of_steps = model_factors.get_groups(steps)
+    override_index = term_factordata.index.intersection(factors_of_steps.index)
+    cols = [
+        'type', 'id_of_source', 'value', 'min', 'max', 'is_discrete', 'm', 'n']
+    term_factordata.loc[override_index, cols] = (
+        factors_of_steps.loc[override_index, cols])
+    term_factor = _add_step_index(
+        model_factors.terminalfactors.set_index('id'), steps)
+    return (
+        term_factordata.reset_index().set_index(['step', 'type', 'id']),
+        term_factor)
 
 def  _get_taps_factor_data(model_factors, steps):
     """Arranges data of taps factors and values for their initialization.
@@ -768,9 +776,7 @@ def  _get_taps_factor_data(model_factors, steps):
     # add data for initialization
     factors_['index_of_source'] = _get_factor_ini_values(factors_)
     return (
-        factors_.assign(devtype='terminal')
-            .reset_index()
-            .set_index(['step', 'type', 'id']),
+        factors_.reset_index().set_index(['step', 'type', 'id']),
         term_factor)
 
 def get_factordata_for_step(model, step):
