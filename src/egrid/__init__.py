@@ -20,7 +20,7 @@ Created on Mon Jan 31 08:00:31 2022
 
 @author: pyprg
 """
-from pandas import DataFrame
+import pandas as pd
 from egrid.model import model_from_frames
 from egrid.builder import make_data_frames, create_objects
 from egrid.check import check_frames, get_first_error
@@ -55,7 +55,8 @@ def make_model_checked(*args):
     -------
     egrid.Model"""
     frames = make_data_frames(create_objects(args))
-    frames['Message'] = DataFrame.from_records(
-        check_frames(frames),
-        columns=['message','level'])
+    frames['Message'] = pd.concat([
+        frames['Message'],
+        pd.DataFrame.from_records(
+            check_frames(frames), columns=['message','level'])])
     return model_from_frames(frames)

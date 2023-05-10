@@ -490,15 +490,14 @@ def get_node_inj_matrix(count_of_nodes, injections):
     -------
     scipy.sparse.csc_matrix"""
     count_of_injections = len(injections)
-    return (
-        coo_matrix(
-            ([1] * count_of_injections,
-             (injections.index_of_node, injections.index)),
-            shape=(count_of_nodes, count_of_injections),
-            dtype=np.int8)
-        if count_of_nodes else
-            coo_matrix(([], ([], [])), shape=(0, 0), dtype=np.int8).tocsc()
-        ).tocsc()
+    try: 
+        return coo_matrix(
+                ([1] * count_of_injections,
+                 (injections.index_of_node, injections.index)),
+                shape=(count_of_nodes, count_of_injections),
+                dtype=np.int8).tocsc()
+    except:
+        return coo_matrix(([], ([], [])), shape=(0, 0), dtype=np.int8).tocsc()
 
 def _getframe(frames, cls_, default):
     """Extracts a pandas.DataFrame from frames and returns a copy with

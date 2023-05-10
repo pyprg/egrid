@@ -114,17 +114,27 @@ def _create_branch(e_id, neighbours, attributes):
 
     Returns
     -------
-    Branch"""
+    Branch|Message"""
     try:
         y_lo = (
             complex(e3(attributes['y_lo']))
             if 'y_lo' in attributes else _COMPLEX_INF)
-        return Branch(
-            id=e_id,
-            id_of_node_A=neighbours[0],
-            id_of_node_B=neighbours[1],
-            y_lo=y_lo,
-            y_tr=complex(e3(attributes.get('y_tr', '0.0j'))))
+        unknown_attributes = attributes.keys() - Branch._fields
+        if unknown_attributes:
+            be = "is" if len(unknown_attributes) < 2 else "are"
+            return Message(
+                f"Error in data of branch '{e_id}', "
+                 "unknown attributes, "
+                f"following attributes are provided: {str(attributes)}, "
+                f"possible attributes are {Branch._fields}, "
+                f"hence, {','.join(unknown_attributes)} {be} unknown")
+        else:
+            return Branch(
+                id=e_id,
+                id_of_node_A=neighbours[0],
+                id_of_node_B=neighbours[1],
+                y_lo=y_lo,
+                y_tr=complex(e3(attributes.get('y_tr', '0.0j'))))
     except KeyError as e:
         return Message(
             f"Error in data of branch '{e_id}', "
@@ -155,13 +165,22 @@ def _create_injection(e_id, neighbours, attributes):
 
     Returns
     -------
-    Injection|str"""
+    Injection|Message"""
     # id id_of_node P10 Q10 Exp_v_p Exp_v_q
     if len(neighbours) != 1:
         return Message(
             f"Error in data of injection '{e_id}', "
             f"the number of neighbours must be exactly 1, "
             f"following neighbours are provided: {str(neighbours)}")
+    unknown_attributes = attributes.keys() - Injection._fields
+    if unknown_attributes:
+        be = "is" if len(unknown_attributes) < 2 else "are"
+        return Message(
+            f"Error in data of injection '{e_id}', "
+             "unknown attributes, "
+            f"following attributes are provided: {str(attributes)}, "
+            f"possible attributes are {Injection._fields}, "
+            f"hence, {','.join(unknown_attributes)} {be} unknown")
     atts = {}
     for key in ('P10', 'Q10', 'Exp_v_p', 'Exp_v_q'):
         if key in attributes:
