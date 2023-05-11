@@ -43,7 +43,7 @@ _Y_LO_ABS_MAX = 1e5
 
 Model = namedtuple(
     'Model',
-    'nodes slacks injections branchterminals '
+    'nodes slacks injections branchterminals bridgeterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'shape_of_Y count_of_slacks y_max '
     'factors '
@@ -77,6 +77,20 @@ injections: pandas.DataFrame
     * .kq_max, float, maximum of reactive power scaling factor
     * .index_of_node, int, index of connected node
 branchterminals: pandas.DataFrame
+    * .index_of_branch, int, index of branch
+    * .id_of_branch, str, unique idendifier of branch
+    * .id_of_node, str, unique identifier of connected node
+    * .id_of_other_node, str, unique identifier of node connected
+        at other side of the branch
+    * .index_of_node, int, index of connected node
+    * .index_of_other_node, int, index of node connected at other side
+        of the branch
+    * .g_lo, float, longitudinal conductance
+    * .b_lo, float, longitudinal susceptance
+    * .g_tr_half, float, transversal conductance of branch devided by 2
+    * .b_tr_half, float, transversal susceptance pf branch devided by 2
+    * .side, str, 'A' | 'B', side of branch, first or second
+bridgeterminals: pandas.DataFrame
     * .index_of_branch, int, index of branch
     * .id_of_branch, str, unique idendifier of branch
     * .id_of_node, str, unique identifier of connected node
@@ -261,11 +275,16 @@ def _add_bg(branches):
 
 def _get_branch_terminals(branches, count_of_branches):
     """Prepares data of branch terminals from data of branches.
+
     Each branch has two terminals. Each branch terminal is connected
     to a node and a branch. The prepared data for a branch terminal provide:
+
         * data of the connected node, ID and index
         * data of the other node connected to the same branch, ID and index
         * ID of branch
+
+    Terminals of branches which are not short circuits are placed before
+    terminals of bridges result.
 
     Parameters
     ----------
@@ -320,7 +339,7 @@ def _get_branch_terminals(branches, count_of_branches):
         .drop('switch_flow_idx_A', axis=1))
     terms_b['side'] = 'B'
     return pd.concat([
-        terms_a[:count_of_branches], 
+        terms_a[:count_of_branches],
         terms_b[:count_of_branches],
         terms_a[count_of_branches:],
         terms_b[count_of_branches:]])
@@ -338,10 +357,13 @@ def _prepare_nodes(dataframes):
 
 def _prepare_branches(branches, nodes, count_of_branches):
     """Adds IDs of nodes and indices of terminals. Sorts by 'is_bridge'.
-    
+
+    Branches which are not bridges are placed before bridges in the result
+    DataFrame.
+
     Branch-terminals of side A and B are given the first indices. First
     part of branches has also first indices of terminals, hence, the indices
-    of branch-terminals can be reused in a terminal-frame. References to them 
+    of branch-terminals can be reused in a terminal-frame. References to them
     are kept consistent in this case.
 
     Parameters
@@ -371,7 +393,7 @@ def _prepare_branches(branches, nodes, count_of_branches):
         .join(nodes_, on='id_of_node_A')
         .join(nodes_, on='id_of_node_B', lsuffix='_A', rsuffix='_B'))
     # first branches then bridges
-    branches_.sort_values('is_bridge', ascending=False, inplace=True)
+    branches_.sort_values('is_bridge', ascending=True, inplace=True)
     objectcount = len(branches)
     bridgecount = objectcount - count_of_branches
     branchtermcount = 2 * count_of_branches
@@ -379,7 +401,7 @@ def _prepare_branches(branches, nodes, count_of_branches):
     termcount = 2 * objectcount
     branches_['index_of_term_A'] = np.concatenate(
         [# branches
-         np.arange(count_of_branches, dtype=np.int64), 
+         np.arange(count_of_branches, dtype=np.int64),
          # bridges
          np.arange(branchtermcount, end_of_bridge_term_a, dtype=np.int64)])
     branches_['index_of_term_B'] = np.concatenate(
@@ -535,7 +557,7 @@ def get_node_inj_matrix(count_of_nodes, injections):
     -------
     scipy.sparse.csc_matrix"""
     count_of_injections = len(injections)
-    try: 
+    try:
         return coo_matrix(
                 ([1] * count_of_injections,
                  (injections.index_of_node, injections.index)),
@@ -698,23 +720,19 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     slackid_groups = [
         head_tail(slack_groups.id_of_node.get_group(group_name))
         for group_name in super_slack_idxs]
-    #
+    # branches and terminals
     count_of_branches = sum(~branches_.is_bridge)
     branches = _prepare_branches(branches_, pfc_nodes, count_of_branches)
-    branchterminals = _get_branch_terminals(
-        _add_bg(branches), count_of_branches)
-    branchterminals['at_slack'] = (
-        branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
-    
-    
+    terminals = _get_branch_terminals(_add_bg(branches), count_of_branches)
+    terminals['at_slack'] = (
+        terminals.index_of_node.isin(pfc_slacks.index_of_node))
+    branchterminals = terminals[:(2*count_of_branches)]
     termindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
          'index_of_other_terminal':
              branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
-        
-        
     # injections
     injections = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
     if not injections['id'].is_unique:
@@ -745,9 +763,14 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
     injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
     # links of terminals
-    termassoc_ = (
-        _getframe(dataframes, Terminallink, TERMINALLINKS)
-        .set_index(['step', 'branchid', 'nodeid']))
+    #   filter for existing branchterminals
+    termlinks = _getframe(dataframes, Terminallink, TERMINALLINKS)
+    at_term = (
+        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
+        .isin(
+            pd.MultiIndex.from_frame(
+                branchterminals[['id_of_branch', 'id_of_node']])))
+    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
     termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
     termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
     termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
@@ -784,6 +807,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         slacks=pfc_slacks,
         injections=injections,
         branchterminals=branchterminals,
+        bridgeterminals=terminals[count_of_branches:],
         branchoutputs=branchoutputs,
         injectionoutputs=injectionoutputs,
         pvalues=_getframe(dataframes, PValue, PVALUES),

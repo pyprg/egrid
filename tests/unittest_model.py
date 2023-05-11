@@ -141,7 +141,7 @@ class Make_model(unittest.TestCase):
             Injection('load_0', 'n1'))
         self.assertIsNotNone(model, 'make_model shall return an object')
         # self.assertEqual(len(model.messages), 0, 'no errors')
-        self.assertEqual(len(model.branchterminals), 2, 'two branch terminals')
+        self.assertEqual(len(model.bridgeterminals), 2, 'two bridge terminals')
         inf_cx = complex(inf, inf)
         self.assertTrue(all(inf_cx==y for y in model.branchterminals.y_lo))
         self.assertEqual(
@@ -153,7 +153,7 @@ class Make_model(unittest.TestCase):
             'n0(-----line_0------)n1-->> load_0_')
         self.assertIsNotNone(model, 'make_model shall return an object')
         # self.assertEqual(len(model.messages), 0, 'no errors')
-        self.assertEqual(len(model.branchterminals), 2, 'two branch terminals')
+        self.assertEqual(len(model.bridgeterminals), 2, 'two bridge terminals')
         inf_cx = complex(inf, inf)
         self.assertTrue(all(inf_cx==y for y in model.branchterminals.y_lo))
         self.assertEqual(

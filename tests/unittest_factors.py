@@ -133,7 +133,8 @@ class Make_factordefs(unittest.TestCase):
                 Branch(
                     id='branch',
                     id_of_node_A='n_0',
-                    id_of_node_B='n_1'),
+                    id_of_node_B='n_1',
+                    y_lo=1e4),
                 Injection('consumer', 'n_1'),
                 # scaling, define scaling factors
                 Deft(
@@ -200,7 +201,8 @@ class Get_taps_factor_data(unittest.TestCase):
                 Branch(
                     id='branch',
                     id_of_node_A='n_0',
-                    id_of_node_B='n_1'),
+                    id_of_node_B='n_1',
+                    y_lo=1e4),
                 Injection('consumer', 'n_1'),
                 Injection('consumer2', 'n_1'),
                 # scaling, define scaling factors
@@ -278,7 +280,8 @@ class Get_scaling_factor_data(unittest.TestCase):
                 Branch(
                     id='branch',
                     id_of_node_A='n_0',
-                    id_of_node_B='n_1'),
+                    id_of_node_B='n_1',
+                    y_lo=1e4),
                 Injection('consumer', 'n_1'),
                 Injection('consumer2', 'n_1'),
                 # scaling, define scaling factors
@@ -354,7 +357,8 @@ class Get_scaling_factor_data(unittest.TestCase):
                 Branch(
                     id='branch',
                     id_of_node_A='n_0',
-                    id_of_node_B='n_1'),
+                    id_of_node_B='n_1',
+                    y_lo=1e4),
                 Injection('consumer', 'n_1'),
                 Injection('consumer2', 'n_1'),
                 # scaling, define scaling factors
@@ -915,8 +919,12 @@ class Make_factor_meta(unittest.TestCase):
         model = model_from_frames(
             make_data_frames([
                 Slacknode('n_0'),
-                Branch(id='branch', id_of_node_A='n_0', id_of_node_B='n_1'),
-                Branch(id='branch2', id_of_node_A='n_1', id_of_node_B='n_2'),
+                Branch(
+                    id='branch', id_of_node_A='n_0', id_of_node_B='n_1',
+                    y_lo=1e4),
+                Branch(
+                    id='branch2', id_of_node_A='n_1', id_of_node_B='n_2',
+                    y_lo=1e4),
                 Injection('consumer', 'n_1'), # has kp and kq
                 Injection('consumer2', 'n_1'),# has _default_ factor for P, Q
                 # scaling, define scaling factors
@@ -956,7 +964,7 @@ class Make_factor_meta(unittest.TestCase):
         assert_array_equal(
             model.factors.gen_factordata.index_of_symbol,
             [0, 1, 2],
-            err_msg="indices of generic factor symbols shall be [0, 1]")
+            err_msg="indices of generic factor symbols shall be [0, 1, 2]")
         fm = make_factor_meta(model, 0, np.zeros((0,1), dtype=float))
         # prepare generic factors
         generic_factors = (
