@@ -259,7 +259,7 @@ def _add_bg(branches):
          'is_bridge'],
         axis=1)
 
-def _get_branch_terminals(branches):
+def _get_branch_terminals(branches, count_of_branches):
     """Prepares data of branch terminals from data of branches.
     Each branch has two terminals. Each branch terminal is connected
     to a node and a branch. The prepared data for a branch terminal provide:
@@ -275,6 +275,8 @@ def _get_branch_terminals(branches):
         * .id_of_node_B
         * .index_of_node_A
         * .index_of_node_B
+    count_of_branches: int
+        number of branches which are not short circuits
 
     Returns
     -------
@@ -317,7 +319,11 @@ def _get_branch_terminals(branches):
         .set_index('index_of_terminal')
         .drop('switch_flow_idx_A', axis=1))
     terms_b['side'] = 'B'
-    return pd.concat([terms_a, terms_b])
+    return pd.concat([
+        terms_a[:count_of_branches], 
+        terms_b[:count_of_branches],
+        terms_a[count_of_branches:],
+        terms_b[count_of_branches:]])
 
 def _prepare_nodes(dataframes):
     node_ids = np.unique(
@@ -330,7 +336,32 @@ def _prepare_nodes(dataframes):
         data={'idx': range(len(node_id_index))},
         index=node_id_index)
 
-def _prepare_branches(branches, nodes):
+def _prepare_branches(branches, nodes, count_of_branches):
+    """Adds IDs of nodes and indices of terminals. Sorts by 'is_bridge'.
+    
+    Branch-terminals of side A and B are given the first indices. First
+    part of branches has also first indices of terminals, hence, the indices
+    of branch-terminals can be reused in a terminal-frame. References to them 
+    are kept consistent in this case.
+
+    Parameters
+    ----------
+    branches : TYPE
+        DESCRIPTION.
+    nodes : TYPE
+        DESCRIPTION.
+    count_of_branches: int
+        number of branches which are not short circuits
+
+    Raises
+    ------
+    ValueError
+        DESCRIPTION.
+
+    Returns
+    -------
+    branches_ : TYPE
+        DESCRIPTION."""
     if not branches['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -339,11 +370,25 @@ def _prepare_branches(branches, nodes):
         branches
         .join(nodes_, on='id_of_node_A')
         .join(nodes_, on='id_of_node_B', lsuffix='_A', rsuffix='_B'))
+    # first branches then bridges
+    branches_.sort_values('is_bridge', ascending=False, inplace=True)
+    objectcount = len(branches)
+    bridgecount = objectcount - count_of_branches
+    branchtermcount = 2 * count_of_branches
+    end_of_bridge_term_a = branchtermcount + bridgecount
+    termcount = 2 * objectcount
+    branches_['index_of_term_A'] = np.concatenate(
+        [# branches
+         np.arange(count_of_branches, dtype=np.int64), 
+         # bridges
+         np.arange(branchtermcount, end_of_bridge_term_a, dtype=np.int64)])
+    branches_['index_of_term_B'] = np.concatenate(
+        [# branches
+         np.arange(count_of_branches, branchtermcount, dtype=np.int64),
+         # bridges
+         np.arange(end_of_bridge_term_a, termcount, dtype=np.int64)])
     branches_.reset_index(inplace=True)
     branches_.rename(columns={'index':'index_of_branch'}, inplace=True)
-    branchcount = len(branches_)
-    branches_['index_of_term_A'] = range(branchcount)
-    branches_['index_of_term_B'] = range(branchcount, 2 * branchcount)
     return branches_
 
 def _prepare_branch_outputs(add_idx_of_node, branches, branchoutputs):
@@ -654,16 +699,22 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         head_tail(slack_groups.id_of_node.get_group(group_name))
         for group_name in super_slack_idxs]
     #
-    branches = _prepare_branches(branches_, pfc_nodes)
-    branchterminals = _get_branch_terminals(_add_bg(branches))
+    count_of_branches = sum(~branches_.is_bridge)
+    branches = _prepare_branches(branches_, pfc_nodes, count_of_branches)
+    branchterminals = _get_branch_terminals(
+        _add_bg(branches), count_of_branches)
     branchterminals['at_slack'] = (
         branchterminals.index_of_node.isin(pfc_slacks.index_of_node))
+    
+    
     termindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
          'index_of_other_terminal':
              branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
+        
+        
     # injections
     injections = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
     if not injections['id'].is_unique:

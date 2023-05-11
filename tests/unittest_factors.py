@@ -56,8 +56,9 @@ def _branchterminal_frame(branches, id_of_slacknodes):
     branches_['is_bridge'] = False
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
         id_of_slacknodes, branches_)
-    branches2 = _prepare_branches(branches_, pfc_nodes)
-    return _get_branch_terminals(_add_bg(branches2))
+    count_of_branches = len(branches)
+    branches2 = _prepare_branches(branches_, pfc_nodes, count_of_branches)
+    return _get_branch_terminals(_add_bg(branches2), count_of_branches)
 
 class Make_factordefs(unittest.TestCase):
 
