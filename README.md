@@ -60,7 +60,31 @@ injections: pandas.DataFrame
     * .Exp_v_q, float, voltage dependency exponent of reactive power
     * .index_of_node, int, index of connected node
 
+terminal_to_branch: numpy.array
+
+    * [0, br] indices of terminal A
+    * [1, br] indices of terminal B
+    index of branch is the column index
+
 branchterminals: pandas.DataFrame
+
+    * .index_of_branch, int, index of branch
+    * .id_of_branch, str, unique idendifier of branch
+    * .id_of_node, str, unique identifier of connected node
+    * .id_of_other_node, str, unique identifier of node connected
+       at other side of the branch
+    * .index_of_node, int, index of connected node
+    * .index_of_other_node, int, index of node connected at other side
+       of the branch
+    * .y_lo, complex, longitudinal branch admittance
+    * .y_tr_half, complex, half of transversal branch admittance
+    * .g_lo, float, longitudinal conductance
+    * .b_lo, float, longitudinal susceptance
+    * .g_tr_half, float, transversal conductance of branch devided by 2
+    * .b_tr_half, float, transversal susceptance of branch devided by 2
+    * .side, str, 'A' | 'B', side of branch, first or second
+
+bridgeterminals: pandas.DataFrame
 
     * .index_of_branch, int, index of branch
     * .id_of_branch, str, unique idendifier of branch

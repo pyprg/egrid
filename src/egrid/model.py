@@ -43,7 +43,8 @@ _Y_LO_ABS_MAX = 1e5
 
 Model = namedtuple(
     'Model',
-    'nodes slacks injections branchterminals bridgeterminals '
+    'nodes slacks injections terminal_to_branch branchterminals '
+    'bridgeterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
     'shape_of_Y count_of_slacks y_max '
     'factors '
@@ -76,6 +77,10 @@ injections: pandas.DataFrame
     * .kq_min, float, minimum of reactive power scaling factor
     * .kq_max, float, maximum of reactive power scaling factor
     * .index_of_node, int, index of connected node
+terminal_to_branch: numpy.array
+    * [0] indices of terminal A
+    * [1] indices of terminal B
+    index of branch is the column index
 branchterminals: pandas.DataFrame
     * .index_of_branch, int, index of branch
     * .id_of_branch, str, unique idendifier of branch
@@ -382,8 +387,7 @@ def _prepare_branches(branches, nodes, count_of_branches):
 
     Returns
     -------
-    branches_ : TYPE
-        DESCRIPTION."""
+    pandas.DataFrame"""
     if not branches['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
@@ -677,6 +681,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .slacks, pandas.DataFrame
         * .injections, pandas.DataFrame
         * .branchterminals, pandas.DataFrame
+        * .bridgeterminals, pandas.DataFrame
         * .branchoutputs, pandas.DataFrame
         * .injectionoutputs, pandas.DataFrame
         * .pvalues, pandas.DataFrame
@@ -722,11 +727,15 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         for group_name in super_slack_idxs]
     # branches and terminals
     count_of_branches = sum(~branches_.is_bridge)
+    count_of_branchterms = 2 * count_of_branches
     branches = _prepare_branches(branches_, pfc_nodes, count_of_branches)
+    # crossreference branch terminals
+    br = branches[:count_of_branches]
+    terminal_to_branch = np.vstack([br.index_of_term_A, br.index_of_term_B])
     terminals = _get_branch_terminals(_add_bg(branches), count_of_branches)
     terminals['at_slack'] = (
         terminals.index_of_node.isin(pfc_slacks.index_of_node))
-    branchterminals = terminals[:(2*count_of_branches)]
+    branchterminals = terminals[:count_of_branchterms]
     termindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
          'index_of_other_terminal':
@@ -806,8 +815,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         nodes=pfc_nodes,
         slacks=pfc_slacks,
         injections=injections,
+        terminal_to_branch=terminal_to_branch,
         branchterminals=branchterminals,
-        bridgeterminals=terminals[count_of_branches:],
+        bridgeterminals=terminals[count_of_branchterms:],
         branchoutputs=branchoutputs,
         injectionoutputs=injectionoutputs,
         pvalues=_getframe(dataframes, PValue, PVALUES),
