@@ -112,8 +112,8 @@ def _create_branch(e_id, neighbours, attributes):
         str, str (ID of left node, ID of right node)
     attributes: dict
 
-    Returns
-    -------
+    Yields
+    ------
     Branch|Message"""
     try:
         y_lo = (
@@ -122,28 +122,28 @@ def _create_branch(e_id, neighbours, attributes):
         unknown_attributes = attributes.keys() - Branch._fields
         if unknown_attributes:
             be = "is" if len(unknown_attributes) < 2 else "are"
-            return Message(
+            yield Message(
                 f"Error in data of branch '{e_id}', "
                  "unknown attributes, "
                 f"following attributes are provided: {str(attributes)}, "
                 f"possible attributes are {Branch._fields}, "
-                f"hence, {','.join(unknown_attributes)} {be} unknown")
-        else:
-            return Branch(
-                id=e_id,
-                id_of_node_A=neighbours[0],
-                id_of_node_B=neighbours[1],
-                y_lo=y_lo,
-                y_tr=complex(e3(attributes.get('y_tr', '0.0j'))))
+                f"hence, {','.join(unknown_attributes)} {be} unknown",
+                level=1)
+        yield Branch(
+            id=e_id,
+            id_of_node_A=neighbours[0],
+            id_of_node_B=neighbours[1],
+            y_lo=y_lo,
+            y_tr=complex(e3(attributes.get('y_tr', '0.0j'))))
     except KeyError as e:
-        return Message(
+        yield Message(
             f"Error in data of branch '{e_id}', "
              "for a branch two neighbour nodes are required, "
             f"following neighbours are provided: {str(neighbours)} - "
             f"following attributes are provided: {str(attributes)} "
             f"(error: {str(e)})")
     except ValueError as e:
-        return Message(
+        yield Message(
             f"Error in data of branch '{e_id}', "
              "for a branch two neighbour nodes are required, "
              "'y_lo' and 'y_tr' must be complex values , "
@@ -163,41 +163,44 @@ def _create_injection(e_id, neighbours, attributes):
         str, (ID of node,)
     attributes: dict
 
-    Returns
-    -------
+    Yields
+    ------
     Injection|Message"""
     # id id_of_node P10 Q10 Exp_v_p Exp_v_q
     if len(neighbours) != 1:
-        return Message(
+        yield Message(
             f"Error in data of injection '{e_id}', "
             f"the number of neighbours must be exactly 1, "
             f"following neighbours are provided: {str(neighbours)}")
+        return
     unknown_attributes = attributes.keys() - Injection._fields
     if unknown_attributes:
         be = "is" if len(unknown_attributes) < 2 else "are"
-        return Message(
+        yield Message(
             f"Error in data of injection '{e_id}', "
              "unknown attributes, "
             f"following attributes are provided: {str(attributes)}, "
             f"possible attributes are {Injection._fields}, "
-            f"hence, {','.join(unknown_attributes)} {be} unknown")
+            f"hence, {','.join(unknown_attributes)} {be} unknown",
+            level=1)
     atts = {}
     for key in ('P10', 'Q10', 'Exp_v_p', 'Exp_v_q'):
         if key in attributes:
             try:
                 atts[key] = float(e3(attributes[key]))
             except ValueError as e:
-                return Message(
+                yield Message(
                     f"Error in data of injection '{e_id}', the value of "
                     f"attribute '{key}' must be of type float if given, "
                     f"following attributes are provided: {str(attributes)} "
                     f"(error: {str(e)})")
+                return
     try:
         atts['id'] = e_id
         atts['id_of_node'] = neighbours[0]
-        return Injection(**atts)
+        yield Injection(**atts)
     except (ValueError, KeyError) as e:
-        return Message(
+        yield Message(
             f"Error in data of injection, "
              "attributes 'id' and 'id_of_node' are required, "
             f"following attributes are provided: {str(attributes)} "
@@ -316,9 +319,9 @@ def _make_node_objects(data):
                     f"(error: {str(e)})")
                 return
     elif count_of_neighbours == 2:
-        yield _create_branch(e_id, neighbours, attributes)
+        yield from _create_branch(e_id, neighbours, attributes)
     elif count_of_neighbours == 1:
-        yield _create_injection(e_id, neighbours, attributes)
+        yield from _create_injection(e_id, neighbours, attributes)
     elif count_of_neighbours == 0:
         yield Message(f"ignoring object '{e_id}' as it is not connected", 1)
 
