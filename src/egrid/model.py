@@ -52,7 +52,6 @@ Model = namedtuple(
     'messages')
 Model.__doc__ = """Data of an electric distribution network.
 
-
 Model is designed for power flow calculation and state estimation.
 
 Parameters
@@ -96,6 +95,7 @@ branchterminals: pandas.DataFrame
     * .b_tr_half, float, transversal susceptance pf branch devided by 2
     * .side, str, 'A' | 'B', side of branch, first or second
 bridgeterminals: pandas.DataFrame
+    terminals of branches being short circuits
     * .index_of_branch, int, index of branch
     * .id_of_branch, str, unique idendifier of branch
     * .id_of_node, str, unique identifier of connected node
@@ -140,10 +140,11 @@ count_of_slacks: int
     number of slack-nodes for power flow calculation
 y_max: float
     * maximum conductance/susceptance value of a branch longitudinal
-      admittance, if a branch has a greater admittance value is is regarded
-      a connection with inifinite admittance (no impedance), the connectivity
-      nodes of both terminals are aggregated into one power-flow-calculation
-      node
+      admittance, a branch with greater admittance value is regarded
+      a connection with inifinite admittance (no impedance), then the
+      connectivity nodes of both terminals are aggregated into one
+      power-flow-calculation node and the terminals of that branch are
+      accessed through Model.bridgeterminals
 factors: factor.Factors
     * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
         * .step, -1
@@ -272,7 +273,7 @@ def _add_bg(branches):
          'id_of_node_A', 'id_of_node_B',
          'index_of_node_A', 'index_of_node_B',
          'index_of_term_A', 'index_of_term_B',
-         'switch_flow_idx_A', 'switch_flow_idx_B',
+         'switch_flow_index_A', 'switch_flow_index_B',
          'g_lo', 'b_lo', 'g_tr_half', 'b_tr_half',
          'index_of_taps_A', 'index_of_taps_B',
          'is_bridge'],
@@ -318,15 +319,15 @@ def _get_branch_terminals(branches, count_of_branches):
                 'id_of_node_A'     : 'id_of_node',
                 'index_of_node_A'  : 'index_of_node',
                 'index_of_term_A'  : 'index_of_terminal',
-                'switch_flow_idx_A': 'switch_flow_index',
+                'switch_flow_index_A': 'switch_flow_index',
                 'index_of_term_B'  : 'index_of_other_terminal',
                 'id_of_node_B'     : 'id_of_other_node',
                 'index_of_node_B'  : 'index_of_other_node',
                 'index_of_taps_A'  : 'index_of_taps',
                 'index_of_taps_B'  : 'index_of_other_taps'})
         .set_index('index_of_terminal')
-        .drop('switch_flow_idx_B', axis=1))
-    terms_a['side'] = 'A'
+        .drop('switch_flow_index_B', axis=1))
+    terms_a['side_a'] = True
     terms_b = (
         bras.rename(
             columns={
@@ -334,15 +335,15 @@ def _get_branch_terminals(branches, count_of_branches):
                 'id_of_node_B'     : 'id_of_node',
                 'index_of_node_B'  : 'index_of_node',
                 'index_of_term_B'  : 'index_of_terminal',
-                'switch_flow_idx_B': 'switch_flow_index',
+                'switch_flow_index_B': 'switch_flow_index',
                 'index_of_term_A'  : 'index_of_other_terminal',
                 'id_of_node_A'     : 'id_of_other_node',
                 'index_of_node_A'  : 'index_of_other_node',
                 'index_of_taps_B'  : 'index_of_taps',
                 'index_of_taps_A'  : 'index_of_other_taps'})
         .set_index('index_of_terminal')
-        .drop('switch_flow_idx_A', axis=1))
-    terms_b['side'] = 'B'
+        .drop('switch_flow_index_A', axis=1))
+    terms_b['side_a'] = False
     return pd.concat([
         terms_a[:count_of_branches],
         terms_b[:count_of_branches],
@@ -391,7 +392,7 @@ def _prepare_branches(branches, nodes, count_of_branches):
     if not branches['id'].is_unique:
         msg = "Error IDs of branches must be unique but are not."
         raise ValueError(msg)
-    nodes_ = nodes[['index_of_node', 'switch_flow_idx']]
+    nodes_ = nodes[['index_of_node', 'switch_flow_index']]
     branches_ = (
         branches
         .join(nodes_, on='id_of_node_A')
@@ -459,7 +460,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         * int, number of power flow calculation nodes
         * pandas.DataFrame (id of node)
             * .index_of_node
-            * .switch_flow_idx"""
+            * .switch_flow_index"""
     set_of_slackids = set(slackids)
     get_of_slackids = set_of_slackids.intersection
     is_slack = lambda myset: bool(get_of_slackids(myset))
@@ -524,22 +525,22 @@ def _get_pfc_nodes(slackids, branch_frame):
         len(connected_components) + len(branch_nodes),
         pd.DataFrame(
             chain.from_iterable([
-                ((id_, idx, switch_flow_idx, True, True)
+                ((id_, idx, switch_flow_index, True, True)
                   for idx, ids in enumerate(cc_slacks.connected_components)
-                  for switch_flow_idx, id_ in enumerate(ids)),
+                  for switch_flow_index, id_ in enumerate(ids)),
                 ((id_, idx, 0, False, True)
                   for idx, id_ in enumerate(
                     branch_nodes_slacks.id_of_node, cc_slack_count)),
-                ((id_, idx, switch_flow_idx, True, False)
+                ((id_, idx, switch_flow_index, True, False)
                   for idx, ids in enumerate(
                     cc_nonslacks.connected_components, count_of_slacks)
-                  for switch_flow_idx, id_ in enumerate(ids)),
+                  for switch_flow_index, id_ in enumerate(ids)),
                 ((id_, idx, 0, False, False)
                   for idx, id_ in enumerate(
                     branch_nodes_nonslacks.id_of_node,
                     count_of_slacks + len(cc_nonslacks)))
                 ]),
-            columns=['node_id', 'index_of_node', 'switch_flow_idx',
+            columns=['node_id', 'index_of_node', 'switch_flow_index',
                      'in_super_node', 'is_slack'])
         .set_index('node_id'))
 
@@ -713,7 +714,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     slack_groups = slacks.groupby('index_of_node')
     slack_groups_size = slack_groups.size()
     slack_groups_first = (
-        slack_groups[['id_of_node', 'switch_flow_idx', 'in_super_node']]
+        slack_groups[['id_of_node', 'switch_flow_index', 'in_super_node']]
         .first())
     slack_groups_first['V'] = slack_groups.V.sum() / slack_groups_size
     pfc_slacks = slack_groups_first.reset_index()
