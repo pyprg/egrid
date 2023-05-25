@@ -753,6 +753,7 @@ def get_factordata_for_step(model, step):
             * .kp, int, index of symbol
             * .kq, int, index of symbol
             * .index_of_injection, int
+            (ordered by index_of_injection)
         * terminal_factors: pandas.DataFrame (just terminals having a factor)
             * .id_of_branch, str, ID of branch
             * .id_of_node, str, ID of node
@@ -770,13 +771,14 @@ def get_factordata_for_step(model, step):
     count_of_generic_factors = len(model_factors.gen_factordata)
     start = repeat(count_of_generic_factors)
     scaling_factors, injection_factors = _get_scaling_factor_data(
-        model.factors, model.injections, steps, start)
+        model_factors, model.injections, steps, start)
     factors = pd.concat([scaling_factors, taps_factors])
     factors.sort_values('index_of_symbol', inplace=True)
     return (
         count_of_generic_factors,
         _loc(factors, step).reset_index(),
-        _loc(injection_factors, step).reset_index(),
+        _loc(injection_factors, step).reset_index().sort_values(
+            'index_of_injection'),
         _loc(terminalfactor, step).reset_index())
 
 def _make_factor_meta(

@@ -402,7 +402,7 @@ def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
 Klink = namedtuple(
     'Klink',
     'id_of_injection part id_of_factor step',
-    defaults=('pq', -1))
+    defaults=(-1,))
 Klink.__doc__ = """Logical connection between injection and a factor.
 
 Parameters
