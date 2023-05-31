@@ -766,8 +766,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     factors_ = (
         _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
     # links of injection
+    injassoc_ = _getframe(dataframes, Injectionlink, INJLINKS)
     injassoc_ = (
-        _getframe(dataframes, Injectionlink, INJLINKS)
+        injassoc_[injassoc_.part.isin(['p', 'q'])]
         .set_index(['step', 'injid', 'part']))
     injassoc_.index.names = ['step', 'id_of_injection', 'part']
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
