@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Model of a balanced electric distribution network for experimental power flow
-calculation and state estimation. Instances of Model can be the input for
-(a variety of) power flow calculation or estimation algorithms. They
+Prepocessed model of a balanced electric distribution network for experimental
+power flow calculation and state estimation. Instances of Model can be the
+input for (a variety of) power flow calculation or estimation algorithms. They
 provide an easy to use structure for calculating current and power flow
 through lines and into consumers (using an additional voltage vector which
 is the result of a power-flow-calculation).
@@ -16,15 +16,15 @@ of type
     - Branch (line, series capacitor, transformer winding, transformer,
       closed switch)
     - Injection (consumer, shunt capacitor, PQ/PV-generator, battery)
-    - Branchtaps
     - Output (indicates that measured flow (I, P or Q) or a part thereof
       flows through the referenced terminal (device or node+device))
     - PValue (measured active power)
     - QValue (measured reactive power)
     - IValue (measured electric current)
     - Vvalue (measured voltage or setpoint)
-    - Deff (definition of a factor, for estimation)
-    - Link (associates a factor to an injection or terminal of a branch)
+    - Defk/Deft (definition of a scaling/termional factor, for estimation)
+    - Defvl (definition of voltage limits)
+    - Klink/Tlink (associates a factor to an injection or terminal of a branch)
 
 including tuples, lists and iterables thereof (for a power-flow-calculation
 just Slacknode ... Branchtaps are necessary).
@@ -42,13 +42,13 @@ Fields of egrid.model.Model
 ---------------------------
 nodes: pandas.DataFrame (id of node)
 
-    * .idx, int index of node
+    * .idx, int, index of power-flow-calculation node
 
 slacks: pandas.DataFrame
 
     * .id_of_node, str, id of connection node
     * .V, complex, given voltage at this slack
-    * .index_of_node, int, index of connection node
+    * .index_of_node, int, index of power-flow-calculation node
 
 injections: pandas.DataFrame
 
@@ -58,7 +58,7 @@ injections: pandas.DataFrame
     * .Q10, float, reactive power at voltage magnitude 1.0 pu
     * .Exp_v_p, float, voltage dependency exponent of active power
     * .Exp_v_q, float, voltage dependency exponent of reactive power
-    * .index_of_node, int, index of connected node
+    * .index_of_node, int, index of connected power-flow-calculation node
 
 terminal_to_branch: numpy.array
 
@@ -73,9 +73,9 @@ branchterminals: pandas.DataFrame
     * .id_of_node, str, unique identifier of connected node
     * .id_of_other_node, str, unique identifier of node connected
        at other side of the branch
-    * .index_of_node, int, index of connected node
-    * .index_of_other_node, int, index of node connected at other side
-       of the branch
+    * .index_of_node, int, index of connected power-flow-calculation node
+    * .index_of_other_node, int, index of power-flow-calculation node connected
+       at other side of the branch
     * .y_lo, complex, longitudinal branch admittance
     * .y_tr_half, complex, half of transversal branch admittance
     * .g_lo, float, longitudinal conductance
@@ -91,9 +91,9 @@ bridgeterminals: pandas.DataFrame
     * .id_of_node, str, unique identifier of connected node
     * .id_of_other_node, str, unique identifier of node connected
        at other side of the branch
-    * .index_of_node, int, index of connected node
-    * .index_of_other_node, int, index of node connected at other side
-       of the branch
+    * .index_of_node, int, index of connected power-flow-calculation node
+    * .index_of_other_node, int, index of power-flow-calculation node connected
+       at other side of the branch
     * .y_lo, complex, longitudinal branch admittance
     * .y_tr_half, complex, half of transversal branch admittance
     * .g_lo, float, longitudinal conductance
@@ -107,7 +107,8 @@ branchoutputs: pandas.DataFrame
     * .id_of_batch, str, unique identifier of measurement batch
     * .id_of_node, str, id of node connected to branch terminal
     * .id_of_branch, str, unique identifier of branch
-    * .index_of_node, int, index of node connected to branch terminal
+    * .index_of_node, int, index of power-flow-calculation node connected
+       to branch terminal
     * .index_of_branch, int, index of branch
 
 injectionoutputs: pandas.DataFrame
@@ -260,8 +261,8 @@ Python code for example, suitable input for function **egrid.make_model**
 however, transformers/transformerwindings are modeled using class Branch too.):
 ```
 from egrid.builder import (
-    Slacknode, PValue, QValue, IValue, Output, Branch, Branchtaps,
-    Injection, Deff, Link)
+    Slacknode, PValue, QValue, IValue, Output, Branch,
+    Injection, Defk, Deft, Klink, Tlink)
 
 example = [
     Slacknode(id_of_node='n_0', V=1.+0.j),
@@ -292,7 +293,7 @@ example = [
         id='taps_0',
         id_of_node='n_0',
         id_of_branch='line_0',
-        Vstep=.2/33,
+        Vstep=.1/16,
         positionmin=-16,
         positionneutral=0,
         positionmax=16,
@@ -316,8 +317,8 @@ example = [
         Q10=10.0,
         Exp_v_p=2.0,
         Exp_v_q=2.0),
-    Deff(step=(0, 1, 2), id=('kp', 'kq')),
-    Link(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
+    Defk(step=(0, 1, 2), id=('kp', 'kq')),
+    Klink(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
 ```
 
 Valid input to **make_model** is a multiline pseudo graphic string e.g.

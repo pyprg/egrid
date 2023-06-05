@@ -93,6 +93,7 @@ class Make_model(unittest.TestCase):
             model.qvalues,
             model.ivalues,
             model.vvalues,
+            model.vlimits,
             model.terms,
             model.messages]
         empty_dataframe = ((isinstance(df, DF) and df.empty) for df in frames)

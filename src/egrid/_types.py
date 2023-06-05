@@ -177,6 +177,25 @@ id_of_node: str
 Vvalue: float (default value 1.0)
     magnitude of electric voltage"""
 
+Vlimit = namedtuple(
+    'Vlimit',
+    'id_of_node min max step', defaults=(0., np.inf, -1))
+Vlimit.__doc__ = """Limits of node voltage.
+
+Parameters
+----------
+id_of_node: str
+    identifier of connectivity node
+min: float
+    optional, default 0
+    smallest possible magnitude of the voltage at node
+max: float
+    optional, default infinite
+    greatest possible magnitude of the voltage at node
+step: int
+    optional, default -1
+    index of optimization step, for all steps"""
+
 DEFAULT_FACTOR_ID = '_default_'
 
 Factor = namedtuple(
@@ -211,6 +230,130 @@ n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value -1)
     index of optimization step, defined for each step if set to -1"""
+
+Terminallink = namedtuple(
+    'Terminallink', 'branchid nodeid id step', defaults=(-1,))
+Terminallink.__doc__ = """Links a branch terminal with a factor.
+
+Parameters
+----------
+branchid: str
+    ID of branch
+nodeid: str
+    ID of connectivity node
+id: str
+    unique identifier (for one step) of linked factor
+step: int (default value -1)
+    optimization step, defined for each step if -1"""
+
+Injectionlink = namedtuple(
+    'Injectionlink', 'injid part id step', defaults=(-1,))
+Injectionlink.__doc__ = """Links an injection with a factor.
+
+Parameters
+----------
+injid: str
+    ID of injection
+part: 'p'|'q'
+    marker for active or reactive power to be multiplied
+id: str
+    unique identifier (for one step) of linked factor
+step: int (default value -1)
+    optimization step, defined for each step if -1"""
+
+Klink = namedtuple(
+    'Klink',
+    'id_of_injection part id_of_factor step',
+    defaults=(-1,))
+Klink.__doc__ = """Logical connection between injection and a factor.
+
+Parameters
+----------
+id_of_injection: str|iterable_of_str
+    identifier of injection
+part: 'p'|'q'|iterable_of_two_char (default 'pq')
+    identifies the attribute of the injection to multipy with
+    ('p'/'q'- injected active/reactive power)
+id_of_factor: str|iterable_of_str
+    identifier of scaling factor to connect to, one identifier for each
+    given value of argument 'part'
+step: int (default value -1)|iterable_of_int
+    addresses the optimization step, first optimization step has index 0,
+    defined for each step if -1"""
+
+Tlink = namedtuple(
+    'Tlink',
+    'id_of_node id_of_branch id_of_factor step',
+    defaults=(-1,))
+Tlink.__doc__ = """Logical connection between a terminal of a branch
+and a factor.
+
+Parameters
+----------
+id_of_node: str|iterable_of_str
+    ID of connectivity node
+id_of_branch: str|iterable_of_str
+    identifier of branch
+id_of_factor: str|iterable_of_str
+    identifier of taps (terminal) factor to connect,
+    id_of_node, id_of_branch, id_of_factor shall have the same lenght
+    if iterable
+step: int (default value -1)|iterable_of_int
+    addresses the optimization step, first optimization step has index 0,
+    defined for each step if -1"""
+
+Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))
+Term.__doc__ = """Data of an ojective-function-term.
+
+Parameters
+----------
+id: str
+    unique identifier of a term
+arg: str
+    reference to an argument of function fn
+fn: str
+    indentifier of function for calculating a term of the objective function
+step: int
+    index of optimization step"""
+
+Message = namedtuple('Message', 'message level', defaults=('', 2))
+Message.__doc__ = """Information, warning or error message.
+
+Parameters
+----------
+message: str
+    human readable text
+level: int
+    0 - information
+    1 - warning
+    2 - error"""
+
+# helper
+
+def expand_def(mydef):
+    """Creates factor definitions for each step and id.
+
+    Parameters
+    ----------
+    mydefk: Defk
+
+    Returns
+    -------
+    iterator"""
+    try:
+        iter_steps = iter(mydef.step)
+    except TypeError:
+        iter_steps = iter([mydef.step])
+    ids = mydef.id if isinstance(mydef.id, (list, tuple)) else [mydef.id]
+    return (
+        Factor(
+            id_, mydef.type,
+            (id_ if mydef.id_of_source is None else mydef.id_of_source),
+            mydef.value, mydef.min, mydef.max, mydef.is_discrete,
+            mydef.m, mydef.n, step)
+        for id_, step in product(ids, iter_steps))
+
+# convenience
 
 Defk = namedtuple(
     'Defk',
@@ -280,58 +423,8 @@ n: float (default 1.)
 step: int (default value -1)
     index of optimization step, for each step set to -1"""
 
-def expand_def(mydef):
-    """Creates afactor definitions for each step and id.
-
-    Parameters
-    ----------
-    mydefk: Defk
-
-    Returns
-    -------
-    iterator"""
-    try:
-        iter_steps = iter(mydef.step)
-    except TypeError:
-        iter_steps = iter([mydef.step])
-    ids = mydef.id if isinstance(mydef.id, (list, tuple)) else [mydef.id]
-    return (
-        Factor(
-            id_, mydef.type,
-            (id_ if mydef.id_of_source is None else mydef.id_of_source),
-            mydef.value, mydef.min, mydef.max, mydef.is_discrete,
-            mydef.m, mydef.n, step)
-        for id_, step in product(ids, iter_steps))
-
-Terminallink = namedtuple(
-    'Terminallink', 'branchid nodeid id step', defaults=(-1,))
-Terminallink.__doc__ = """Links a branch terminal with a factor.
-
-Parameters
-----------
-branchid: str
-    ID of branch
-nodeid: str
-    ID of connectivity node
-id: str
-    unique identifier (for one step) of linked factor
-step: int (default value -1)
-    optimization step, defined for each step if -1"""
-
-Injectionlink = namedtuple(
-    'Injectionlink', 'injid part id step', defaults=(-1,))
-Injectionlink.__doc__ = """Links an injection with a factor.
-
-Parameters
-----------
-injid: str
-    ID of injection
-part: 'p'|'q'
-    marker for active or reactive power to be multiplied
-id: str
-    unique identifier (for one step) of linked factor
-step: int (default value -1)
-    optimization step, defined for each step if -1"""
+def _iterable(item):
+    return item if isinstance(item, (list, tuple)) else[item]
 
 def expand_klink(id_of_injection, part, id_of_factor, steps):
     """Creates instances of class Injectionlink.
@@ -351,17 +444,11 @@ def expand_klink(id_of_injection, part, id_of_factor, steps):
         iter_steps = iter(steps)
     except TypeError:
         iter_steps = iter([steps])
-    objids = (
-        id_of_injection
-        if isinstance(id_of_injection, (list, tuple)) else
-        [id_of_injection])
-    ids = (
-        id_of_factor
-        if isinstance(id_of_factor, (list, tuple)) else
-        [id_of_factor])
-    return [Injectionlink(objid_, t[0], t[1], step_)
-            for step_, objid_, t in
-                product(iter_steps, objids, zip(part, ids))]
+    objids = _iterable(id_of_injection)
+    ids = _iterable(id_of_factor)
+    return [
+        Injectionlink(objid_, t[0], t[1], step_)
+        for step_, objid_, t in product(iter_steps, objids, zip(part, ids))]
 
 def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
     """Creates instances of class Terminallink.
@@ -381,90 +468,52 @@ def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
         iter_steps = iter(steps)
     except TypeError:
         iter_steps = iter([steps])
-    objids = (
-        id_of_branch
-        if isinstance(id_of_branch, (list, tuple))
-        else [id_of_branch])
-    nodeids = (
-        id_of_node
-        if isinstance(id_of_node, (list, tuple)) else
-        [id_of_node])
-    factorids = (
-        id_of_factor
-        if isinstance(id_of_factor, (list, tuple)) else
-        [id_of_factor])
+    objids = _iterable(id_of_branch)
+    nodeids = _iterable(id_of_node)
+    factorids = _iterable(id_of_factor)
     if (len(factorids)==1) and (1 < len(nodeids)):
         factorids *= len(nodeids)
-    return [Terminallink(t[0], t[1], t[2], step_)
-            for step_, t in
-                product(iter_steps, zip(objids, nodeids, factorids))]
+    return [
+        Terminallink(t[0], t[1], t[2], step_)
+        for step_, t in product(iter_steps, zip(objids, nodeids, factorids))]
 
-Klink = namedtuple(
-    'Klink',
-    'id_of_injection part id_of_factor step',
-    defaults=(-1,))
-Klink.__doc__ = """Logical connection between injection and a factor.
-
-Parameters
-----------
-id_of_injection: str|iterable_of_str
-    identifier of injection
-part: 'p'|'q'|iterable_of_two_char (default 'pq')
-    identifies the attribute of the injection to multipy with
-    ('p'/'q'- injected active/reactive power)
-id_of_factor: str|iterable_of_str
-    identifier of scaling factor to connect to, one identifier for each
-    given value of argument 'part'
-step: int (default value -1)|iterable_of_int
-    addresses the optimization step, first optimization step has index 0,
-    defined for each step if -1"""
-
-Tlink = namedtuple(
-    'Tlink',
-    'id_of_node id_of_branch id_of_factor step',
-    defaults=(-1,))
-Tlink.__doc__ = """Logical connection between a terminal of a branch
-and a factor.
+Defvl = namedtuple(
+    'Defvl',
+    'id_of_node min max step', defaults=('', 0., np.inf, -1))
+Defvl.__doc__ = """Define limit of node voltage.
 
 Parameters
 ----------
 id_of_node: str|iterable_of_str
-    ID of connectivity node
-id_of_branch: str|iterable_of_str
-    identifier of branch
-id_of_factor: str|iterable_of_str
-    identifier of taps (terminal) factor to connect,
-    id_of_node, id_of_branch, id_of_factor shall have the same lenght
-    if iterable
-step: int (default value -1)|iterable_of_int
-    addresses the optimization step, first optimization step has index 0,
-    defined for each step if -1"""
+    optional, default ''
+    identifier of connectivity node(s), addresses all nodes if empty string ''
+min: float
+    optional, default 0
+    smallest possible magnitude of the voltage at node
+max: float
+    optional, default infinite
+    greatest possible magnitude of the voltage at node
+step: int|iterable_of_int
+    optional, default -1
+    index of optimization step, -1 for all steps"""
 
-Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))
-Term.__doc__ = """Data of an ojective-function-term.
+def expand_defvl(defvl):
+    """Creates instances of Vlimit.
 
-Parameters
-----------
-id: str
-    unique identifier of a term
-arg: str
-    reference to an argument of function fn
-fn: str
-    indentifier of function for calculating a term of the objective function
-step: int
-    index of optimization step"""
+    Parameters
+    ----------
+    defvl : defvl
+        definition of voltage limits for nodes and steps
 
-Message = namedtuple('Message', 'message level', defaults=('', 2))
-Message.__doc__ = """Information, warning or error message.
-
-Parameters
-----------
-message: str
-    human readable text
-level: int
-    0 - information
-    1 - warning
-    2 - error"""
+    Returns
+    -------
+    list
+        Vlimit"""
+    nodeids = _iterable(defvl.id_of_node)
+    steps = _iterable(defvl.step)
+    return [
+        Vlimit(nodeid_, defvl.min, defvl.max, step_)
+        for nodeid_, step_ in product(nodeids, steps)]
 
 def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
@@ -492,6 +541,10 @@ _attribute_types = {
          [_tostring, _tostring, _tostring, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16],
          [True, False, False, False, False, False, False, False, False, True]),
+     #    id_of_node min max step
+     Defvl:([object, np.float64, np.float64, np.int16],
+            [_tostring, np.float64, np.float64, np.int16],
+            [True, False, False, True]),
      #    id, type, id_of_source, value, min, max,
      #    is_discrete, m, n, step
      Factor:(
@@ -551,6 +604,11 @@ _attribute_types = {
          [object, np.float64],
          [_tostring, np.float64],
          [False, False]),
+     #     id_of_node min max step
+     Vlimit:(
+         [object, np.float64, np.float64, np.int16],
+         [_tostring, np.float64, np.float64, np.int16],
+         [False, False, False, False]),
      #    id      id_of_node_A id_of_node_B y_lo   y_tr
      Branch:(
          [object, object, object, np.complex128, np.complex128],
@@ -620,6 +678,7 @@ PVALUES = make_df(PValue)
 QVALUES = make_df(QValue)
 IVALUES = make_df(IValue)
 VVALUES = make_df(Vvalue)
+VLIMITS = make_df(Vlimit)
 FACTORS = make_df(Factor)
 INJLINKS = make_df(Injectionlink)
 TERMINALLINKS = make_df(Terminallink)

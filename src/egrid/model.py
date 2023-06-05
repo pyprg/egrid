@@ -32,9 +32,9 @@ from itertools import chain
 from egrid._types import (
     df_astype,
     Slacknode, Branch, Factor, Injectionlink, Terminallink,
-    Injection, Output, IValue, PValue, QValue, Vvalue, Term, Message,
+    Injection, Output, IValue, PValue, QValue, Vvalue, Vlimit, Term, Message,
     SLACKNODES, BRANCHES, FACTORS, INJLINKS, TERMINALLINKS,
-    INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES,
+    INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, VLIMITS,
     TERMS,
     MESSAGES)
 from egrid.factors import make_factordefs
@@ -45,7 +45,7 @@ Model = namedtuple(
     'Model',
     'nodes slacks injections terminal_to_branch branchterminals '
     'bridgeterminals '
-    'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues '
+    'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues vlimits '
     'shape_of_Y count_of_slacks y_max '
     'factors '
     'mnodeinj terms '
@@ -57,11 +57,11 @@ Model is designed for power flow calculation and state estimation.
 Parameters
 ----------
 nodes: pandas.DataFrame (id of node)
-    * .idx, int index of node
+    * .idx, int, index of power-flow-calculation node
 slacks: pandas.DataFrame
     * .id_of_node, str, id of connection node
     * .V, complex, given voltage at this slack
-    * .index_of_node, int, index of connection node
+    * .index_of_node, int, index of power-flow-calculation node
 injections: pandas.DataFrame
     * .id, str, unique identifier of injection
     * .id_of_node, str, unique identifier of connected node
@@ -69,13 +69,10 @@ injections: pandas.DataFrame
     * .Q10, float, reactive power at voltage magnitude 1.0 pu
     * .Exp_v_p, float, voltage dependency exponent of active power
     * .Exp_v_q, float, voltage dependency exponent of reactive power
-    * .scalingp, None | str
-    * .scalingq, None | str
-    * .kp_min, float, minimum of active power scaling factor
-    * .kp_max, float, maximum of active power scaling factor
-    * .kq_min, float, minimum of reactive power scaling factor
-    * .kq_max, float, maximum of reactive power scaling factor
-    * .index_of_node, int, index of connected node
+    * .index_of_node, int, index of connected power-flow-calculation node
+    * .switch_flow_index, int
+    * .in_super_node, bool
+    * .is_slack, bool
 terminal_to_branch: numpy.array
     * [0] indices of terminal A
     * [1] indices of terminal B
@@ -134,6 +131,12 @@ vvalues: pandas.DataFrame
     * .id_of_node, unique identifier of node voltage is given for
     * .V, float, magnitude of voltage
     * .index_of_node, index of node voltage is given for
+vlimits: pandas.DataFrame
+    * .id_of_node, str, unique identifier of connectivity node
+    * .min, float, smallest value
+    * .max, float, greates value
+    * .step, int, index of optimization step
+    * .index_of_node, index of power-flow-calulation node
 shape_of_Y: tuple (int, int)
     shape of admittance matrix for power flow calculation
 count_of_slacks: int
@@ -228,9 +231,6 @@ def _join_on(to_join, on_field, dataframe):
     ------
     pandas.DataFrame"""
     return dataframe.join(to_join, on=on_field)
-
-def _join_index_of_node_inner(nodes, dataframe):
-    return dataframe.join(nodes, on='id_of_node', how='inner')
 
 def _add_bg(branches):
     """Prepares data of branches for power flow calculation with seperate real
@@ -597,6 +597,77 @@ def _getframe(frames, cls_, default):
         return default
     return df_astype(df, cls_)
 
+def _get_pfc_slacks(slacks):
+    slack_groups = slacks.groupby('index_of_node')
+    slack_groups_size = slack_groups.size()
+    slack_groups_first = (
+        slack_groups[['id_of_node', 'switch_flow_index', 'in_super_node']]
+        .first())
+    slack_groups_first['V'] = slack_groups.V.sum() / slack_groups_size
+    return slack_groups_first.reset_index()
+    # # identifies slacks connected without impedance to other slacks
+    # # currently not used for substitution
+    # super_slacks = 1 < slack_groups_size
+    # super_slack_idxs = super_slacks[super_slacks].index
+    # head_tail = lambda col: (col[0], col[1:].to_list())
+    # slackid_groups = [
+    #     head_tail(slack_groups.id_of_node.get_group(group_name))
+    #     for group_name in super_slack_idxs]
+
+def _get_factors(injassoc, termassoc, factor_frame, branchterminals):
+    # injection links
+    is_valid_injassoc = (
+        injassoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(factor_frame.type, how='left')
+        .isin(('const', 'var')))
+    is_valid_injassoc.index = injassoc.index
+    # terminal links
+    is_valid_termassoc = (
+        termassoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(factor_frame.type, how='left')
+        .isin(('const', 'var')))
+    is_valid_termassoc.index = termassoc.index
+    return make_factordefs(
+        factor_frame,
+        termassoc[is_valid_termassoc.type],
+        injassoc[is_valid_injassoc.type],
+        branchterminals)
+
+def _get_factors2(dataframes, branchterminals):
+    # factors
+    factors_ = (
+        _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
+    # links of injection
+    injassoc_ = _getframe(dataframes, Injectionlink, INJLINKS)
+    injassoc_ = (
+        injassoc_[injassoc_.part.isin(['p', 'q'])]
+        .set_index(['step', 'injid', 'part']))
+    injassoc_.index.names = ['step', 'id_of_injection', 'part']
+    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
+    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
+    # links of terminals
+    #   filter for existing branchterminals
+    termlinks = _getframe(dataframes, Terminallink, TERMINALLINKS)
+    at_term = (
+        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
+        .isin(
+            pd.MultiIndex.from_frame(
+                branchterminals[['id_of_branch', 'id_of_node']])))
+    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
+    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
+    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
+    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
+    # filter stepwise for intersection of injlinks+termlinks and factors
+    df_ = pd.concat(
+        [pd.DataFrame([], index=injindex_),
+         pd.DataFrame([], index=termindex_)])
+    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
+    return _get_factors(injassoc, termassoc, factor_frame, branchterminals)
+
 def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     """Creates a network model for power flow calculation.
 
@@ -681,6 +752,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .nodes, pandas.DataFrame, slack nodes are first
         * .slacks, pandas.DataFrame
         * .injections, pandas.DataFrame
+        * .terminal_to_branch, numpy.array, int
         * .branchterminals, pandas.DataFrame
         * .bridgeterminals, pandas.DataFrame
         * .branchoutputs, pandas.DataFrame
@@ -689,6 +761,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         * .qvalues, pandas.DataFrame
         * .ivalues, pandas.DataFrame
         * .vvalues, pandas.DataFrame
+        * .vlimits, pandas.DataFrame
         * .shape_of_Y, tuple of int, shape of admittance matrix
         * .count_of_slacks, int, number of slacks for power flow calculation
         * .y_max, float, maximum admittance between two power-flow-calculation
@@ -708,24 +781,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
         slacks_.id_of_node, branches_)
     add_idx_of_node = partial(_join_on, pfc_nodes, 'id_of_node')
-    #  processing of slack nodes especially if multiple slack-nodes are
-    #   placed in the same pfc-node
-    slacks = _join_index_of_node_inner(pfc_nodes, slacks_)
-    slack_groups = slacks.groupby('index_of_node')
-    slack_groups_size = slack_groups.size()
-    slack_groups_first = (
-        slack_groups[['id_of_node', 'switch_flow_index', 'in_super_node']]
-        .first())
-    slack_groups_first['V'] = slack_groups.V.sum() / slack_groups_size
-    pfc_slacks = slack_groups_first.reset_index()
-    # identifies slacks connected without impedance to other slacks
-    # currently not used for substitution
-    super_slacks = 1 < slack_groups_size
-    super_slack_idxs = super_slacks[super_slacks].index
-    head_tail = lambda col: (col[0], col[1:].to_list())
-    slackid_groups = [
-        head_tail(slack_groups.id_of_node.get_group(group_name))
-        for group_name in super_slack_idxs]
+    #  processing of slack nodes
+    pfc_slacks = _get_pfc_slacks(
+        slacks_.join(pfc_nodes, on='id_of_node', how='inner'))
     # branches and terminals
     count_of_branches = sum(~branches_.is_bridge)
     count_of_branchterms = 2 * count_of_branches
@@ -762,55 +820,6 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     injectionoutputs = _prepare_injection_outputs(
         injections,
         outputs.loc[is_injection_output, ['id_of_batch', 'id_of_device']])
-    # factors
-    factors_ = (
-        _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
-    # links of injection
-    injassoc_ = _getframe(dataframes, Injectionlink, INJLINKS)
-    injassoc_ = (
-        injassoc_[injassoc_.part.isin(['p', 'q'])]
-        .set_index(['step', 'injid', 'part']))
-    injassoc_.index.names = ['step', 'id_of_injection', 'part']
-    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
-    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
-    # links of terminals
-    #   filter for existing branchterminals
-    termlinks = _getframe(dataframes, Terminallink, TERMINALLINKS)
-    at_term = (
-        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
-        .isin(
-            pd.MultiIndex.from_frame(
-                branchterminals[['id_of_branch', 'id_of_node']])))
-    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
-    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
-    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
-    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
-    # filter stepwise for intersection of injlinks+termlinks and factors
-    df_ = pd.concat(
-        [pd.DataFrame([], index=injindex_),
-         pd.DataFrame([], index=termindex_)])
-    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
-    # injection links
-    is_valid_injassoc = (
-        injassoc
-        .reset_index(['step'])
-        .set_index(['step', 'id'])
-        .join(factor_frame.type, how='left')
-        .isin(('const', 'var')))
-    is_valid_injassoc.index = injassoc.index
-    # terminal links
-    is_valid_termassoc = (
-        termassoc
-        .reset_index(['step'])
-        .set_index(['step', 'id'])
-        .join(factor_frame.type, how='left')
-        .isin(('const', 'var')))
-    is_valid_termassoc.index = termassoc.index
-    factors = make_factordefs(
-        factor_frame,
-        termassoc[is_valid_termassoc.type],
-        injassoc[is_valid_injassoc.type],
-        branchterminals)
     # math terms (parts) of objective function
     terms = _getframe(dataframes, Term, TERMS)
     return Model(
@@ -826,10 +835,11 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         qvalues=_getframe(dataframes, QValue, QVALUES),
         ivalues=_getframe(dataframes, IValue, IVALUES),
         vvalues=add_idx_of_node(_getframe(dataframes, Vvalue, VVALUES)),
+        vlimits=add_idx_of_node(_getframe(dataframes, Vlimit, VLIMITS)),
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
-        factors=factors,
+        factors=_get_factors2(dataframes, branchterminals),
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))

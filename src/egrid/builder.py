@@ -27,7 +27,8 @@ import re
 from itertools import chain, tee
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-    Factor, Defk, Deft, expand_def, DEFAULT_FACTOR_ID,
+    Vlimit, expand_defvl, Factor, Defk, Deft, Defvl, expand_def,
+    DEFAULT_FACTOR_ID,
     Klink, Tlink, expand_klink, expand_tlink, Injectionlink, Terminallink,
     Term, Message, meta_of_types)
 
@@ -73,7 +74,7 @@ MODEL_TYPES = (
     Branch, Slacknode, Injection,
     Output, PValue, QValue, IValue, Vvalue,
     Term, Message)
-SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Klink, Tlink)
+SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
 def _create_slack(e_id, attributes):
@@ -365,13 +366,13 @@ def make_model_objects(entities):
 def make_data_frames(devices=()):
     """Creates a dictionary of pandas.DataFrame instances from an iterable
     of devices (Branch, Slacknode, Injection, Output, PValue, QValue, IValue,
-    Vvalue, Branchtaps, Defk, Link, Message)
+    Vvalue, Defk, Deft, Defvl, Klink, Tlink, Message)
 
     Parameters
     ----------
     devices: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link
+        Defk, Deft, Defvl, Kink, Tlink
 
     Returns
     -------
@@ -418,6 +419,12 @@ def make_data_frames(devices=()):
             pandas.DataFrame
             * .id_of_node, str
             * .V, float, magnitude of voltage, pu
+        * 'Vlimit':
+            pandas.DataFrame
+            * .id_of_node, str
+            * .min, float
+            * .max, float
+            * .step, int
         * 'Factor':
             pandas.DataFrame
             * .id, str, ID of load factor
@@ -478,6 +485,10 @@ def make_data_frames(devices=()):
         chain.from_iterable(
             expand_tlink(*args) for args in sources[Tlink.__name__]),
         columns=Terminallink._fields)
+    dataframes[Vlimit.__name__] = pd.DataFrame(
+        chain.from_iterable(
+            expand_defvl(defvl) for defvl in sources[Defvl.__name__]),
+        columns=Vlimit._fields)
     return dataframes
 
 def _flatten(args):
