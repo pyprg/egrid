@@ -21,9 +21,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 import context
+import numpy as np
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Klink, Tlink)
+    Message, Defk, Klink, Tlink, Vlimit)
 
 _EMPTY_DICT = {}
 
@@ -450,6 +451,23 @@ class Make_data_frames(unittest.TestCase):
         self.assertTrue(
             all(df.empty for key, df in frames.items()),
             'all dataframes are empty')
+
+    def test_vlimit(self):
+        frames = make_data_frames([Vlimit(id_of_node='n_0')])
+        vlimit = frames['Vlimit'].loc[0]
+        self.assertEqual(vlimit.id_of_node, 'n_0')
+        self.assertEqual(vlimit['min'], 0)
+        self.assertEqual(vlimit['max'], np.inf)
+        self.assertEqual(vlimit.step, -1)
+
+    def test_vlimit2(self):
+        objs = create_objects(['#.Defvl(id_of_node=n_0)'])
+        frames = make_data_frames(objs)
+        vlimit = frames['Vlimit'].loc[0]
+        self.assertEqual(vlimit.id_of_node, 'n_0')
+        self.assertEqual(vlimit['min'], 0)
+        self.assertEqual(vlimit['max'], np.inf)
+        self.assertEqual(vlimit.step, -1)
 
     def test_injlink(self):
         objs = create_objects(

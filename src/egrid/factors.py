@@ -191,7 +191,10 @@ def make_factordefs(
     injection_factor_associations: pandas.DataFrame
 
     branchterminals: pandas.DataFrame
-
+        * .id_of_node
+        * .id_of_branch
+        * .index_of_terminal
+        * .index_of_other_terminal'
 
     Returns
     -------

@@ -350,16 +350,16 @@ def _get_branch_terminals(branches, count_of_branches):
         terms_a[count_of_branches:],
         terms_b[count_of_branches:]])
 
-def _prepare_nodes(dataframes):
-    node_ids = np.unique(
-        _getframe(dataframes, Branch, BRANCHES)
-        [['id_of_node_A', 'id_of_node_B']]
-        .to_numpy()
-        .reshape(-1))
-    node_id_index = pd.Index(node_ids, dtype=str)
-    return pd.DataFrame(
-        data={'idx': range(len(node_id_index))},
-        index=node_id_index)
+# def _prepare_nodes(dataframes):
+#     node_ids = np.unique(
+#         _getframe(dataframes, Branch, BRANCHES)
+#         [['id_of_node_A', 'id_of_node_B']]
+#         .to_numpy()
+#         .reshape(-1))
+#     node_id_index = pd.Index(node_ids, dtype=str)
+#     return pd.DataFrame(
+#         data={'idx': range(len(node_id_index))},
+#         index=node_id_index)
 
 def _prepare_branches(branches, nodes, count_of_branches):
     """Adds IDs of nodes and indices of terminals. Sorts by 'is_bridge'.
@@ -615,6 +615,32 @@ def _get_pfc_slacks(slacks):
     #     for group_name in super_slack_idxs]
 
 def _get_factors(injassoc, termassoc, factor_frame, branchterminals):
+    """Arranges data of factors for further processing.
+
+    Parameters
+    ----------
+    injassoc: pandas.DataFrame
+
+    termassoc: pandas.DataFrame
+
+    factor_frame: pandas.DataFrame
+
+    branchterminals: pandas.DataFrame
+        * .id_of_node
+        * .id_of_branch
+        * .index_of_terminal
+        * .index_of_other_terminal
+
+    Returns
+    -------
+    Factors
+        * .gen_factordata, pandas.DataFrame
+        * .gen_injfactor, pandas.DataFrame
+        * .terminalfactors, pandas.DataFrame
+        * .get_groups: function
+            (iterable_of_int)-> (pandas.DataFrame)
+        * .get_injfactorgroups: function
+            (iterable_of_int)-> (pandas.DataFrame)"""
     # injection links
     is_valid_injassoc = (
         injassoc
@@ -637,7 +663,92 @@ def _get_factors(injassoc, termassoc, factor_frame, branchterminals):
         injassoc[is_valid_injassoc.type],
         branchterminals)
 
+def _get_vlimits(dataframes, pfc_nodes):
+    # limits
+    vlimits_ = _getframe(dataframes, Vlimit, VLIMITS)
+    # connectivity nodes
+    empty_node_ids = vlimits_.id_of_node==''
+    if any(empty_node_ids):
+        node_ids = pfc_nodes.index
+        node_count = len(node_ids)
+        # complete set of all node Ids for each row with node
+        vlimits_empty_ids= vlimits_[empty_node_ids]
+        generic = (
+            # generate entries for each node per empty id_of_node
+            pd.DataFrame(
+                np.repeat(
+                    vlimits_empty_ids[['min', 'max', 'step']].values,
+                    node_count,
+                    axis=0),
+                columns=['min', 'max', 'step'],
+                index=pd.Index(
+                    np.concatenate(
+                        [node_ids.to_numpy()
+                         for _ in range(len(vlimits_empty_ids))]),
+                    name='id_of_node'))
+            .astype({'step':int})
+            .set_index('step', append=True))
+        # update with explicitely given values for the specific steps
+        generic.update(
+            vlimits_[~empty_node_ids].set_index(['id_of_node', 'step']))
+        return generic.reset_index(drop=False)
+    else:
+        return vlimits_
+
+def _aggregate_vlimits(vlimits):
+    """Aggregates values for same node and step.
+    ::
+        min_value = max(min_input_values)
+        max_value = min(max_input_values)
+
+    Parameters
+    ----------
+    vlimits: pandas.DataFrame
+        * .index_of_node, int
+        * .min, float
+           smallest possible magnitude of the voltage at node
+        * .max, float
+           greatest possible magnitude of the voltage at node
+        * .step, int
+           index of optimization step, -1 for all steps
+
+    Returns
+    -------
+    pandas.DataFrame
+        * .index_of_node, int
+        * .min, float
+        * .max, float
+        * .step, int"""
+    grouped = vlimits.groupby(['step', 'index_of_node'])
+    return (
+        pd.concat([grouped['min'].max(), grouped['max'].min()], axis=1)
+        .reset_index())
+
 def _get_factors2(dataframes, branchterminals):
+    """Arranges data of factors for further processing.
+
+    Parameters
+    ----------
+    dataframes: dict
+        * [Factor] => pandas.DataFrame
+        * [Injectionlink] => pandas.DataFrame
+        * [Terminallink] => pandas.DataFrame
+    branchterminals: pandas.DataFrame
+        * .id_of_node
+        * .id_of_branch
+        * .index_of_terminal
+        * .index_of_other_terminal
+
+    Returns
+    -------
+    Factors
+        * .gen_factordata, pandas.DataFrame
+        * .gen_injfactor, pandas.DataFrame
+        * .terminalfactors, pandas.DataFrame
+        * .get_groups: function
+            (iterable_of_int)-> (pandas.DataFrame)
+        * .get_injfactorgroups: function
+            (iterable_of_int)-> (pandas.DataFrame)"""
     # factors
     factors_ = (
         _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
@@ -806,6 +917,8 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     if not injections['id'].is_unique:
         msg = "Error: IDs of injections must be unique but are not."
         raise ValueError(msg)
+    # limits
+    vlimits = add_idx_of_node(_get_vlimits(dataframes, pfc_nodes))
     # measured terminals
     outputs = _getframe(dataframes, Output, OUTPUTS)
     is_branch_output = outputs.id_of_device.isin(branches.id)
@@ -835,7 +948,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         qvalues=_getframe(dataframes, QValue, QVALUES),
         ivalues=_getframe(dataframes, IValue, IVALUES),
         vvalues=add_idx_of_node(_getframe(dataframes, Vvalue, VVALUES)),
-        vlimits=add_idx_of_node(_getframe(dataframes, Vlimit, VLIMITS)),
+        vlimits=_aggregate_vlimits(vlimits),
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
@@ -867,3 +980,31 @@ def get_pfc_nodes(nodes):
     pfc_nodes.reset_index(inplace=True)
     pfc_nodes.set_index('node_id', inplace=True)
     return pfc_nodes
+
+def get_vlimits_for_step(vlimits, index_of_step):
+    """Fetches minimum and maximum values for given index of optimization step.
+
+    Adds generic values to step specific values.
+
+    Parameters
+    ----------
+    vlimits: pandas.DataFrame
+        * .index_of_node, int
+        * .min, float
+        * .max, float
+        * .step, int
+    index_of_step : int
+        index of optimization step
+
+    Returns
+    -------
+    pandas.DataFrame (index: index_of_node)
+        * .min, float
+        * .max, float"""
+    generic_limits = vlimits[vlimits.step==-1].set_index('index_of_node')
+    step_limits = (
+        vlimits[vlimits.step==index_of_step].set_index('index_of_node'))
+    index = generic_limits.index.union(step_limits.index)
+    res = generic_limits.reindex(index)
+    res.update(step_limits)
+    return res.drop(columns=['step'])

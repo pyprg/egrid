@@ -179,13 +179,14 @@ Vvalue: float (default value 1.0)
 
 Vlimit = namedtuple(
     'Vlimit',
-    'id_of_node min max step', defaults=(0., np.inf, -1))
+    'id_of_node min max step', defaults=("", 0., np.inf, -1))
 Vlimit.__doc__ = """Limits of node voltage.
 
 Parameters
 ----------
 id_of_node: str
-    identifier of connectivity node
+    optional, defaults to ""
+    identifier of connectivity node, empty string "" addresses all nodes
 min: float
     optional, default 0
     smallest possible magnitude of the voltage at node
@@ -194,7 +195,7 @@ max: float
     greatest possible magnitude of the voltage at node
 step: int
     optional, default -1
-    index of optimization step, for all steps"""
+    index of optimization step, -1 for all steps"""
 
 DEFAULT_FACTOR_ID = '_default_'
 

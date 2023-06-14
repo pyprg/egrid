@@ -72,7 +72,7 @@ def e3(string):
 # all device types of gridmodel.Model and taps and analog values with helper
 MODEL_TYPES = (
     Branch, Slacknode, Injection,
-    Output, PValue, QValue, IValue, Vvalue,
+    Output, PValue, QValue, IValue, Vvalue, Vlimit,
     Term, Message)
 SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
@@ -485,10 +485,12 @@ def make_data_frames(devices=()):
         chain.from_iterable(
             expand_tlink(*args) for args in sources[Tlink.__name__]),
         columns=Terminallink._fields)
-    dataframes[Vlimit.__name__] = pd.DataFrame(
+    vlimits = dataframes[Vlimit.__name__]
+    vlimits2 = pd.DataFrame(
         chain.from_iterable(
             expand_defvl(defvl) for defvl in sources[Defvl.__name__]),
         columns=Vlimit._fields)
+    dataframes[Vlimit.__name__] = pd.concat([vlimits, vlimits2])
     return dataframes
 
 def _flatten(args):
@@ -536,14 +538,14 @@ def create_objects(args=()):
     ----------
     args: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Branchtaps, Defk, Link, Term, Message, str and iterables thereof;
-        strings in args are processed with graphparser.parse
+        Defk, Deft, Defvl, Klink, Tlink, Term, Message, str and 
+        iterables thereof; strings in args are processed with graphparser.parse
 
     Returns
     -------
     iterator
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Defk, Deft, Link, Term, Message"""
+        Defk, Deft, Defvl, Link, Term, Message"""
     t1, t2 = tee(_flatten(args))
     return chain(
         (t for t in t1 if not isinstance(t, str)),

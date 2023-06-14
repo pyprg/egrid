@@ -19,20 +19,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 @author: pyprg
 """
+import context
 import unittest
 import scipy.sparse
+import pandas as pd
 from numpy import inf
-from pandas import DataFrame as DF
-import context
+from numpy.testing import assert_array_equal
 from egrid import make_model
 from egrid.builder import (
     Slacknode, Branch, Injection,
-    make_data_frames, create_objects)
-from egrid.model import Model, model_from_frames
-from egrid.builder import Factor
+    make_data_frames, create_objects, Factor, Vlimit)
+from egrid.model import (
+    Model, model_from_frames, _aggregate_vlimits, get_vlimits_for_step)
 
 
-_factor_test_string = """
+_test_net_string = """
                                   P10=7 Q10=4
                          n1 -->> inj1
                          ||
@@ -59,10 +60,41 @@ slack0 <------br0------> n1 <------br1------> n2 -->> inj2
 #.     is_discrete=True type=var step(0 1 2))
 #.  Tlink(id_of_branch=br1 id_of_node=n1 id_of_factor=br1_n1 step(0 1 2))"""
 
+
+class Aggregate_vlimits(unittest.TestCase):
+
+    def test_aggregate_vlimits(self):
+        """also tests get_vlimits_for_step"""
+        vlimit_in = pd.DataFrame(
+            {'id_of_node':   ['n0', 'n0',  'n0', 'n0', 'n1', 'n1', 'n1', 'n1'],
+              'step':         [-1,   -1,    3,    2,    2,    1,    1,    1],
+              'index_of_node':[0,    0,     0,    0,    1,    1,    1,    1],
+              'min':          [  .6,   .7,   .8,   .9,   .71,  .74,  .73,  .73],
+              'max':          [ 1.6,  1.9,  1.5,  1.7,  1.6,  1.9,  1.5,  1.7]})
+        vlimit = _aggregate_vlimits(vlimit_in)
+        Vlimit_exp = pd.DataFrame(
+            {'step':          [-1,   1,   2,   2,   3],
+              'index_of_node': [ 0,   1,   0,   1,   0],
+              'min':           [  .7,  .74, .9,  .71, .8],
+              'max':           [ 1.6, 1.5, 1.7, 1.6, 1.5]})
+        assert_array_equal(vlimit.to_numpy(), Vlimit_exp.to_numpy())
+        df_exp_step2 = pd.DataFrame(
+            {'min':[.9, .71], 'max':[1.7, 1.6]}, index=[0, 1])
+        df_step2 = get_vlimits_for_step(vlimit, 2)
+        assert_array_equal(df_step2.to_numpy(), df_exp_step2.to_numpy())
+
+    def test_generic_vlimits(self):
+        model = make_model(
+            create_objects(_test_net_string),
+            Vlimit(),
+            Vlimit(max=2.),
+            Vlimit(id_of_node='n1', min=.5))
+        # print(model)
+
 class Make_data_Frames(unittest.TestCase):
 
     def test_make_data_frames(self):
-        frames = make_data_frames(create_objects(_factor_test_string))
+        frames = make_data_frames(create_objects(_test_net_string))
         rowcounts = {
             'Branch': 2, 'Slacknode': 1, 'Injection': 2, 'Factor': 12,
             'Injectionlink': 6, 'Terminallink': 6}
@@ -96,7 +128,8 @@ class Make_model(unittest.TestCase):
             model.vlimits,
             model.terms,
             model.messages]
-        empty_dataframe = ((isinstance(df, DF) and df.empty) for df in frames)
+        empty_dataframe = (
+            (isinstance(df, pd.DataFrame) and df.empty) for df in frames)
         self.assertTrue(all(empty_dataframe), 'empty data frames')
         self.assertEqual(model.shape_of_Y, (0,0), 'matrix shape is 0,0')
         self.assertEqual(model.count_of_slacks, 0, 'no slack')
@@ -161,7 +194,7 @@ class Make_model(unittest.TestCase):
             model.shape_of_Y, (1,1), 'one pfc node (branch without impedance)')
 
     def test_make_with_factors(self):
-        model = make_model(_factor_test_string)
+        model = make_model(_test_net_string)
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(
             len(model.branchterminals), 4, 'four branch terminals')
