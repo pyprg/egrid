@@ -201,9 +201,9 @@ DEFAULT_FACTOR_ID = '_default_'
 
 Factor = namedtuple(
     'Factor',
-    'id type id_of_source value min max is_discrete m n step',
+    'id type id_of_source value min max is_discrete m n step cost',
     defaults=(
-        'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., -1))
+        'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., -1, 1.))
 Factor.__doc__ = """Data of a factor.
 
 Parameters
@@ -230,7 +230,9 @@ m: float (default 1.)
 n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value -1)
-    index of optimization step, defined for each step if set to -1"""
+    index of optimization step, defined for each step if set to -1
+cost: float (default 1.)
+    cost of change (for Volt-Var-Control)"""
 
 Terminallink = namedtuple(
     'Terminallink', 'branchid nodeid id step', defaults=(-1,))
@@ -351,15 +353,15 @@ def expand_def(mydef):
             id_, mydef.type,
             (id_ if mydef.id_of_source is None else mydef.id_of_source),
             mydef.value, mydef.min, mydef.max, mydef.is_discrete,
-            mydef.m, mydef.n, step)
+            mydef.m, mydef.n, step, mydef.cost)
         for id_, step in product(ids, iter_steps))
 
 # convenience
 
 Defk = namedtuple(
     'Defk',
-    'id type id_of_source value min max is_discrete m n step',
-    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1))
+    'id type id_of_source value min max is_discrete m n step cost',
+    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1, 1.))
 Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
@@ -389,12 +391,14 @@ n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
     not used
 step: int (default value -1)
-    index of optimization step, for each step set to -1"""
+    index of optimization step, for each step set to -1
+cost: float (default 1.)
+    cost of change (for Volt-Var-Control)"""
 
 Deft = namedtuple(
     'Deft',
-    'id type id_of_source value min max is_discrete m n step',
-    defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1))
+    'id type id_of_source value min max is_discrete m n step cost',
+    defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1, 1.))
 Deft.__doc__ = """Definition of a taps (terminal) factor.
 
 Parameters
@@ -422,7 +426,9 @@ m: float (default -.1/16)
 n: float (default 1.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value -1)
-    index of optimization step, for each step set to -1"""
+    index of optimization step, for each step set to -1
+cost: float (default 1.)
+    cost of change (for Volt-Var-Control)"""
 
 def _iterable(item):
     return item if isinstance(item, (list, tuple)) else[item]
@@ -527,21 +533,23 @@ _attribute_types = {
          [_tostring, np.int16],
          [False, False]),
      #    id      type id_of_source value     min
-     #    max     is_discrete   step
+     #    max     is_discrete   step       cost
      Defk:(
          [object, object, object, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16],
+          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
          [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16],
-         [True, False, False, False, False, False, False, False, False, True]),
+          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
+         [True, False, False, False, False, False, False, False, False, True,
+          False]),
      #    id      type id_of_source value     min
      #    max     is_discrete   m    n   step
      Deft:(
          [object, object, object, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16],
+          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
          [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16],
-         [True, False, False, False, False, False, False, False, False, True]),
+          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
+         [True, False, False, False, False, False, False, False, False, True,
+          False]),
      #    id_of_node min max step
      Defvl:([object, np.float64, np.float64, np.int16],
             [_tostring, np.float64, np.float64, np.int16],

@@ -164,13 +164,16 @@ factors: egrid.factors.Factors (namedtuple)
         * .is_discrete, bool
            just 0 digits after decimal point if True, input for solver,
            accepted by MINLP solvers
-        * .m, float
-           increase of multiplier with respect to change of var/const
-           the effective multiplier is a linear function of var/const (mx + n)
-        * .n, float
-           multiplier when var/const is 0.
-           the effective multiplier is a linear function of var/const (mx + n)
+        * .m, float,
+           multiplier,
+           the effective value of the factor is a linear function
+           of var/const (mx + n)
+        * .n, float,
+           value of factor when var/const is 0,
+           the effective value of the factor is a linear function
+           of var/const (mx + n)
         * .index_of_symbol, int
+        * .cost, float, cost of changing (for Volt-Var-control)
 
     * .gen_injfactor, pandas.DataFrame (index: ('id_of_injection', 'part'))
 
@@ -191,6 +194,7 @@ factors: egrid.factors.Factors (namedtuple)
         * .m, float
         * .n, float
         * .index_of_symbol, int
+        * .cost, float, cost of changing (for Volt-Var-control)
 
     * .get_groups: function (iterable_of_int) -> (pandas.DataFrame)
 
@@ -217,6 +221,7 @@ factors: egrid.factors.Factors (namedtuple)
                multiplier when var/const is 0.
                the effective multiplier is a linear function of
                var/const (mx + n)
+            * .cost, float, cost of changing (for Volt-Var-control)
 
     * .get_injfactorgroups: function (iterable_of_int) -> (pandas.DataFrame)
 
