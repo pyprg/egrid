@@ -261,7 +261,7 @@ Factormeta = namedtuple(
     'Factormeta',
     'id_of_step_symbol '
     'index_of_kpq_symbol index_of_var_symbol index_of_const_symbol '
-    'values_of_vars var_min var_max is_discrete '
+    'values_of_vars cost_of_change var_min var_max is_discrete '
     'values_of_consts '
     'var_const_to_factor var_const_to_kp var_const_to_kq var_const_to_ftaps')
 Factormeta.__doc__="""
@@ -279,6 +279,8 @@ index_of_const_symbol: numpy.array
     int, indices of parameters
 values_of_vars: numpy.array
     column vector, initial values for vars
+cost_of_change: numpy.array
+    float
 var_min: numpy.array
     lower limits of vars
 var_max: numpy.array
@@ -908,11 +910,12 @@ def _make_factor_meta(
         factors.id[count_of_generic_factors <= factors.index_of_symbol])
     return Factormeta(
         id_of_step_symbol=id_of_step_symbol, # per optimization step
-        index_of_var_symbol = factors_var.index_of_symbol,
-        index_of_const_symbol = factors_consts.index_of_symbol,
-        index_of_kpq_symbol = injection_factors[['kp', 'kq']].to_numpy(),
+        index_of_var_symbol=factors_var.index_of_symbol,
+        index_of_const_symbol=factors_consts.index_of_symbol,
+        index_of_kpq_symbol=injection_factors[['kp', 'kq']].to_numpy(),
         # initial values, argument in solver call
         values_of_vars=values_of_vars,
+        cost_of_change=factors_var.cost,
         # lower bound of scaling factors, argument in solver call
         var_min=factors_var['min'],
         # upper bound of scaling factors, argument in solver call

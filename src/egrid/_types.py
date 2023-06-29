@@ -525,6 +525,9 @@ def expand_defvl(defvl):
 def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
+def _tobool(string):
+    return False if string.upper() == 'False' else bool(string)
+
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
      #    message level
@@ -538,7 +541,7 @@ _attribute_types = {
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16, np.float64],
          [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
+          np.float64, _tobool, np.float64, np.float64, np.int16, np.float64],
          [True, False, False, False, False, False, False, False, False, True,
           False]),
      #    id      type id_of_source value     min
@@ -547,7 +550,7 @@ _attribute_types = {
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16, np.float64],
          [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, bool, np.float64, np.float64, np.int16, np.float64],
+          np.float64, _tobool, np.float64, np.float64, np.int16, np.float64],
          [True, False, False, False, False, False, False, False, False, True,
           False]),
      #    id_of_node min max step
@@ -560,7 +563,7 @@ _attribute_types = {
          [object, object, object, np.float64, np.float64, np.float64,
           bool, np.float64, np.float64, np.int16],
          [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64,
-          bool, np.float64, np.float64, np.int16],
+          _tobool, np.float64, np.float64, np.int16],
          [False, False, False, False, False, False,
           False, False, False, False]),
      #    injid, part, id, step
