@@ -361,7 +361,7 @@ def expand_def(mydef):
 Defk = namedtuple(
     'Defk',
     'id type id_of_source value min max is_discrete m n step cost',
-    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1, 1.))
+    defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1, 0.))
 Defk.__doc__ = """Definition of a scaling factor.
 
 Parameters
@@ -398,7 +398,7 @@ cost: float (default 1.)
 Deft = namedtuple(
     'Deft',
     'id type id_of_source value min max is_discrete m n step cost',
-    defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1, 1.))
+    defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1, 0.))
 Deft.__doc__ = """Definition of a taps (terminal) factor.
 
 Parameters
@@ -526,7 +526,7 @@ def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
 def _tobool(string):
-    return False if string.upper() == 'False' else bool(string)
+    return False if string.upper() == 'FALSE' else bool(string)
 
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
