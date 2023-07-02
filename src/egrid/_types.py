@@ -105,15 +105,18 @@ id_of_node: str (default value None)
 
 PValue = namedtuple(
     'PValue',
-    'id_of_batch P direction',
-    defaults=(0., 1.))
-PValue.__doc__ = """Value of (measured) active power. The
-optimization (estimation) target is to meet those (and other given) values.
+    'id_of_batch P direction cost',
+    defaults=(0., 1., 0.))
+PValue.__doc__ = """Value of (measured) active power.
+
+The optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance(s) having the identical 'id_of_batch' value must
 exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by PValue and Output instances
 sharing the same 'id_of_batch'-value.
+
+Attribute cost is introduced for Volt-Var-Control.
 
 Parameters
 ----------
@@ -122,19 +125,24 @@ id_of_batch: str
 P: float
     active power, sum of all three phases
 direction: float (default value 1)
-    -1 or 1"""
+    -1 or 1
+cost: float (default value 0)
+    cost"""
 
 QValue = namedtuple(
     'QValue',
-    'id_of_batch Q direction',
-    defaults=(0., 1.))
-QValue.__doc__ = """Value of (measured) reactive power. The
-optimization (estimation) target is to meet those (and other given) values.
+    'id_of_batch Q direction cost',
+    defaults=(0., 1., 0.))
+QValue.__doc__ = """Value of (measured) reactive power.
+
+The optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance(s) having the identical 'id_of_batch' value
 must exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by QValue and Output instances
 sharing the same 'id_of_batch'-value.
+
+Attribute cost is introduced for Volt-Var-Control.
 
 Parameters
 ----------
@@ -143,7 +151,9 @@ id_of_batch: str
 Q: float
     reactive power, sum of all three phases
 direction: float (default value 1)
-    -1 or 1"""
+    -1 or 1
+cost: float (default value 0)
+    cost"""
 
 IValue = namedtuple(
     'IValue',
@@ -598,14 +608,14 @@ _attribute_types = {
          [False, False, False]),
      #    id_of_batch   P     direction
      PValue:(
-         [object, np.float64, np.float64],
-         [_tostring,  np.float64, np.float64],
-         [False, False, False]),
+         [object, np.float64, np.float64, np.float64],
+         [_tostring,  np.float64, np.float64, np.float64],
+         [False, False, False, False]),
      #    id_of_batch   Q     direction
      QValue:(
-         [object, np.float64, np.float64],
-         [_tostring, np.float64, np.float64],
-         [False, False, False]),
+         [object, np.float64, np.float64, np.float64],
+         [_tostring, np.float64, np.float64, np.float64],
+         [False, False, False, False]),
      #    id_of_batch   I
      IValue:(
          [object, np.float64],

@@ -25,6 +25,7 @@ import pandas as pd
 import numpy as np
 import re
 from itertools import chain, tee
+from collections import defaultdict
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
     Vlimit, expand_defvl, Factor, Defk, Deft, Defvl, expand_def,
@@ -219,35 +220,47 @@ def _is_connectivity_node(string):
     bool"""
     return string.startswith('n') or string.startswith('slack')
 
-def _create_pvalue(id_of_node, id_of_device, val):
+def _create_pvalue(id_of_node, id_of_device, vals):
+    atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
+    atts.update((k, e3(v)) for k,v in vals.items())
     try:
-        return True, PValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}', P=float(e3(val)))
+        return True, PValue(**atts)
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"value {val} of attribute 'P' must be of type float, "
-            f"(error: {str(e)})")
+            f"all values for 'P/P...' ({vals}) "
+            f"must be of type float, (error: {str(e)})")
 
-def _create_qvalue(id_of_node, id_of_device, val):
+def _create_qvalue(id_of_node, id_of_device, vals):
+    atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
+    atts.update((k, e3(v)) for k,v in vals.items())
     try:
-        return True, QValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}', Q=float(e3(val)))
+        return True, QValue(**atts)
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"value {val} of attribute 'Q' must be of type float, "
-            f"(error: {str(e)})")
+            f"all values for 'Q/Q...' ({vals}) "
+            f"must be of type float, (error: {str(e)})")
 
-def _create_ivalue(id_of_node, id_of_device, val):
+def _create_ivalue(id_of_node, id_of_device, vals):
+    atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
+    atts.update((k, e3(v)) for k,v in vals.items())
     try:
-        return True, IValue(
-            id_of_batch=f'{id_of_node}_{id_of_device}', I=float(e3(val)))
+        return True, IValue(**atts)
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"value {val} of attribute 'I' must be of type float, "
-            f"(error: {str(e)})")
+            f"all values for 'I/I...' ({vals}) "
+            f"must be of type float, (error: {str(e)})")
+
+def _collect_attributes(attributes):
+    d = defaultdict(dict)
+    for key, val in attributes.items():
+        m = re.match(r'(\w+)(\.(\w+))?', key)
+        if not m is None:
+            part_two = m.groups()[2]
+            d[m.group(1)][m.string if part_two is None else part_two] = val
+    return d
 
 def _make_edge_objects(data):
     """Creates data objects which are associated to an edge.
@@ -271,25 +284,26 @@ def _make_edge_objects(data):
             f"Error in data of edge '{neighbours[0]}-{neighbours[1]}', "
              "one node needs to be a connectivity node and one a device node "
              "(IDs of connectivity nodes start with letter 'n', "
-             "slack-nodes with prefix 'slack')")
+             "slack-nodes (which are connectivity nodes) with prefix 'slack')")
         return
     id_of_node, id_of_device = neighbours if a_is_node else neighbours[::-1]
     create_output = False
+    collected = _collect_attributes(attributes)
     has_p, has_q, has_I, has_Tl = (
-        key in attributes for key in ('P', 'Q', 'I', 'Tlink'))
+        key in collected for key in ('P', 'Q', 'I', 'Tlink'))
     if has_p:
         success, val = _create_pvalue(
-            id_of_node, id_of_device, attributes['P'])
+            id_of_node, id_of_device, collected['P'])
         yield val
         create_output |= success
     if has_q:
         success, val = _create_qvalue(
-            id_of_node, id_of_device, attributes['Q'])
+            id_of_node, id_of_device, collected['Q'])
         yield val
         create_output |= success
     if has_I:
         success, val = _create_ivalue(
-            id_of_node, id_of_device, attributes['I'])
+            id_of_node, id_of_device, collected['I'])
         yield val
         create_output |= success
     if create_output:
@@ -298,10 +312,12 @@ def _make_edge_objects(data):
             id_of_node=id_of_node,
             id_of_device=id_of_device)
     if has_Tl:
-        yield Tlink(
-            id_of_node=id_of_node,
-            id_of_branch=id_of_device,
-            id_of_factor=attributes['Tlink'])
+        terminallink = collected['Tlink'].get('Tlink')
+        if terminallink:
+            yield Tlink(
+                id_of_node=id_of_node,
+                id_of_branch=id_of_device,
+                id_of_factor=terminallink)
 
 def _make_node_objects(data):
     _, e_id, neighbours, attributes = data
@@ -538,7 +554,7 @@ def create_objects(args=()):
     ----------
     args: iterable, optional
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Defk, Deft, Defvl, Klink, Tlink, Term, Message, str and 
+        Defk, Deft, Defvl, Klink, Tlink, Term, Message, str and
         iterables thereof; strings in args are processed with graphparser.parse
 
     Returns

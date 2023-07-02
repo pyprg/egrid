@@ -109,7 +109,9 @@ class Make_data_Frames(unittest.TestCase):
                y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
-                                |                               |
+      P.cost=10                 |                               |
+      P=27                      |                               |
+      Q.cost=10                 |                               |
                                 |                               |
                                 n1->> load0_1_        _load1 <<-n2->> load1_1_
                                 |      P10=30.0         P10=20.7       P10=4.3
@@ -125,8 +127,6 @@ n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
             """
         frames = make_data_frames(create_objects(string))
         print('')
-
-
 
 class Make_model(unittest.TestCase):
 
@@ -245,7 +245,7 @@ class Model_from_frames(unittest.TestCase):
     def test_model_from_frames(self):
         # line_2 is a bridge as admittance is to high
         string = """
-               y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
+                y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                 |                               |
