@@ -99,7 +99,7 @@ class Make_factordefs(unittest.TestCase):
                     factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'var', 'id_of_source': 'kp', 'value': 1.0,
               'min': -np.inf, 'max': np.inf, 'is_discrete': False, 'm': 1.0,
-              'n': 0.0, 'cost': 1., 'index_of_symbol': 0})
+              'n': 0.0, 'cost': 0., 'index_of_symbol': 0})
         self.assertEqual(
             factordefs.gen_factordata.index[0],
             'kp',
@@ -154,7 +154,7 @@ class Make_factordefs(unittest.TestCase):
                     factordefs.gen_factordata.iloc[0].to_numpy())),
             {'step': -1, 'type': 'const', 'id_of_source': 'taps', 'value': 0.,
               'min': -16, 'max': 16, 'is_discrete': True, 'm': -0.00625,
-              'n': 1.0, 'cost': 1., 'index_of_symbol': 0})
+              'n': 1.0, 'cost': 0., 'index_of_symbol': 0})
         self.assertEqual(
             factordefs.gen_factordata.index[0],
             'taps',

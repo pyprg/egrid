@@ -103,6 +103,31 @@ class Make_data_Frames(unittest.TestCase):
                 for table_name, table in frames.items()),
             'row count matches expectations')
 
+    def test_make_data_frames2(self):
+        # line_2 is a bridge as admittance is to high
+        string = """
+               y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
+slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
+n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
+                                |                               |
+                                |                               |
+                                n1->> load0_1_        _load1 <<-n2->> load1_1_
+                                |      P10=30.0         P10=20.7       P10=4.3
+                                |      Q10=5            Q10=5.7        Q10=2
+                                |
+                                |              y_lo=1e8-1e8j
+                                |              y_tr=1e-6+1e-6j
+                                n1(---------- line_2 ----------)n3
+                                                                |
+                                                      _load2 <<-n3->> load2_1_
+                                                        P10=20.7       P10=20
+                                                        Q10=5.7        Q10=5.7
+            """
+        frames = make_data_frames(create_objects(string))
+        print('')
+
+
+
 class Make_model(unittest.TestCase):
 
     def test_make_model_empty(self):
@@ -223,6 +248,7 @@ class Model_from_frames(unittest.TestCase):
                y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
+                                |                               |
                                 |                               |
                                 n1->> load0_1_        _load1 <<-n2->> load1_1_
                                 |      P10=30.0         P10=20.7       P10=4.3

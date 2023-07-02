@@ -372,7 +372,7 @@ type: 'var'|'const' (default value 'var')
     'var' - factor is a decision variable
     'const' - factor is a parameter
 id_of_source: str (default value None)
-    identifies scaling factor of previous estimation step whose value
+    identifies factor of previous estimation step whose value
     will be used for initialization
 value: float (default value 1)
     used for initialization if 'id_of_source' does not reference a
@@ -392,7 +392,7 @@ n: float (default 0.)
     not used
 step: int (default value -1)
     index of optimization step, for each step set to -1
-cost: float (default 1.)
+cost: float (default 0.)
     cost of change (for Volt-Var-Control)"""
 
 Deft = namedtuple(
@@ -409,7 +409,7 @@ type: 'var'|'const' (default value 'const')
     'var' - factor is a decision variable
     'const' - factor is a parameter
 id_of_source: str (default value None)
-    identifies scaling factor of previous estimation step whose value
+    identifies factor of previous estimation step whose value
     will be used for initialization
 value: float (default value 0)
     used for initialization if 'id_of_source' does not reference a
@@ -427,7 +427,7 @@ n: float (default 1.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
 step: int (default value -1)
     index of optimization step, for each step set to -1
-cost: float (default 1.)
+cost: float (default 0.)
     cost of change (for Volt-Var-Control)"""
 
 def _iterable(item):
