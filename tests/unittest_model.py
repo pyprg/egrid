@@ -23,7 +23,7 @@ import context
 import unittest
 import scipy.sparse
 import pandas as pd
-from numpy import inf
+from numpy import inf, array
 from numpy.testing import assert_array_equal
 from egrid import make_model
 from egrid.builder import (
@@ -67,16 +67,16 @@ class Aggregate_vlimits(unittest.TestCase):
         """also tests get_vlimits_for_step"""
         vlimit_in = pd.DataFrame(
             {'id_of_node':   ['n0', 'n0',  'n0', 'n0', 'n1', 'n1', 'n1', 'n1'],
-              'step':         [-1,   -1,    3,    2,    2,    1,    1,    1],
-              'index_of_node':[0,    0,     0,    0,    1,    1,    1,    1],
-              'min':          [  .6,   .7,   .8,   .9,   .71,  .74,  .73,  .73],
-              'max':          [ 1.6,  1.9,  1.5,  1.7,  1.6,  1.9,  1.5,  1.7]})
+             'step':         [-1,   -1,    3,    2,    2,    1,    1,    1],
+             'index_of_node':[0,    0,     0,    0,    1,    1,    1,    1],
+             'min':          [  .6,   .7,   .8,   .9,   .71,  .74,  .73,  .73],
+             'max':          [ 1.6,  1.9,  1.5,  1.7,  1.6,  1.9,  1.5,  1.7]})
         vlimit = _aggregate_vlimits(vlimit_in)
         Vlimit_exp = pd.DataFrame(
-            {'step':          [-1,   1,   2,   2,   3],
-              'index_of_node': [ 0,   1,   0,   1,   0],
-              'min':           [  .7,  .74, .9,  .71, .8],
-              'max':           [ 1.6, 1.5, 1.7, 1.6, 1.5]})
+            {'step':         [-1,   1,   2,   2,   3],
+             'index_of_node':[ 0,   1,   0,   1,   0],
+             'min':          [  .7,  .74, .9,  .71, .8],
+             'max':          [ 1.6, 1.5, 1.7, 1.6, 1.5]})
         assert_array_equal(vlimit.to_numpy(), Vlimit_exp.to_numpy())
         df_exp_step2 = pd.DataFrame(
             {'min':[.9, .71], 'max':[1.7, 1.6]}, index=[0, 1])
@@ -89,7 +89,11 @@ class Aggregate_vlimits(unittest.TestCase):
             Vlimit(),
             Vlimit(max=2.),
             Vlimit(id_of_node='n1', min=.5))
-        # print(model)
+        exp = array(
+            [[-1.,   0.,   0.,   2. ],
+             [-1.,   1.,   0.5,  inf],
+             [-1.,   2.,   0.,   2. ]])
+        assert_array_equal(model.vlimits.to_numpy(), exp)
 
 class Make_data_Frames(unittest.TestCase):
 
@@ -126,7 +130,7 @@ n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
                                                         Q10=5.7        Q10=5.7
             """
         frames = make_data_frames(create_objects(string))
-        print('')
+        #print('')
 
 class Make_model(unittest.TestCase):
 
