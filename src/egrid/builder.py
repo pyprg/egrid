@@ -78,29 +78,6 @@ MODEL_TYPES = (
 SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
-def _create_slack(e_id, attributes):
-    """Creates a new instance of Slacknode
-
-    Parameters
-    ----------
-    e_id: str
-        ID of element
-    attributes: dict
-
-    Returns
-    -------
-    Slacknode"""
-    try:
-        voltage = complex(attributes['V'])
-        return Slacknode(id_of_node=e_id, V=voltage)
-    except KeyError:
-        return Slacknode(id_of_node=e_id)
-    except ValueError as e:
-        return Message(
-            f"Error in data of slacknode '{e_id}', "
-            f"following attributes are given: {str(attributes)} "
-            f"(error: {str(e)})")
-
 _COMPLEX_INF = complex(np.inf, np.inf)
 
 def _create_branch(e_id, neighbours, attributes):
@@ -220,38 +197,82 @@ def _is_connectivity_node(string):
     bool"""
     return string.startswith('n') or string.startswith('slack')
 
-def _create_pvalue(id_of_node, id_of_device, vals):
+def _create_value(clss, attname, id_of_node, id_of_device, vals):
+    """Converts input data and creates an instance of PValue, QValue or IValue.
+
+    Parameters
+    ----------
+    clss: PValue | QValue | IValue
+        constructor for instance
+    attname: str
+        'P'|'Q'|'I'
+    id_of_node : str
+        identifier of connectivity node
+    id_of_device : str
+        identifier of electrical device
+    vals : dict
+        attributes for PValue | QValue | IValue
+
+    Returns
+    -------
+    tuple
+        * bool, success?
+        * PValue | QValue | IValue or str, if success True or False"""
     atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
-    atts.update((k, e3(v)) for k,v in vals.items())
+    atts.update((k, float(e3(v))) for k,v in vals.items())
     try:
-        return True, PValue(**atts)
+        return True, clss(**atts)
     except ValueError as e:
         return False, Message(
             f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"all values for 'P/P...' ({vals}) "
+            f"all values for '{attname}' ({vals}) "
             f"must be of type float, (error: {str(e)})")
 
-def _create_qvalue(id_of_node, id_of_device, vals):
-    atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
-    atts.update((k, e3(v)) for k,v in vals.items())
-    try:
-        return True, QValue(**atts)
-    except ValueError as e:
-        return False, Message(
-            f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"all values for 'Q/Q...' ({vals}) "
-            f"must be of type float, (error: {str(e)})")
+def _create_slack(e_id, attributes):
+    """Creates a new instance of Slacknode
 
-def _create_ivalue(id_of_node, id_of_device, vals):
-    atts = dict(id_of_batch=f'{id_of_node}_{id_of_device}')
-    atts.update((k, e3(v)) for k,v in vals.items())
+    Parameters
+    ----------
+    e_id: str
+        ID of element
+    attributes: dict
+
+    Returns
+    -------
+    Slacknode"""
     try:
-        return True, IValue(**atts)
+        voltage = complex(attributes['V'])
+        return Slacknode(id_of_node=e_id, V=voltage)
+    except KeyError:
+        return Slacknode(id_of_node=e_id)
     except ValueError as e:
-        return False, Message(
-            f"Error in data of edge '{id_of_node}-{id_of_device}', "
-            f"all values for 'I/I...' ({vals}) "
-            f"must be of type float, (error: {str(e)})")
+        return Message(
+            f"Error in data of slacknode '{e_id}', "
+            f"following attributes are given: {str(attributes)} "
+            f"(error: {str(e)})")
+
+def _create_vvalue(id_of_node, attributes):
+    try:
+        return Vvalue(id_of_node=id_of_node, V=float(e3(attributes['V'])))
+    except ValueError as e:
+        return Message(
+            f"Error in data of node '{id_of_node}', "
+             "value of attribute 'V' must be of type float, "
+            f"following attributes are provided: {attributes} "
+            f"(error: {str(e)})")
+
+def _create_vlimit(attname, id_of_node, attributes):
+    atts = dict(id_of_node=id_of_node)
+    atts.update(
+        (k, (int if k=='step' else float)(e3(v)))
+        for k,v in attributes.items())
+    try:
+        return Defvl(**atts)
+    except ValueError as e:
+        return Message(
+            f"Error in data of {attname} at node '{id_of_node}', "
+            f"following attributes are given: {str(attributes)} "
+            f"(error: {str(e)})")
 
 def _collect_attributes(attributes):
     d = defaultdict(dict)
@@ -292,18 +313,18 @@ def _make_edge_objects(data):
     has_p, has_q, has_I, has_Tl = (
         key in collected for key in ('P', 'Q', 'I', 'Tlink'))
     if has_p:
-        success, val = _create_pvalue(
-            id_of_node, id_of_device, collected['P'])
+        success, val = _create_value(
+            PValue, 'P', id_of_node, id_of_device, collected['P'])
         yield val
         create_output |= success
     if has_q:
-        success, val = _create_qvalue(
-            id_of_node, id_of_device, collected['Q'])
+        success, val = _create_value(
+            QValue, 'Q', id_of_node, id_of_device, collected['Q'])
         yield val
         create_output |= success
     if has_I:
-        success, val = _create_ivalue(
-            id_of_node, id_of_device, collected['I'])
+        success, val = _create_value(
+            IValue, 'I', id_of_node, id_of_device, collected['I'])
         yield val
         create_output |= success
     if create_output:
@@ -326,15 +347,13 @@ def _make_node_objects(data):
         if attributes.get('slack')=='True' or e_id.startswith('slack'):
             yield _create_slack(e_id, attributes)
         elif 'V' in attributes:
-            try:
-                yield Vvalue(id_of_node=e_id, V=float(e3(attributes['V'])))
-            except ValueError as e:
-                yield Message(
-                    f"Error in data of node '{e_id}', "
-                     "value of attribute 'V' must be of type float, "
-                    f"following attributes are provided: {attributes} "
-                    f"(error: {str(e)})")
-                return
+            yield _create_vvalue(e_id, attributes)
+        else:
+            collected = _collect_attributes(attributes)
+            if 'Vlimit' in collected:
+                yield _create_vlimit('Vlimit', e_id, collected['Vlimit'])
+            elif 'Defvl' in collected:
+                yield _create_vlimit('Devfl', e_id, collected['Devfl'])
     elif count_of_neighbours == 2:
         yield from _create_branch(e_id, neighbours, attributes)
     elif count_of_neighbours == 1:
