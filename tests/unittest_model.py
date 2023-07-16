@@ -89,11 +89,20 @@ class Aggregate_vlimits(unittest.TestCase):
             Vlimit(),
             Vlimit(max=2.),
             Vlimit(id_of_node='n1', min=.5))
+        order_of_ids = ['slack0', 'n1', 'n2']
+        nodes = model.nodes
+        idx_order = nodes.reindex(order_of_ids).index_of_node
         exp = array(
-            [[-1.,   0.,   0.,   2. ],
-             [-1.,   1.,   0.5,  inf],
-             [-1.,   2.,   0.,   2. ]])
-        #assert_array_equal(model.vlimits.to_numpy(), exp)
+            [[ 0.,   2. ],
+             [ 0.5,  inf], # n1
+             [ 0.,   2. ]])
+        assert_array_equal(
+            model
+            .vlimits.set_index('index_of_node')
+            .reindex(idx_order)
+            [['min','max']]
+            .to_numpy(),
+            exp)
 
 class Make_data_Frames(unittest.TestCase):
 
@@ -110,7 +119,7 @@ class Make_data_Frames(unittest.TestCase):
     def test_make_data_frames2(self):
         # line_2 is a bridge as admittance is to high
         string = """
-               y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
+                y_tr=1e-6+1e-6j                 y_tr=1e-6+1e-6j
 slack=True     y_lo=1e3-1e3j                   y_lo=1e3-1e3j
 n0(---------- line_0 ----------)n1(---------- line_1 ----------)n2
       P.cost=10                 |                               |

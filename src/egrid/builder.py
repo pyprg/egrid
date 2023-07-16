@@ -28,7 +28,8 @@ from itertools import chain, tee
 from collections import defaultdict
 from egrid._types import (
     Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-    Vlimit, expand_defvl, Factor, Defk, Deft, Defvl, expand_def,
+    Vlimit, expand_defvl, Factor, Defk, Deft, Defvl, Defoterm,
+    expand_def, expand_defoterm,
     DEFAULT_FACTOR_ID,
     Klink, Tlink, expand_klink, expand_tlink, Injectionlink, Terminallink,
     Term, Message, meta_of_types)
@@ -75,7 +76,7 @@ MODEL_TYPES = (
     Branch, Slacknode, Injection,
     Output, PValue, QValue, IValue, Vvalue, Vlimit,
     Term, Message)
-SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Klink, Tlink)
+SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Defoterm, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
 _COMPLEX_INF = complex(np.inf, np.inf)
@@ -526,6 +527,11 @@ def make_data_frames(devices=()):
             expand_defvl(defvl) for defvl in sources[Defvl.__name__]),
         columns=Vlimit._fields)
     dataframes[Vlimit.__name__] = pd.concat([vlimits, vlimits2])
+    dataframes[Term.__name__] = pd.DataFrame(
+        chain.from_iterable(
+            expand_defoterm(idx, defoterm)
+            for idx, defoterm in enumerate(sources[Defoterm.__name__])),
+        columns=Term._fields)
     return dataframes
 
 def _flatten(args):

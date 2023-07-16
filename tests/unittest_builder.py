@@ -22,9 +22,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import unittest
 import context
 import numpy as np
+from numpy.testing import assert_array_equal
+import pandas as pd
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Klink, Tlink, Vlimit)
+    Message, Defk, Klink, Tlink, Vlimit, Defoterm, Term)
 
 _EMPTY_DICT = {}
 
@@ -400,7 +402,7 @@ class Create_objects(unittest.TestCase):
         """remove quotes from strings"""
         res = [*create_objects(
             ['#.   Message(message="hallo", level=0)',
-             '#.   Defk(id="kp")'])]
+              '#.   Defk(id="kp")'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
@@ -425,7 +427,7 @@ class Create_objects(unittest.TestCase):
     def test_create_terminallink(self):
         res = [*create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=myid '
-             'step=(1 2))'])]
+              'step=(1 2))'])]
         self.assertEqual(
             len(res), 1, 'create_objects returns one object')
         self.assertEqual(
@@ -437,10 +439,15 @@ class Create_objects(unittest.TestCase):
                 step=(1,2))],
             'create_objects creates instances of Tlink')
 
+    def test_create_defoterm(self):
+        res = [*create_objects(['#. Defoterm()'])]
+        self.assertEqual(len(res), 1, 'create_objects returns one object')
+        self.assertEqual(
+            res, [Defoterm()], 'create_objects creates instances of Defoterm')
+
 class Make_data_frames(unittest.TestCase):
 
     def test_empty(self):
-        import pandas as pd
         frames = make_data_frames()
         self.assertEqual(
             len(frames), 14, 'make_data_frames creates 13 items')
@@ -451,6 +458,16 @@ class Make_data_frames(unittest.TestCase):
         self.assertTrue(
             all(df.empty for key, df in frames.items()),
             'all dataframes are empty')
+
+    def test_term(self):
+        frames = make_data_frames([Defoterm()])
+        term = frames.get('Term')
+        self.assertIsInstance(term, pd.DataFrame)
+        row = term.iloc[0]
+        self.assertEqual(row.id, '0')
+        assert_array_equal(row.args, Defoterm._field_defaults['args'])
+        self.assertEqual(row.fn, Defoterm._field_defaults['fn'])
+        self.assertEqual(row.step, Defoterm._field_defaults['step'])
 
     def test_vlimit(self):
         frames = make_data_frames([Vlimit(id_of_node='n_0')])
@@ -472,7 +489,7 @@ class Make_data_frames(unittest.TestCase):
     def test_injlink(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=p id_of_factor=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -482,7 +499,7 @@ class Make_data_frames(unittest.TestCase):
     def test_injlink2(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=(p q) id_of_factor=(f0 f1)',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -492,7 +509,7 @@ class Make_data_frames(unittest.TestCase):
     def test_terminallink(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']),
@@ -502,7 +519,7 @@ class Make_data_frames(unittest.TestCase):
     def test_terminallink2(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
-             '#.       id_of_factor=f0 step=(1 2))'])
+              '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']),
@@ -512,7 +529,7 @@ class Make_data_frames(unittest.TestCase):
     def test_wrong_class(self):
         objs = create_objects(
             ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Message']),

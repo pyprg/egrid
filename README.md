@@ -235,6 +235,13 @@ mnodeinj: scipy.sparse.csc_matrix
     ordered according to power flow calculation nodes (adding values of
     injections for each node) by calculating 'mnodeinj @ vector'
 
+terms: pandas.DataFrame
+
+    * .id, str, unique identifier
+    * .args, list of strings, arguments for function
+    * .fn, str, identifier of function
+    * .step, int
+
 messages: pandas.DataFrame
 
     * .message, str, message on reason of error

@@ -315,19 +315,59 @@ step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
     defined for each step if -1"""
 
-Term = namedtuple('Term', 'id arg fn step', defaults=('diff', 0))
+Term = namedtuple('Term', 'id args fn step', defaults=([''], 'diff', -1))
 Term.__doc__ = """Data of an ojective-function-term.
 
 Parameters
 ----------
 id: str
     unique identifier of a term
-arg: str
-    reference to an argument of function fn
+args: list
+    str,
+    references to an arguments of function fn
 fn: str
     indentifier of function for calculating a term of the objective function
 step: int
     index of optimization step"""
+
+Defoterm = namedtuple('Defoterm', 'fn args step', defaults=('diff','',-1))
+Defoterm.__doc__ = """Definition of mathematical terms for objective function.
+
+Parameters
+----------
+fn: str
+    optional, default 'diff'
+    name of function
+args: str | iterable_of_str
+    optional, default ''
+    name of argument or name of arguments
+step: int | iterable_of_int
+    optional, default -1
+    optimization step, -1 means all steps"""
+
+def expand_defoterm(index,  defoterm):
+    """Creates definitions of terms for objective function (Term).
+
+    Parameters
+    ----------
+    index: int
+        index of defoterm
+    defoterm: Defoterm
+
+    Returns
+    -------
+    iterator
+        Term"""
+    try:
+        iter_steps = iter(defoterm.step)
+    except TypeError:
+        iter_steps = iter([defoterm.step])
+    args = (
+        defoterm.args
+        if isinstance(defoterm.args, (list, tuple)) else [defoterm.args])
+    return (
+        Term(id=str(index), args=args, fn=defoterm.fn, step=step)
+        for step in iter_steps)
 
 Message = namedtuple('Message', 'message level', defaults=('', 2))
 Message.__doc__ = """Information, warning or error message.
@@ -567,6 +607,11 @@ _attribute_types = {
      Defvl:([object, np.float64, np.float64, np.int16],
             [_tostring, np.float64, np.float64, np.int16],
             [True, False, False, True]),
+     #    fn args step
+     Defoterm:(
+         [object, object, np.int32],
+         [_tostring, _tostring, np.int32],
+         [False, True, True]),
      #    id, type, id_of_source, value, min, max,
      #    is_discrete, m, n, step
      Factor:(
@@ -600,7 +645,7 @@ _attribute_types = {
      Term:(
          [object,  object, object, np.int32],
          [_tostring, _tostring, _tostring, np.int32],
-         [False, False, False, True]),
+         [False, False, False, False]),
      #    id_of_batch id_of_device id_of_node
      Output:(
          [object, object, object],

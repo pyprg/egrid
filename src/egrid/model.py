@@ -206,10 +206,10 @@ mnodeinj: scipy.sparse.csc_matrix
     ordered according to power flow calculation nodes (adding entries of
     injections for each node) by calculating 'mnodeinj @ vector'
 terms: pandas.DataFrame
-    * .step, int
     * .id, str, unique identifier
+    * .args, str, argument for function
     * .fn, str, identifier of function
-    * .arg, str, argument for function
+    * .step, int
 messages: pandas.DataFrame
     * .message, str
     * .level, 0 - information, 1 - warning, 2 - error"""
@@ -960,6 +960,9 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
 def get_pfc_nodes(nodes):
     """Aggregates nodes of same power-flow-calculation node.
 
+    (cim names power-flow-calculation nodes 'topological nodes'
+     https://ontology.tno.nl/IEC_CIM/cim_TopologicalNode.html )
+
     Parameters
     ----------
     nodes: pandas.DataFrame (node_id, str)
@@ -980,6 +983,12 @@ def get_pfc_nodes(nodes):
     pfc_nodes.reset_index(inplace=True)
     pfc_nodes.set_index('node_id', inplace=True)
     return pfc_nodes
+
+def _unite(generic, stepspecific):
+    index = generic.index.union(stepspecific.index)
+    res = generic.reindex(index)
+    res.update(stepspecific)
+    return res.drop(columns=['step'])
 
 def get_vlimits_for_step(vlimits, index_of_step):
     """Fetches minimum and maximum values for given index of optimization step.
@@ -1004,7 +1013,29 @@ def get_vlimits_for_step(vlimits, index_of_step):
     generic_limits = vlimits[vlimits.step==-1].set_index('index_of_node')
     step_limits = (
         vlimits[vlimits.step==index_of_step].set_index('index_of_node'))
-    index = generic_limits.index.union(step_limits.index)
-    res = generic_limits.reindex(index)
-    res.update(step_limits)
-    return res.drop(columns=['step'])
+    return _unite(generic_limits, step_limits)
+
+def get_terms_for_step(terms, index_of_step):
+    """Fetches objective function terms for given index of optimization step.
+
+    Adds generic values to step specific values.
+
+    Parameters
+    ----------
+    terms: pandas.DataFrame
+        * .id, int
+        * .args, list of str
+        * .fn, str
+        * .step, int
+    index_of_step : int
+        index of optimization step
+
+    Returns
+    -------
+    pandas.DataFrame (index: id)
+        * .args, list of str
+        * .fn, str"""
+    generic_terms = terms[terms.step==-1].set_index('id')
+    step_terms = (
+        terms[terms.step==index_of_step].set_index('id'))
+    return _unite(generic_terms, step_terms)
