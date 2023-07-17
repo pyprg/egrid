@@ -263,7 +263,8 @@ Factormeta = namedtuple(
     'index_of_kpq_symbol index_of_var_symbol index_of_const_symbol '
     'values_of_vars cost_of_change var_min var_max is_discrete '
     'values_of_consts '
-    'var_const_to_factor var_const_to_kp var_const_to_kq var_const_to_ftaps')
+    'var_const_to_factor var_const_to_kp var_const_to_kq var_const_to_ftaps '
+    'id_to_idx')
 Factormeta.__doc__="""
 Symbols of variables and constants for factors.
 
@@ -301,7 +302,9 @@ var_const_to_kq: array_like
 var_const_to_ftaps: array_like
     int, converts var_const to ftaps, factor assigned to
     (selected) terminals (var_const[var_const_to_ftaps] selects ftaps
-    in the order of model.factors.terminalfactors)"""
+    in the order of model.factors.terminalfactors)
+id_to_idx: pandas.Series  (index: id_of_factor)
+    int, index_of_symbol"""
 
 def _select_rows(vecs, row_index):
     """Selects rows from vectors.
@@ -887,7 +890,9 @@ def _make_factor_meta(
         var_const_to_ftaps: array_like
             int, converts var_const to ftaps, factor assigned to
             (selected) terminals (var_const[var_const_to_ftaps] selects ftaps
-            in the order of argument terminalfactor)"""
+            in the order of argument terminalfactor)
+        id_to_idx: pandas.Series  (index: id_of_factor)
+            int, index_of_symbol"""
     # inital for vars, value for parameters (consts)
     #   values are ordered by index_of_symbol
     values = _get_values_of_symbols(factors, k_prev)
@@ -908,6 +913,10 @@ def _make_factor_meta(
     # step-specific symbols
     id_of_step_symbol = (
         factors.id[count_of_generic_factors <= factors.index_of_symbol])
+    id_to_idx = pd.Series(
+        factors.index_of_symbol.array,
+        index=factors.id,
+        name='index_of_symbol')
     return Factormeta(
         id_of_step_symbol=id_of_step_symbol, # per optimization step
         index_of_var_symbol=factors_var.index_of_symbol,
@@ -929,7 +938,8 @@ def _make_factor_meta(
         var_const_to_kp=var_const_to_factor[injection_factors.kp],
         var_const_to_kq=var_const_to_factor[injection_factors.kq],
         var_const_to_ftaps=var_const_to_factor[
-            terminalfactors.index_of_symbol])
+            terminalfactors.index_of_symbol],
+        id_to_idx=id_to_idx)
 
 def make_factor_meta(model, step, k_prev):
     """Prepares data of decision variables and paramters for one step.
@@ -992,5 +1002,7 @@ def make_factor_meta(model, step, k_prev):
             for each injection (var_const[var_const_to_kq])
         var_const_to_ftaps: array_like
             int, converts var_const to ftaps, factor assigned to
-            (selected) terminals (var_const[var_const_to_ftaps])"""
+            (selected) terminals (var_const[var_const_to_ftaps])
+        id_to_idx: pandas.Series  (index: id_of_factor)
+            int, index_of_symbol"""
     return _make_factor_meta(*get_factordata_for_step(model, step), k_prev)
