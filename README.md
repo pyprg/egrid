@@ -240,6 +240,7 @@ terms: pandas.DataFrame
     * .id, str, unique identifier
     * .args, list of strings, arguments for function
     * .fn, str, identifier of function
+    * .weight, float, multiplier for term in objective function
     * .step, int
 
 messages: pandas.DataFrame

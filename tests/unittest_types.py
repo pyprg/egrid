@@ -38,6 +38,12 @@ class Expand_defoterm(unittest.TestCase):
         expected = [Term(id='0', fn='avg')]
         self.assertEqual(res, expected)
 
+    def test_fn_weight(self):
+        defoterm = Defoterm(fn='avg', weight=3.14)
+        res = list(expand_defoterm(0, defoterm))
+        expected = [Term(id='0', fn='avg', weight=3.14)]
+        self.assertEqual(res, expected)
+
     def test_single_argument(self):
         defoterm = Defoterm(args='a')
         res = list(expand_defoterm(0, defoterm))

@@ -315,7 +315,10 @@ step: int (default value -1)|iterable_of_int
     addresses the optimization step, first optimization step has index 0,
     defined for each step if -1"""
 
-Term = namedtuple('Term', 'id args fn step', defaults=([''], 'diff', -1))
+Term = namedtuple(
+    'Term',
+    'id args fn weight step',
+    defaults=([''], 'diff', 1., -1))
 Term.__doc__ = """Data of an ojective-function-term.
 
 Parameters
@@ -327,11 +330,17 @@ args: list
     references to an arguments of function fn
 fn: str
     indentifier of function for calculating a term of the objective function
+weight: float
+    multiplier for term in objective function
 step: int
     index of optimization step"""
 
-Defoterm = namedtuple('Defoterm', 'fn args step', defaults=('diff','',-1))
-Defoterm.__doc__ = """Definition of mathematical terms for objective function.
+Defoterm = namedtuple(
+    'Defoterm',
+    'fn args weight step',
+    defaults=('diff', '', 1., -1))
+Defoterm.__doc__ = """Definition for a mathematical term of the objective
+function.
 
 Parameters
 ----------
@@ -341,6 +350,9 @@ fn: str
 args: str | iterable_of_str
     optional, default ''
     name of argument or name of arguments
+weight: float
+    optional, default 1.0
+    multiplier for term in objective function
 step: int | iterable_of_int
     optional, default -1
     optimization step, -1 means all steps"""
@@ -366,7 +378,12 @@ def expand_defoterm(index,  defoterm):
         defoterm.args
         if isinstance(defoterm.args, (list, tuple)) else [defoterm.args])
     return (
-        Term(id=str(index), args=args, fn=defoterm.fn, step=step)
+        Term(
+            id=str(index),
+            args=args,
+            weight=defoterm.weight,
+            fn=defoterm.fn,
+            step=step)
         for step in iter_steps)
 
 Message = namedtuple('Message', 'message level', defaults=('', 2))
@@ -609,9 +626,9 @@ _attribute_types = {
             [True, False, False, True]),
      #    fn args step
      Defoterm:(
-         [object, object, np.int32],
-         [_tostring, _tostring, np.int32],
-         [False, True, True]),
+         [object, object, np.float64, np.int32],
+         [_tostring, _tostring, np.float64, np.int32],
+         [False, True, False, True]),
      #    id, type, id_of_source, value, min, max,
      #    is_discrete, m, n, step
      Factor:(
@@ -641,11 +658,11 @@ _attribute_types = {
          [object, object, object, np.int16],
          [_tostring,  _tostring, _tostring, np.int16],
          [True, True, True, True]),
-     #    id       arg     fn      step
+     #    id       arg     fn  weight   step
      Term:(
-         [object,  object, object, np.int32],
-         [_tostring, _tostring, _tostring, np.int32],
-         [False, False, False, False]),
+         [object,  object, object, np.float64, np.int32],
+         [_tostring, _tostring, _tostring, np.float64, np.int32],
+         [False, False, False, False, False]),
      #    id_of_batch id_of_device id_of_node
      Output:(
          [object, object, object],
