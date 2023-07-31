@@ -175,9 +175,12 @@ def check_batch_links(frames, msg_cls=1):
             msg_cls)
     # Outputs with invalid references
     bf = branch_frames[['id', 'id_of_node_A', 'id_of_node_B']]
-    bf_stacked = bf.set_index('id').stack()
-    bf_ids = bf_stacked.index.get_level_values(0)
-    idx = pd.MultiIndex.from_tuples(zip(bf_stacked, bf_ids))
+    if len(bf):
+        bf_stacked = bf.set_index('id').stack()
+        bf_ids = bf_stacked.index.get_level_values(0)
+        idx = pd.MultiIndex.from_tuples(zip(bf_stacked, bf_ids))
+    else:
+        idx = pd.MultiIndex.from_arrays([[], []])
     br_ = pd.MultiIndex.from_frame(
         br_outputs[['id_of_node', 'id_of_device']])
     is_valid = br_.isin(idx.to_list())

@@ -49,14 +49,16 @@ y_tr: complex (default value 0j)
 Slacknode = namedtuple(
     'Slacknode',
     'id_of_node V',
-    defaults=(1.+.0j,))
+    defaults=('slack', 1.+.0j,))
 Slacknode.__doc__ = """Tag for a slack node.
 
 Parameters
 ----------
 id_of_node: str
+    optional, default 'slack'
     identifier of the slack node
-V: complex (default value 1+0j)
+V: complex
+    optional, default 1+0j
     voltage at slack node"""
 
 Injection = namedtuple(

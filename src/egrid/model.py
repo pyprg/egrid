@@ -29,10 +29,11 @@ from scipy.sparse import coo_matrix
 from collections import namedtuple
 from functools import partial
 from itertools import chain
+from egrid.builder import (
+    Slacknode, Branch, Factor, Injectionlink, Terminallink,
+    Injection, Output, IValue, PValue, QValue, Vvalue, Vlimit, Term, Message)
 from egrid._types import (
     df_astype,
-    Slacknode, Branch, Factor, Injectionlink, Terminallink,
-    Injection, Output, IValue, PValue, QValue, Vvalue, Vlimit, Term, Message,
     SLACKNODES, BRANCHES, FACTORS, INJLINKS, TERMINALLINKS,
     INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, VLIMITS,
     TERMS,
