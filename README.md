@@ -2,12 +2,10 @@
 
 ## Purpose
 
-Prepocessed model of a balanced electric distribution network for experimental
-power flow calculation and state estimation. Instances of Model can be the
-input for (a variety of) power flow calculation or estimation algorithms. They
-provide an easy to use structure for calculating current and power flow
-through lines and into consumers (using an additional voltage vector which
-is the result of a power-flow-calculation).
+Egrid is the outsourced first part of a power flow calculation for an electric,
+balanced, distribution network. Instances of Model provide a structure for
+calculating current and power flow through lines and into consumers
+(using the voltage vector which is the result of a power-flow-calculation).
 
 Function **make_model(\*args)** creates an instance of Model from  arguments
 of type
@@ -28,7 +26,7 @@ of type
     - Defoterm (term for objective function)
 
 including tuples, lists and iterables thereof (for a power-flow-calculation
-just Slacknode ... Branchtaps are necessary).
+just Slacknode ... Injection are necessary).
 Additionally, __make_model__ can consume network descriptions as multiline
 strings if package 'graphparser' is installed. This method is intended to
 input very small electric networks using a text editor.
@@ -332,7 +330,8 @@ example = [
         Exp_v_p=2.0,
         Exp_v_q=2.0),
     Defk(step=(0, 1, 2), id=('kp', 'kq')),
-    Klink(step=(0, 1, 2), objid='consumer_0', part='pq', id=('kp', 'kq'))]
+    Klink(
+    step=(0, 1, 2), objid='consumer_0', part=('p', 'q'), id=('kp', 'kq'))]
 ```
 
 Valid input to **make_model** is a multiline pseudo graphic string e.g.

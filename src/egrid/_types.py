@@ -589,6 +589,9 @@ def expand_defvl(defvl):
         Vlimit(nodeid_, defvl.min, defvl.max, step_)
         for nodeid_, step_ in product(nodeids, steps)]
 
+# meta data for use by graphparser, and for creation of empty pandas.DataFrame
+#   instances with correct column types
+
 def _tostring(string):
     return string[1:-1] if string.startswith(('\'', '"')) else string
 
@@ -753,7 +756,7 @@ def make_df(cls_, content=_EMPTY_TUPLE):
     Exception when data cannot be converted into required type"""
     return df_astype(pd.DataFrame(content, columns=cls_._fields), cls_)
 
-# frames with types for columns
+# frames with correct types for columns
 SLACKNODES = make_df(Slacknode)
 BRANCHES = make_df(Branch)
 INJECTIONS = make_df(Injection)

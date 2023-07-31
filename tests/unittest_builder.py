@@ -26,7 +26,7 @@ from numpy.testing import assert_array_equal
 import pandas as pd
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Klink, Tlink, Vlimit, Defoterm, Term)
+    Message, Defk, Klink, Tlink, Vlimit, Defoterm)
 
 _EMPTY_DICT = {}
 
