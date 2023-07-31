@@ -24,13 +24,14 @@ import unittest
 from pandas import DataFrame
 import context
 from egrid.builder import (make_data_frames,
-    Slacknode, PValue, QValue, Output, IValue, Vvalue,
+    Slacknode, PValue, QValue, Output, IValue, Vvalue, Vlimit,
     Branch, Injection,
-    Defk, Klink)
+    Defk, Klink, Term)
 from egrid.check import (
     check_numbers, check_factor_links, check_batch_links, check_ids,
     get_first_error,
-    check_connections_of_injections, check_connections_of_branches)
+    check_connections_of_injections, check_connections_of_branches,
+    check_ids_of_vlimits, check_ids_of_terms)
 
 _elements = [
     Slacknode('n0'),
@@ -92,7 +93,7 @@ class Check_factors_links(unittest.TestCase):
         frames = make_data_frames(
             _elements +
             [Defk(id='k'),
-             Klink('load_0', id_of_factor='k', part='p')])
+              Klink('load_0', id_of_factor='k', part='p')])
         self.assertIsInstance(
             frames, dict, 'make_data_frames shall return an instance of dict')
         self.assertEqual(len(frames['Message']), 0, 'no error')
@@ -158,7 +159,8 @@ class Check_factors_links(unittest.TestCase):
     def test_deff_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
-            _elements + [Defk(id='k'), Klink('invalid_id', id_of_factor='k', part='p')])
+            _elements +
+            [Defk(id='k'), Klink('invalid_id', id_of_factor='k', part='p')])
         self.assertIsInstance(
             frames,
             dict,
@@ -687,7 +689,7 @@ class Check_batch_links(unittest.TestCase):
         self.assertEqual(
             len(messages),
             1,
-            'check_batch_links yields no message')
+            'check_batch_links yields one message')
 
     def test_branch_output_with_invalid_node_reference(self):
         """invalid configuration, referenced node does not exist,
@@ -721,7 +723,7 @@ class Check_batch_links(unittest.TestCase):
         self.assertEqual(
             len(messages),
             1,
-            'check_batch_links yields no message')
+            'check_batch_links yields onemessage')
 
     def test_ivalue_with_invalid_batch_reference(self):
         """valid configuration, 1 messages"""
@@ -781,6 +783,48 @@ class Check_batch_links(unittest.TestCase):
             len(messages),
             1,
             'check_batch_links yields no message')
+
+class Check_ids_of_vlimits(unittest.TestCase):
+
+    def test_vlimit_with_invalid_node_reference(self):
+        """invalid configuration, one warning"""
+        frames = make_data_frames(
+            _elements
+            + [Vlimit(id_of_node='n')])
+        self.assertIsInstance(
+            frames.get('Vlimit'),
+            DataFrame,
+            'frames["Vlimit"] exists')
+        vlimits = frames['Vlimit']
+        self.assertEqual(
+            len(vlimits),
+            1,
+            'make_data_frames returns 1 Vlimit')
+        messages = [*check_ids_of_vlimits(frames, msg_cls=1)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_ids_of_vlimits yields one message')
+
+    def test_vlimit_with_generic_node_reference(self):
+        """valid configuration, no messages"""
+        frames = make_data_frames(
+            _elements
+            + [Vlimit()])
+        self.assertIsInstance(
+            frames.get('Vlimit'),
+            DataFrame,
+            'frames["Vlimit"] exists')
+        vlimits = frames['Vlimit']
+        self.assertEqual(
+            len(vlimits),
+            1,
+            'make_data_frames returns 1 Vlimit')
+        messages = [*check_ids_of_vlimits(frames, msg_cls=1)]
+        self.assertEqual(
+            len(messages),
+            0,
+            'check_ids_of_vlimits yields no message')
 
 _elements2 = [
     Slacknode('n0'),
@@ -903,6 +947,107 @@ class Check_connections_of_injections(unittest.TestCase):
             len(messages),
             1,
             'check_connections_of_injections yields 1 message')
+
+class Check_ids_of_terms(unittest.TestCase):
+
+    def test_invalid_reference(self):
+        """there is not any factor"""
+        frames = make_data_frames(
+            _elements
+            + [Term(id='t0')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        terms = frames['Term']
+        self.assertEqual(
+            len(terms),
+            1,
+            'make_data_frames returns 1 Term')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids_of_terms(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_ids_of_terms yields 1 message')
+
+    def test_invalid_reference2(self):
+        """one valid and one invalid reference"""
+        frames = make_data_frames(
+            _elements
+            + [Defk(id='kp', step=-1),
+                Klink(
+                    id_of_injection='load_0',
+                    part='p',
+                    id_of_factor='kp',
+                    step=-1),
+                Term(id='t0', args=['kp', 'kq'])])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        terms = frames['Term']
+        self.assertEqual(
+            len(terms),
+            1,
+            'make_data_frames returns 1 Term')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids_of_terms(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_ids_of_terms yields 1 message')
+
+    def test_valid_reference(self):
+        """one valid and one invalid reference"""
+        frames = make_data_frames(
+            _elements
+            + [Defk(id=('kp', 'kq'), step=-1),
+                Klink(
+                    id_of_injection='load_0',
+                    part=('p', 'q'),
+                    id_of_factor=('kp', 'kq'),
+                    step=-1),
+                Term(id='t0', args=['kp', 'kq'])])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        terms = frames['Term']
+        self.assertEqual(
+            len(terms),
+            1,
+            'make_data_frames returns 1 Term')
+        self.assertIsInstance(
+            frames['Message'],
+            DataFrame,
+            'frames["Message"] is a pandas.DataFrame')
+        msgs = frames['Message']
+        self.assertEqual(
+            len(msgs),
+            0,
+            'frames["Message"] is empty')
+        messages = [*check_ids_of_terms(frames)]
+        self.assertEqual(
+            len(messages),
+            0,
+            'check_ids_of_terms yields no message')
 
 class Check_connections_of_branches(unittest.TestCase):
 

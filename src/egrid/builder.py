@@ -527,11 +527,13 @@ def make_data_frames(devices=()):
             expand_defvl(defvl) for defvl in sources[Defvl.__name__]),
         columns=Vlimit._fields)
     dataframes[Vlimit.__name__] = pd.concat([vlimits, vlimits2])
-    dataframes[Term.__name__] = pd.DataFrame(
+    terms = dataframes[Term.__name__]
+    terms2 = pd.DataFrame(
         chain.from_iterable(
             expand_defoterm(idx, defoterm)
             for idx, defoterm in enumerate(sources[Defoterm.__name__])),
         columns=Term._fields)
+    dataframes[Term.__name__] = pd.concat([terms, terms2])
     return dataframes
 
 def _flatten(args):

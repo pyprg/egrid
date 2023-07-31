@@ -21,9 +21,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
+import numpy as np
 from egrid._types import (
     SLACKNODES, FACTORS, INJLINKS, INJECTIONS,
-    OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES)
+    OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES, VLIMITS, TERMS)
 
 def check_numbers(frames, msg_cls=(2, 0, 2)):
     """Checks numbers of nodes, injections, and slack nodes.
@@ -173,23 +174,19 @@ def check_batch_links(frames, msg_cls=1):
             f'(\'{id_of_batch}\')',
             msg_cls)
     # Outputs with invalid references
-    ids_of_branches_ = branch_frames.id
-    ids_of_branches = pd.concat([ids_of_branches_, ids_of_branches_])
-    idx = pd.MultiIndex.from_tuples(
-        zip(ids_of_nodes_AB, ids_of_branches),
-        names=['id_of_node', 'id_of_device'])
-    branch_terms = pd.Series(True, idx, name='exists')
-    br_ = (
-        br_outputs[['id_of_node', 'id_of_device', 'id_of_batch']]
-        .set_index(['id_of_node', 'id_of_device']))
-    for _, row in (
-            br_[br_.join(branch_terms,how='left').exists.isna()]
-            .reset_index()
-            .iterrows()):
+    bf = branch_frames[['id', 'id_of_node_A', 'id_of_node_B']]
+    bf_stacked = bf.set_index('id').stack()
+    bf_ids = bf_stacked.index.get_level_values(0)
+    idx = pd.MultiIndex.from_tuples(zip(bf_stacked, bf_ids))
+    br_ = pd.MultiIndex.from_frame(
+        br_outputs[['id_of_node', 'id_of_device']])
+    is_valid = br_.isin(idx.to_list())
+    for _, row in br_outputs[~is_valid].iterrows():
         yield (
             '(Branch) Output with invalid terminal reference '
-            f'(id_of_node \'{row[0]}\', id_of_branch \'{row[1]}\'), '
-            f'id_of_batch \'{row[2]}\'',
+            f'(id_of_node \'{row.id_of_node}\', '
+            f'id_of_branch \'{row.id_of_device}\'), '
+            f'id_of_batch \'{row.id_of_batch}\'',
             msg_cls)
     injections = frames.get('Injection', INJECTIONS)
     for _, row in (
@@ -263,8 +260,71 @@ def check_connections_of_branches(frames, msg_cls=2):
                 f'(branch{"es" if 1 < len(ids) else ""}: {", ".join(ids)})',
                 msg_cls)
 
+def check_ids_of_vlimits(frames, msg_cls=1):
+    """Checks if Vlimit rows reference existing nodes.
+
+    Parameters
+    ----------
+    frames: dict
+        * ['Node'], pandas.DataFrame with column 'id'
+        * ['Vlimit'], pandas.DataFrame with column 'id_of_node'
+    msg_cls: int
+        class of message
+
+    Yields
+    ------
+    tuple
+        str, int"""
+    slack_frame = frames.get('Slacknode', SLACKNODES)
+    slack_ids = slack_frame.id_of_node.to_numpy().reshape(-1)
+    branch_frame = frames.get('Branch', BRANCHES)
+    node_ids = (
+        branch_frame[['id_of_node_A','id_of_node_B']].to_numpy().reshape(-1))
+    ids = np.concatenate([slack_ids, node_ids])
+    vlimits = frames.get('Vlimit', VLIMITS)
+    # value '' for id_of_node is a generic value and means for each node
+    id_is_valid = (vlimits.id_of_node.isin(ids)) | (vlimits.id_of_node == '')
+    for _, row in vlimits[~id_is_valid].iterrows():
+        yield(
+            f"invalid attribute of Vlimit id_of_node='{row.id_of_node}'",
+            msg_cls)
+
+def check_ids_of_terms(frames, msg_cls=1):
+    """Checks if Term rows reference existing factors.
+
+    Parameters
+    ----------
+    frames: dict
+        * ['Term'], pandas.DataFrame with column 'id'
+        * ['Factor'], pandas.DataFrame with column 'id_of_node'
+    msg_cls: int
+        class of message
+
+    Yields
+    ------
+    tuple
+        str, int"""
+    factorids = frames.get('Factor', FACTORS)[['step','id']].groupby('step')
+    def get_invalid(row):
+        try:
+            ids = set(factorids.get_group(row.step).id)
+        except KeyError:
+            ids = {}
+        return [arg for arg in row.args if arg not in ids]
+    terms = frames.get('Term', TERMS)
+    invalid_args = terms[['args', 'step']].apply(get_invalid, axis=1)
+    for idx, row in terms[invalid_args.astype(bool)].iterrows():
+        inv_args = invalid_args[idx]
+        pl = 's' if 1 < len(inv_args) else ''
+        args = ', '.join(f'\'{arg}\'' for arg in inv_args)
+        msg = (
+            f"invalid reference{pl} to not existing factor{pl} {args} in "
+            f"Term id='{row.id}', fn='{row.fn}', step={row.step}")
+        yield msg, msg_cls
+
 def check_ids(frames, msg_cls=2):
     """Checks uniqueness of branch and injection identifiers.
+
     Issues a message if identifiers are not unique.
 
     Parameters
@@ -290,15 +350,21 @@ def check_ids(frames, msg_cls=2):
             msg_cls)
 
 def check_frames(frames):
-    """Checks numbers of nodes, injections, and slack nodes.
+    """Checks numbers of nodes, injections, and slack nodes. Checks references.
+
     Finds factors having no link. Finds links with invalid reference
     to not existing factors/loads.
     Finds I/P/Q/Vvalues having an invalid batch/node reference.
     Finds outputs having invalid value reference or device references.
     Finds disconnected injections and branches.
     Finds duplicates in identifiers of injections and branches.
-    Issues warnings (level == 1) and errors (level == 2).
-    Create a pandas DataFrame with:
+    Finds voltage limits having invalid references to not existing nodes.
+    Finds objective function terms having invalid references to not existing
+    factors.
+
+    Issues infos(level == 0), warnings (level == 1) and errors (level == 2).
+
+    Creates a pandas DataFrame with:
     ::
         pandas.DataFrame.from_records(
             check_frames(frames),
@@ -317,6 +383,8 @@ def check_frames(frames):
         * ['QValue'], pandas.DataFrame
         * ['Vvalue'], pandas.DataFrame
         * ['Output'], pandas.DataFrame
+        * ['Vlimit'], pandas.DataFrame
+        * ['Term'], pandas.DataFrame
 
     Yields
     ------
@@ -328,6 +396,8 @@ def check_frames(frames):
     yield from check_ids(frames)
     yield from check_connections_of_injections(frames)
     yield from check_connections_of_branches(frames)
+    yield from check_ids_of_vlimits(frames)
+    yield from check_ids_of_terms(frames)
 
 def get_first_error(frames):
     """Checks if data is usable (free of errors), returns the first error

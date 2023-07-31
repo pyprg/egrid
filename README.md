@@ -25,6 +25,7 @@ of type
     - Defk/Deft (definition of a scaling/termional factor, for estimation)
     - Defvl (definition of voltage limits)
     - Klink/Tlink (associates a factor to an injection or terminal of a branch)
+    - Defoterm (term for objective function)
 
 including tuples, lists and iterables thereof (for a power-flow-calculation
 just Slacknode ... Branchtaps are necessary).
