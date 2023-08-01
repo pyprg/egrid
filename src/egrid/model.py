@@ -445,6 +445,7 @@ def _prepare_injection_outputs(injections, injectionoutputs):
 
 def _get_pfc_nodes(slackids, branch_frame):
     """Collapses nodes connected to impedanceless branches.
+
     Creates indices for power flow calculation and
     for 'switch flow calculation'. Slack-nodes are returned first.
 
@@ -526,7 +527,7 @@ def _get_pfc_nodes(slackids, branch_frame):
         len(connected_components) + len(branch_nodes),
         pd.DataFrame(
             chain.from_iterable([
-                ((id_, idx, switch_flow_index, True, True)
+                ((id_, idx, switch_flow_index, True, id_ in set_of_slackids)
                   for idx, ids in enumerate(cc_slacks.connected_components)
                   for switch_flow_index, id_ in enumerate(ids)),
                 ((id_, idx, 0, False, True)
@@ -892,7 +893,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     branches_['is_bridge'] = y_lo_abs_max < branches_.y_lo.abs()
     pfc_slack_count, node_count, pfc_nodes = _get_pfc_nodes(
         slacks_.id_of_node, branches_)
-    add_idx_of_node = partial(_join_on, pfc_nodes, 'id_of_node')
+    add_idx_of_node = partial(
+        _join_on,
+        pfc_nodes[['index_of_node', 'switch_flow_index', 'in_super_node']],
+        'id_of_node')
     #  processing of slack nodes
     pfc_slacks = _get_pfc_slacks(
         slacks_.join(pfc_nodes, on='id_of_node', how='inner'))
@@ -905,7 +909,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     terminal_to_branch = np.vstack([br.index_of_term_A, br.index_of_term_B])
     terminals = _get_branch_terminals(_add_bg(branches), count_of_branches)
     terminals['at_slack'] = (
-        terminals.index_of_node.isin(pfc_slacks.index_of_node))
+        terminals.id_of_node.isin(pfc_slacks.id_of_node))
     branchterminals = terminals[:count_of_branchterms]
     termindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
