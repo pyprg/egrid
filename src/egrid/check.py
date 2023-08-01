@@ -224,8 +224,8 @@ def check_connections_of_injections(frames, msg_cls=2):
     disconnected_nodes = set(injs.id_of_node) - ids_of_nodes
     for idx, row in injs[injs.id_of_node.isin(disconnected_nodes)].iterrows():
         yield (
-            f'disconnected injection id=\'{row.id}\' '\
-            f'(id_of_node=\'{row.id_of_node}\')',
+            f'isolated injection id=\'{row.id}\', injection references '
+            f'unknown node (id_of_node=\'{row.id_of_node}\')',
             msg_cls)
 
 def check_connections_of_branches(frames, msg_cls=2):
