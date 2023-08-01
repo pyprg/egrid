@@ -32,7 +32,7 @@ def make_model(*args):
     ----------
     args: iterable
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Defk, Deft, Klink, Tlink, str
+        Vlimit, Defk, Deft, Defoterm, Klink, Tlink, str
         strings in args are processed with graphparser.parse
 
     Returns
@@ -48,7 +48,7 @@ def make_model_checked(*args):
     ----------
     args: iterable
         Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
-        Defk, Deft, Klink, Tlink, str
+        Vlimit, Defk, Deft, Defoterm, Klink, Tlink, str
         strings in args are processed with graphparser.parse
 
     Returns
