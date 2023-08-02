@@ -789,6 +789,57 @@ def get_factordata_for_step(model, step):
             'index_of_injection'),
         _loc(terminalfactor, step).reset_index())
 
+def initial_scaling_factor_values(model):
+    """Retrieves initial values for scaling factors (step 0) from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    numpy.array (nx2)
+        * [:,0], float, scaling factor for active power,
+        * [:,1], float, scaling factor for reactive power"""
+    count_of_generic_factors, injs, k, f =  get_factordata_for_step(model, 0)
+    vals = injs.value
+    return np.hstack(
+        [vals.iloc[k.kp].to_numpy().reshape(-1,1),
+         vals.iloc[k.kq].to_numpy().reshape(-1,1)],
+        dtype=np.float64)
+
+def initial_terminal_factor_values(model):
+    """Retrieves initial values for terminal factors (step 0) from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    numpy.array"""
+    return model.factors.terminalfactors.value.to_numpy().reshape(-1)
+
+def initial_values(model):
+    """Retrieves initial value from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    dict
+        * ['positions']
+        * ['kpq']"""
+    return {
+        'positions':initial_terminal_factor_values(model),
+        'kpq':initial_scaling_factor_values(model)}
+
+
 def _make_factor_meta(
         count_of_generic_factors, factors, injection_factors, terminalfactors,
         k_prev):
