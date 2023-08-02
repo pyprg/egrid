@@ -26,7 +26,7 @@ import context
 from egrid.builder import (make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Vvalue, Vlimit,
     Branch, Injection,
-    Defk, Klink, Term)
+    Defk, Deft, Klink, Tlink, Term)
 from egrid.check import (
     check_numbers, check_factor_links, check_batch_links, check_ids,
     get_first_error,
@@ -87,7 +87,7 @@ class Check_numbers(unittest.TestCase):
 
 class Check_factors_links(unittest.TestCase):
 
-    def test_deff_with_link(self):
+    def test_defk_with_link(self):
         """Define a load factor and link the load to an injection.
         No messages."""
         frames = make_data_frames(
@@ -111,7 +111,7 @@ class Check_factors_links(unittest.TestCase):
             get_first_error(frames),
             'get_first_error returns None')
 
-    def test_deff_without_link(self):
+    def test_defk_without_link(self):
         """Message for unlinked load factor."""
         frames = make_data_frames([Defk('k')])
         self.assertIsInstance(
@@ -133,7 +133,29 @@ class Check_factors_links(unittest.TestCase):
             1,
             'check_factors_links yields 1 message')
 
-    def test_deff_without_link2(self):
+    def test_deft_without_link(self):
+        """Message for unlinked load factor."""
+        frames = make_data_frames([Deft('t')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Factor'],
+            DataFrame,
+            'frames["Factor"] is a pandas.DataFrame')
+        loadfactors = frames['Factor']
+        self.assertEqual(
+            len(loadfactors),
+            1,
+            'frames["Factor"] has one row')
+        messages = [*check_factor_links(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_factors_links yields 1 message')
+
+    def test_defk_without_link2(self):
         """Message for unlinked load factor."""
         frames = make_data_frames(
             _elements + [Defk(id='k')])
@@ -156,7 +178,7 @@ class Check_factors_links(unittest.TestCase):
             1,
             'check_factors_links yields 1 message')
 
-    def test_deff_with_invalid_link(self):
+    def test_defk_with_invalid_link(self):
         """Message for link with invalid reference to injection."""
         frames = make_data_frames(
             _elements +
@@ -180,7 +202,68 @@ class Check_factors_links(unittest.TestCase):
             1,
             'check_factors_links yields 1 message')
 
-    def test_deff_with_invalid_link2(self):
+    def test_deft_with_invalid_link(self):
+        """Message for link with invalid reference to node."""
+        frames = make_data_frames(
+            _elements +
+            [Deft(id='t'),
+              Tlink(
+                  id_of_node='invalid_id',
+                  id_of_branch='line_0',
+                  id_of_factor='t')])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Factor'],
+            DataFrame,
+            'frames["Factor"] is a pandas.DataFrame')
+        loadfactors = frames['Factor']
+        self.assertEqual(
+            len(loadfactors),
+            1,
+            'frames["Factor"] has one row')
+        messages = [*check_factor_links(frames)]
+        self.assertEqual(
+            len(messages),
+            1,
+            'check_factors_links yields 1 message')
+
+    def test_deft_with_invalid_link2(self):
+        """Message for link with invalid reference to injection."""
+        frames = make_data_frames(
+            _elements +
+            [Deft(id='t'),
+              Tlink(
+                  id_of_node='invalid_id',
+                  id_of_branch='line_0',
+                  id_of_factor='t'),
+              Tlink(
+                  id_of_node='invalid_id',
+                  id_of_branch='line_0',
+                  id_of_factor='t',
+                  step=0)])
+        self.assertIsInstance(
+            frames,
+            dict,
+            'make_data_frames shall return an instance of dict')
+        self.assertIsInstance(
+            frames['Factor'],
+            DataFrame,
+            'frames["Factor"] is a pandas.DataFrame')
+        loadfactors = frames['Factor']
+        self.assertEqual(
+            len(loadfactors),
+            1,
+            'frames["Factor"] has one row')
+        messages = [*check_factor_links(frames)]
+        self.assertEqual(
+            len(messages),
+            3,
+            'check_factors_links yields 2 messages')
+
+    def test_defk_with_invalid_link2(self):
         """Message for link with invalid reference to factor."""
         frames = make_data_frames(
             _elements

@@ -23,7 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import pandas as pd
 import numpy as np
 from egrid._types import (
-    SLACKNODES, FACTORS, INJLINKS, INJECTIONS,
+    SLACKNODES, FACTORS, INJLINKS, INJECTIONS, TERMINALLINKS,
     OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, BRANCHES, VLIMITS, TERMS)
 
 def check_numbers(frames, msg_cls=(2, 0, 2)):
@@ -78,34 +78,81 @@ def check_factor_links(frames, msg_cls=1):
     factors = (
         frames.get('Factor', FACTORS)
         .set_index(['step', 'id'], drop=True))
+    # injection
     injlinks = (
         frames.get('Injectionlink', INJLINKS)
         .set_index(['step', 'id'], drop=True))
-    join = factors[['type']].join(injlinks, how="outer")
-    for step, id_ in join[join.injid.isna()].index:
-        yield (
-            f'missing link to load scaling factor \'{id_}\' (step {step})',
-            msg_cls)
+    join_inj = factors[['type']].join(injlinks, how="right")
     for _, row in (
-        join[join.type.isna()]
-        .reset_index()[['id', 'injid', 'step']]
+        join_inj[join_inj.type.isna()]
+        .reset_index()[['id', 'injid', 'step', 'part']]
         .iterrows()):
         yield (
-            f'invalid link for injection \'{row.injid}\' in step {row.step}, '
-            f'load scaling factor \'{row.id}\' does not exist',
+            "Klink references a not existing scaling factor, "
+            f"id_of_injection='{row.injid}', part='{row.part}', "
+            f"id_of_factor='{row.id}', step={row.step}",
             msg_cls)
     injlinks_ = injlinks.reset_index()
-    assoc = injlinks_.copy().set_index(['step', 'injid', 'part'])
-    for idx, id_ in assoc[assoc.index.duplicated(keep='first')].iterrows():
-        yield f'duplicate Injectionlink (step={idx[0]}, '\
-            f'injid=\'{idx[1]}\', part=\'{idx[2]}\'), id=\'{id_[0]}\''
+    assoc_inj = injlinks_.set_index(['step', 'injid', 'part'])
+    for idx, id_ in \
+        assoc_inj[assoc_inj.index.duplicated(keep='first')].iterrows():
+        yield (
+            "duplicate Klink "
+            "(combination injection/part/step multiple times), "
+            f"id_of_injection='{idx[1]}', part='{idx[2]}', "
+            f"id_of_factor='{id_.id}', step={idx[0]}",
+            msg_cls)
     injections = frames.get('Injection', INJECTIONS)
     valid_inj_ref = injlinks_['injid'].isin(injections.id)
     for _, row in injlinks_[~valid_inj_ref].iterrows():
         yield (
-            f'invalid link for load scaling factor \'{row[1]}\' '
-            f'in step {row[0]}, injection \'{row[2]}\' does not exist',
+             "Klink references a not existing injection, "
+            f"id_of_injection='{row.injid}', part='{row.part}', "
+            f"id_of_factor='{row.id}', step={row.step}",
             msg_cls)
+    # terminal
+    terminallinks = frames.get('Terminallink', TERMINALLINKS)
+    join_term = (
+        factors[['type']]
+        .join(terminallinks.set_index(['step', 'id'], drop=True), how="right"))
+    for _, row in (
+        join_term[join_term.type.isna()]
+        .reset_index()[['nodeid', 'branchid', 'id', 'step']]
+        .iterrows()):
+        yield (
+             "Tlink references a not existing factor, "
+             f"id_of_node='{row.nodeid}', id_of_branch='{row.branchid}', "
+             f"id_of_factor='{row.id}', step={row.step}",
+            msg_cls)
+    assoc_terms = terminallinks.set_index(['step', 'branchid', 'nodeid'])
+    for idx, id_ in \
+        assoc_terms[assoc_terms.index.duplicated(keep='first')].iterrows():
+        yield (
+            "duplicate Tlink (combination node/branch/step multiple times), "
+            f"id_of_node='{idx[2]}'), id_of_branch='{idx[1]}', "
+            f"id_of_factor='{id_[0]}', step={idx[0]}",
+            msg_cls)
+    branches = frames.get('Branch', BRANCHES)
+    node_branch = pd.MultiIndex.from_frame(
+        pd.concat(
+            [branches[['id_of_node_A', 'id']]
+             .rename(columns={'id_of_node_A':'id_of_node'}),
+             branches[['id_of_node_B','id']]
+             .rename(columns={'id_of_node_B':'id_of_node'})],
+            ignore_index=True))
+    terminallinks_ = pd.MultiIndex.from_frame(
+        terminallinks[['nodeid', 'branchid']])
+    invalid_term_links = terminallinks_.difference(node_branch)
+    terminallinks.index = terminallinks_
+    for _, row in terminallinks.loc[invalid_term_links].iterrows():
+        yield (
+            f"Tlink references invalid combination of node and branch, "
+            f"id_of_node='{row.nodeid}', id_of_branch='{row.branchid}', "
+            f"id_of_factor='{row.id}', step={row.step}")
+    # factor
+    step_id = join_inj.index.append(join_term.index)
+    for step, id_ in factors.index.difference(step_id):
+        yield f"unused factor id='{id_}', step={step}", msg_cls
 
 def check_batch_links(frames, msg_cls=1):
     """Finds I/P/Q/Vvalues having an invalid batch/node reference.
