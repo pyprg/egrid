@@ -38,7 +38,7 @@ from egrid._types import (
     INJECTIONS, OUTPUTS, IVALUES, PVALUES, QVALUES, VVALUES, VLIMITS,
     TERMS,
     MESSAGES)
-from egrid.factors import make_factordefs
+from egrid.factors import make_factordefs, get_factordata_for_step
 
 _Y_LO_ABS_MAX = 1e5
 
@@ -995,8 +995,8 @@ def _unite(generic, stepspecific):
     res.update(stepspecific)
     return res.drop(columns=['step'])
 
-def get_vlimits_for_step(vlimits, index_of_step):
-    """Fetches minimum and maximum values for given index of optimization step.
+def get_vminmax_for_step(vlimits, index_of_step):
+    """Fetches minimum and maximum voltages for index of optimization step.
 
     Adds generic values to step specific values.
 
@@ -1044,3 +1044,132 @@ def get_terms_for_step(terms, index_of_step):
     step_terms = (
         terms[terms.step==index_of_step].set_index('id'))
     return _unite(generic_terms, step_terms)
+
+def _update_positions(factors, pos):
+    """Extracts 'value' from factors and overwrites them with matching pos.
+
+    Parameters
+    ----------
+    factors: egrid.factors.Factors
+
+    pos: iterable
+        tuple (id_of_factor, value)
+
+    Returns
+    -------
+    pandas.Series id_of_factor -> value_of_factor (float)"""
+    factorvalues = (
+        factors.gen_factordata.loc[
+            factors.gen_factordata.index.isin(factors.terminalfactors.id)]
+        .value
+        .copy())
+    positions = (
+        pd.DataFrame.from_records(pos, columns=['id', 'value'])
+        .set_index('id')
+        .value)
+    common = factorvalues.index.intersection(positions.index)
+    factorvalues[common] = positions[common]
+    return factorvalues
+
+def get_positions(factors, pos=()):
+    """Returns factors.terminalfactors.value after update with pos.
+
+    The function is intended for manual updates of tap-positions.
+    The result can be passed to functions pfcnum.calculate_power_flow
+    and pfcnum.calculate_electric_data as argument 'positions'. The return
+    value is identical to factors.terminalfactors.value.to_numpy().reshape(-1)
+    if pos is not given.
+
+    Parameters
+    ----------
+    factors: egrid.factors.Factors
+        * .gen_factordata
+        * .terminalfactors
+        factors is retrieved from egrid.model.Model.factors
+    pos: iterable, optional
+        tuple(str - id_of_terminalfactor, float - position)
+        positions for selected terminalfactors,
+        example: pos=[('taps', -16), ('taps2', 3)],
+        the default is ().
+
+    Returns
+    -------
+    numpy.ndarray
+        values of terminalfactors"""
+    return (
+        # positions for defined factors
+        _update_positions(factors, pos)
+        # order value of positions according to factors.terminalfactors
+        .reindex(factors.terminalfactors.id)
+        .to_numpy()
+        .reshape(-1))
+
+def initial_voltage_limits(model):
+    """Fetches minimum and maximum voltages for step 0.
+
+    Parameters
+    ----------
+    vlimits: pandas.DataFrame
+        * .index_of_node, int
+        * .min, float
+        * .max, float
+        * .step, int
+    index_of_step : int
+        index of optimization step
+
+    Returns
+    -------
+    pandas.DataFrame (index: index_of_node)
+        * .min, float
+        * .max, float"""
+    return get_vminmax_for_step(model.vlimits, 0)
+
+def initial_scaling_factor_values(model):
+    """Retrieves initial values for scaling factors (step 0) from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    numpy.array (nx2)
+        * [:,0], float, scaling factor for active power,
+        * [:,1], float, scaling factor for reactive power"""
+    count_of_generic_factors, injs, k, f = get_factordata_for_step(model, 0)
+    vals = injs.value
+    return np.hstack(
+        [vals.iloc[k.kp].to_numpy().reshape(-1,1),
+         vals.iloc[k.kq].to_numpy().reshape(-1,1)],
+        dtype=np.float64)
+
+def initial_terminal_factor_values(model):
+    """Retrieves initial values for terminal factors (step 0) from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    numpy.array"""
+    return model.factors.terminalfactors.value.to_numpy().reshape(-1)
+
+def initial_values(model):
+    """Retrieves initial value from model.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric distribution network for calculation
+
+    Returns
+    -------
+    dict
+        * ['positions']
+        * ['kpq']"""
+    return {
+        'positions':initial_terminal_factor_values(model),
+        'kpq':initial_scaling_factor_values(model)}
