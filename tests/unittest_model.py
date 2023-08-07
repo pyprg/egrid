@@ -30,7 +30,7 @@ from egrid.builder import (
     Slacknode, Branch, Injection,
     make_data_frames, create_objects, Factor, Vlimit)
 from egrid.model import (
-    Model, model_from_frames, _aggregate_vlimits, get_vlimits_for_step)
+    Model, model_from_frames, _aggregate_vlimits, get_vminmax_for_step)
 
 
 _test_net_string = """
@@ -64,7 +64,7 @@ slack0 <------br0------> n1 <------br1------> n2 -->> inj2
 class Aggregate_vlimits(unittest.TestCase):
 
     def test_aggregate_vlimits(self):
-        """also tests get_vlimits_for_step"""
+        """also tests get_vminmax_for_step"""
         vlimit_in = pd.DataFrame(
             {'id_of_node':   ['n0', 'n0',  'n0', 'n0', 'n1', 'n1', 'n1', 'n1'],
              'step':         [-1,   -1,    3,    2,    2,    1,    1,    1],
@@ -80,7 +80,7 @@ class Aggregate_vlimits(unittest.TestCase):
         assert_array_equal(vlimit.to_numpy(), Vlimit_exp.to_numpy())
         df_exp_step2 = pd.DataFrame(
             {'min':[.9, .71], 'max':[1.7, 1.6]}, index=[0, 1])
-        df_step2 = get_vlimits_for_step(vlimit, 2)
+        df_step2 = get_vminmax_for_step(vlimit, 2)
         assert_array_equal(df_step2.to_numpy(), df_exp_step2.to_numpy())
 
     def test_generic_vlimits(self):
