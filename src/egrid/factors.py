@@ -261,7 +261,8 @@ Factormeta = namedtuple(
     'Factormeta',
     'id_of_step_symbol '
     'index_of_kpq_symbol index_of_var_symbol index_of_const_symbol '
-    'values_of_vars cost_of_change var_min var_max is_discrete '
+    'values_of_vars values_of_vars_model cost_of_change '
+    'var_min var_max is_discrete '
     'values_of_consts '
     'var_const_to_factor var_const_to_kp var_const_to_kq var_const_to_ftaps '
     'id_to_idx')
@@ -279,7 +280,9 @@ index_of_var_symbol: numpy.array
 index_of_const_symbol: numpy.array
     int, indices of parameters
 values_of_vars: numpy.array
-    column vector, initial values for vars
+    column vector, initial values of decision variables for optimizatin step
+values_of_vars_model:
+    column vector, values of decision variables from model
 cost_of_change: numpy.array
     float
 var_min: numpy.array
@@ -453,9 +456,11 @@ def _factor_index_per_step(factors, start):
 def _get_values_of_symbols(factordata, value_of_previous_step):
     """Returns values for symbols.
 
-    When a symbol is a variable the value
-    is the initial value. Values are either given explicitely or are
-    calculated in the previous calculation step.
+    When a symbol is a decision variable the value is used as the initial
+    value.
+
+    Values are either given explicitely or are calculated in the previous
+    calculation step.
 
     Parameters
     ----------
@@ -468,21 +473,29 @@ def _get_values_of_symbols(factordata, value_of_previous_step):
 
     Returns
     -------
-    numpy.array (ordered according to index_of_symbol)
-        column vector of float"""
+    tuple
+
+        * numpy.array (ordered according to index_of_symbol)
+          column vector of float, initial values for step
+        * numpy.array (ordered according to index_of_symbol)
+          column vector of float, static values of model"""
+    # values of model, ordered according to index of symbol
+    vals = (
+        factordata.value[factordata.index_of_symbol].to_numpy().reshape(-1,1))
+    # values for next step
     values = np.zeros((len(factordata),1), dtype=float)
-    # explicitely given values not calculated in previous step
+    # fill with explicitely given values not calculated in previous step
     is_given = factordata.index_of_source < 0
     given = factordata[is_given]
     if len(given):
         values[given.index_of_symbol] = given.value.to_numpy().reshape(-1,1)
-    # values calculated in previous step
+    # fill with values calculated in previous step
     calc = factordata[~is_given]
     if len(calc):
         assert len(value_of_previous_step), 'missing value_of_previous_step'
         values[calc.index_of_symbol] = (
             value_of_previous_step[calc.index_of_source.astype(int)])
-    return values
+    return values, vals
 
 def _add_step_index(df, step_indices):
     """Copies data of df for each step index in step_indices.
@@ -523,8 +536,12 @@ def _get_injection_factors(step_factor_injection_part, factors):
 
     Returns
     -------
-    pandas.DataFrame
-        DESCRIPTION."""
+    pandas.DataFrame (index: [step, id_of_injection])
+
+        * .id_p
+        * .id_q
+        * .kp
+        * .kq"""
     if not step_factor_injection_part.empty:
         injection_factors = (
             step_factor_injection_part
@@ -572,8 +589,10 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
     Returns
     -------
     tuple
+
         * pandas.DataFrame, all scaling factors
           (str (step), 'const'|'var', str (id of factor)) ->
+
           * .id_of_source, str, source of initial value,
             factor of previous step
           * .value, float, initial value if no valid source reference
@@ -586,8 +605,10 @@ def _get_scaling_factor_data(factordefs, injections, steps, start):
           * .n, float, not used for scaling factors
           * .index_of_symbol, int, index in 1d-vector of var/const
           * .index_of_source, int, index in 1d-vector of previous step
+
         * pandas.DataFrame, injections with scaling factors
           (int (step), str (id_of_injection))
+
           * .id_p, str, ID for scaling factor of active power
           * .id_q, str, ID for scaling factor of reactive power
           * .kp, int, index of active power scaling factor in 1d-vector
@@ -678,8 +699,10 @@ def  _get_taps_factor_data(model_factors, steps):
     Returns
     -------
     tuple
+
         * pandas.DataFrame, all taps factors
-          (str (step), 'const'|'var', str (id of factor)) ->
+          (str (step), 'const'|'var', str (id of factor)) ->:
+
           * .id_of_source, str, source of initial value,
             factor of previous step
           * .value, float, initial value if no valid source reference
@@ -692,8 +715,10 @@ def  _get_taps_factor_data(model_factors, steps):
             e.g. when index_of_neutral_position=0 --> n=1
           * .index_of_symbol, int, index in 1d-vector of var/const
           * .index_of_source, int, index in 1d-vector of previous step
+
         * pandas.DataFrame, terminals with taps factors
-          (int (step), str (id_of_factor))
+          (int (step), str (id_of_factor)):
+
           * .index_of_terminal, int
           * .index_of_other_terminal, int
           * .value, float, value of var/const
@@ -736,33 +761,41 @@ def get_factordata_for_step(model, step):
     Returns
     -------
     tuple
+
         * count_of_generic_factors, int
+
         * factors: pandas.DataFrame (for requested step)
+
             sorted by 'index_of_symbol'
             * .type, 'var|'const', decision variable or
               parameter
             * .id, str, id of factor
             * .id_of_source, id of factor of previous step
               for initialization
-            * .value, float, used fo initialization if
-              id_of_source is invalid
+            * .value, float, used for initialization if
+              id_of_source is invalid, reference for cost of change
             * .min, float, smalles possible value
             * .max, float, greates possible value
             * .is_discrete, bool
             * .m, float, -Vdiff per tap-step in case of taps
             * .n, float, n = 1 - (Vdiff * index_of_neutral_position) for taps,
               e.g. when index_of_neutral_position=0 --> n=1
+            * .cost, float, cost of change
             * .index_of_symbol, int, index in 1d-vector of var/const
             * .index_of_source, int, index in 1d-vector of previous step
-        * injection_factors: pandas.DataFrame (for each injection)
+
+        * injection_factors: pandas.DataFrame (for each injection),
+            ordered by index_of_injection
+
             * .id_of_injection, str, ID of injection
             * .id_p, str, ID of scaling factor for active power
             * .id_q, str, ID of scaling factor for reactive power
             * .kp, int, index of symbol
             * .kq, int, index of symbol
             * .index_of_injection, int
-            (ordered by index_of_injection)
-        * terminal_factors: pandas.DataFrame (just terminals having a factor)
+
+        * terminal_factors: pandas.DataFrame (for terminals having a factor)
+
             * .id_of_branch, str, ID of branch
             * .id_of_node, str, ID of node
             * .id, str, ID of factor
@@ -812,8 +845,11 @@ def _make_factor_meta(
     Parameters
     ----------
     count_of_generic_factors: int
+
         number of generic factors
+
     factors: pandas.DataFrame
+
         sorted by 'index_of_symbol'
         * .type, 'var'|'const'
         * .id, str
@@ -826,15 +862,19 @@ def _make_factor_meta(
         * .n, float
         * .index_of_symbol, int
         * .index_of_source, int
+
     injection_factors: pandas.DataFrame
-        (each injection, ordered by index_of_injection)
+    (each injection, ordered by index_of_injection)
+
         * .id_of_injection
         * .id_p
         * .id_q
         * .kp
         * .kq
         * .index_of_injection
+
     terminalfactors: pandas.DataFrame
+
         * .id, str
         * .index_of_terminal, int
         * .index_of_other_terminal, int
@@ -848,13 +888,16 @@ def _make_factor_meta(
         * .m, float
         * .n, float
         * .index_of_symbol, int
+
     k_prev: numpy.array
+
         float, values of scaling factors from previous step,
         variables and constants
 
     Returns
     -------
     Factormeta
+
         id_of_step_symbol: pandas.Series
             str, identifiers for all symbols specific for processed step
         index_of_var_symbol: pandas.Series
@@ -870,6 +913,10 @@ def _make_factor_meta(
             int, inidices of terminals having a taps factor
         values_of_vars: numpy.array
             float, column vector, initial values for vars
+        values_of_vars_model:
+            column vector, values of decision variables from model
+        cost_of_change: numpy.array
+            float
         var_min: numpy.array
             float, lower limits of vars
         var_max: numpy.array
@@ -895,11 +942,12 @@ def _make_factor_meta(
             int, index_of_symbol"""
     # inital for vars, value for parameters (consts)
     #   values are ordered by index_of_symbol
-    values = _get_values_of_symbols(factors, k_prev)
+    values, values_of_model = _get_values_of_symbols(factors, k_prev)
     factors_var = factors[factors.type=='var']
-    values_of_vars = values[factors_var.index_of_symbol, 0]
+    values_of_vars = values[factors_var.index_of_symbol,0]
+    values_of_vars_model = values_of_model[factors_var.index_of_symbol,0]
     factors_consts = factors[factors.type=='const']
-    values_of_consts = values[factors_consts.index_of_symbol, 0]
+    values_of_consts = values[factors_consts.index_of_symbol,0]
     # the optimization result is provided as a concatenation of
     #   values for decision variables and parameters, here we prepare indices
     #   for mapping to kp/kq (which are ordered according to injections)
@@ -924,6 +972,8 @@ def _make_factor_meta(
         index_of_kpq_symbol=injection_factors[['kp', 'kq']].to_numpy(),
         # initial values, argument in solver call
         values_of_vars=values_of_vars,
+        # reference value for cost of change, values of vars from model
+        values_of_vars_model=values_of_vars_model,
         cost_of_change=factors_var.cost,
         # lower bound of scaling factors, argument in solver call
         var_min=factors_var['min'],
@@ -968,6 +1018,7 @@ def make_factor_meta(model, step, k_prev):
     Returns
     -------
     Factormeta
+
         id_of_step_symbol: pandas.Series
             str, identifiers for all symbols specific for processed step
         index_of_var_symbol: pandas.Series
@@ -983,6 +1034,10 @@ def make_factor_meta(model, step, k_prev):
             int, inidices of terminals having a taps factor
         values_of_vars: numpy.array
             float, column vector, initial values for vars
+        values_of_vars_model:
+            column vector, values of decision variables from model
+        cost_of_change: numpy.array
+            float
         var_min: numpy.array
             float, lower limits of vars
         var_max: numpy.array
