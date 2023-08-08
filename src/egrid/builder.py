@@ -354,7 +354,7 @@ def _make_node_objects(data):
             if 'Vlimit' in collected:
                 yield _create_vlimit('Vlimit', e_id, collected['Vlimit'])
             elif 'Defvl' in collected:
-                yield _create_vlimit('Devfl', e_id, collected['Devfl'])
+                yield _create_vlimit('Defvl', e_id, collected['Defvl'])
     elif count_of_neighbours == 2:
         yield from _create_branch(e_id, neighbours, attributes)
     elif count_of_neighbours == 1:
