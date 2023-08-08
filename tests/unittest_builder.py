@@ -21,7 +21,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import unittest
 import context
-import numpy as np
 from numpy.testing import assert_array_equal
 import pandas as pd
 from egrid.builder import (make_objects, create_objects, make_data_frames,
@@ -555,10 +554,6 @@ class Make_data_frames(unittest.TestCase):
             0,
             'one error message')
         self.assertEqual(
-            len(frames['Terminallink']),
-            0,
-            'Terminallink is empty')
-        self.assertEqual(
             len(frames['Vlimit']),
             1,
             'Vlimit has one row')
@@ -573,15 +568,29 @@ class Make_data_frames(unittest.TestCase):
         self.assertEqual(
             len(frames['Message']),
             0,
-            'one error message')
-        self.assertEqual(
-            len(frames['Terminallink']),
-            0,
-            'Terminallink is empty')
+            'no error message')
         self.assertEqual(
             len(frames['Vlimit']),
             1,
             'Vlimit has one row')
+
+    def test_P(self):
+        objs = create_objects(
+            ['n       inj\n'
+             '  P=10 P.direction=-1'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['PValue']),
+            1,
+            'Pvalue has one row')
+        self.assertEqual(
+            frames['PValue'].iloc[0]
+            [['id_of_batch', 'P', 'direction', 'cost']].to_list(),
+            ['n_inj', 10.0, -1.0, 0.0])
 
 if __name__ == '__main__':
     unittest.main()
