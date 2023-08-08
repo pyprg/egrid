@@ -349,12 +349,11 @@ def _make_node_objects(data):
             yield _create_slack(e_id, attributes)
         elif 'V' in attributes:
             yield _create_vvalue(e_id, attributes)
-        else:
-            collected = _collect_attributes(attributes)
-            if 'Vlimit' in collected:
-                yield _create_vlimit('Vlimit', e_id, collected['Vlimit'])
-            elif 'Defvl' in collected:
-                yield _create_vlimit('Defvl', e_id, collected['Defvl'])
+        collected = _collect_attributes(attributes)
+        if 'Vlimit' in collected:
+            yield _create_vlimit('Vlimit', e_id, collected['Vlimit'])
+        elif 'Defvl' in collected:
+            yield _create_vlimit('Defvl', e_id, collected['Defvl'])
     elif count_of_neighbours == 2:
         yield from _create_branch(e_id, neighbours, attributes)
     elif count_of_neighbours == 1:

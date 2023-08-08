@@ -191,7 +191,7 @@ Vvalue: float (default value 1.0)
 
 Vlimit = namedtuple(
     'Vlimit',
-    'id_of_node min max step', defaults=("", 0., np.inf, -1))
+    'id_of_node min max step', defaults=("", 0.9, 1.1, -1))
 Vlimit.__doc__ = """Limits of node voltage.
 
 Parameters
@@ -200,10 +200,10 @@ id_of_node: str
     optional, defaults to ""
     identifier of connectivity node, empty string "" addresses all nodes
 min: float
-    optional, default 0
+    optional, default 0.9
     smallest possible magnitude of the voltage at node
 max: float
-    optional, default infinite
+    optional, default 1.1
     greatest possible magnitude of the voltage at node
 step: int
     optional, default -1
@@ -555,7 +555,7 @@ def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
 
 Defvl = namedtuple(
     'Defvl',
-    'id_of_node min max step', defaults=('', 0., np.inf, -1))
+    'id_of_node min max step', defaults=('', 0.9, 1.1, -1))
 Defvl.__doc__ = """Define limit of node voltage.
 
 Parameters
@@ -564,10 +564,10 @@ id_of_node: str|iterable_of_str
     optional, default ''
     identifier of connectivity node(s), addresses all nodes if empty string ''
 min: float
-    optional, default 0
+    optional, default 0.9
     smallest possible magnitude of the voltage at node
 max: float
-    optional, default infinite
+    optional, default 1.1
     greatest possible magnitude of the voltage at node
 step: int|iterable_of_int
     optional, default -1

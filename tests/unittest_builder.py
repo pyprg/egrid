@@ -473,23 +473,23 @@ class Make_data_frames(unittest.TestCase):
         frames = make_data_frames([Vlimit(id_of_node='n_0')])
         vlimit = frames['Vlimit'].loc[0]
         self.assertEqual(vlimit.id_of_node, 'n_0')
-        self.assertEqual(vlimit['min'], 0)
-        self.assertEqual(vlimit['max'], np.inf)
+        self.assertAlmostEqual(vlimit['min'], 0.9)
+        self.assertAlmostEqual(vlimit['max'], 1.1)
         self.assertEqual(vlimit.step, -1)
 
-    def test_vlimit2(self):
+    def test_defvl(self):
         objs = create_objects(['#.Defvl(id_of_node=n_0)'])
         frames = make_data_frames(objs)
         vlimit = frames['Vlimit'].loc[0]
         self.assertEqual(vlimit.id_of_node, 'n_0')
-        self.assertEqual(vlimit['min'], 0)
-        self.assertEqual(vlimit['max'], np.inf)
+        self.assertAlmostEqual(vlimit['min'], 0.9)
+        self.assertAlmostEqual(vlimit['max'], 1.1)
         self.assertEqual(vlimit.step, -1)
 
     def test_injlink(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=p id_of_factor=f0',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -499,7 +499,7 @@ class Make_data_frames(unittest.TestCase):
     def test_injlink2(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=(p q) id_of_factor=(f0 f1)',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -509,7 +509,7 @@ class Make_data_frames(unittest.TestCase):
     def test_terminallink(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']),
@@ -519,7 +519,7 @@ class Make_data_frames(unittest.TestCase):
     def test_terminallink2(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
-              '#.       id_of_factor=f0 step=(1 2))'])
+             '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']),
@@ -529,7 +529,7 @@ class Make_data_frames(unittest.TestCase):
     def test_wrong_class(self):
         objs = create_objects(
             ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Message']),
@@ -543,6 +543,45 @@ class Make_data_frames(unittest.TestCase):
             len(frames['Injectionlink']),
             0,
             'Injectionlink is empty')
+
+    def test_defvl2(self):
+        objs = create_objects(
+            ['n      inj\n'
+             'Vlimit.min=.98\n'
+             'Vlimit.step=1'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'one error message')
+        self.assertEqual(
+            len(frames['Terminallink']),
+            0,
+            'Terminallink is empty')
+        self.assertEqual(
+            len(frames['Vlimit']),
+            1,
+            'Vlimit has one row')
+        self.assertEqual(
+            frames['Vlimit'].iloc[0][['id_of_node','min','step']].to_list(),
+            ['n', 0.98, 1])
+
+    def test_vlimit3(self):
+        objs = create_objects(
+            ['#. Vlimit'])
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'one error message')
+        self.assertEqual(
+            len(frames['Terminallink']),
+            0,
+            'Terminallink is empty')
+        self.assertEqual(
+            len(frames['Vlimit']),
+            1,
+            'Vlimit has one row')
 
 if __name__ == '__main__':
     unittest.main()
