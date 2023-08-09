@@ -388,7 +388,7 @@ class Create_objects(unittest.TestCase):
     def test_create_instruction(self):
         res = [*create_objects(
             ['#.   Message(message=hallo, level=0)',
-              '#.   Defk(id=kp)'])]
+             '#.   Defk(id=kp)'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
@@ -445,14 +445,14 @@ class Create_objects(unittest.TestCase):
             res, [Defoterm()], 'create_objects creates instances of Defoterm')
 
 class Make_data_frames(unittest.TestCase):
+    """objects input"""
 
     def test_empty(self):
         frames = make_data_frames()
         self.assertEqual(
             len(frames), 14, 'make_data_frames creates 13 items')
         self.assertTrue(
-            all(isinstance(df, pd.DataFrame)
-                for key, df in frames.items()),
+            all(isinstance(df, pd.DataFrame) for key, df in frames.items()),
             'all values are pandas.DataFrames')
         self.assertTrue(
             all(df.empty for key, df in frames.items()),
@@ -476,16 +476,22 @@ class Make_data_frames(unittest.TestCase):
         self.assertAlmostEqual(vlimit['max'], 1.1)
         self.assertEqual(vlimit.step, -1)
 
-    def test_defvl(self):
-        objs = create_objects(['#.Defvl(id_of_node=n_0)'])
-        frames = make_data_frames(objs)
-        vlimit = frames['Vlimit'].loc[0]
-        self.assertEqual(vlimit.id_of_node, 'n_0')
-        self.assertAlmostEqual(vlimit['min'], 0.9)
-        self.assertAlmostEqual(vlimit['max'], 1.1)
-        self.assertEqual(vlimit.step, -1)
+class Make_data_frames2(unittest.TestCase):
+    """string input"""
 
-    def test_injlink(self):
+    def test_empty(self):
+        objs = create_objects(
+            ['#.'])
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames.items()), 14)
+        for k in [
+                'Branch', 'Slacknode', 'Injection', 'Output', 'PValue',
+                'QValue', 'IValue', 'Vvalue', 'Vlimit', 'Term', 'Message',
+                'Factor', 'Injectionlink', 'Terminallink']:
+            df = frames[k]
+            self.assertTrue(df.empty)
+
+    def test_injlink_in_footer(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=p id_of_factor=f0',
              '#.      step=(1 2))'])
@@ -495,7 +501,7 @@ class Make_data_frames(unittest.TestCase):
             2,
             'two rows in table Injectionlink')
 
-    def test_injlink2(self):
+    def test_injlink2_in_footer(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=(p q) id_of_factor=(f0 f1)',
              '#.      step=(1 2))'])
@@ -505,79 +511,85 @@ class Make_data_frames(unittest.TestCase):
             4,
             'four rows in table Injectionlink')
 
-    def test_terminallink(self):
+    def test_terminallink_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
-        self.assertEqual(
-            len(frames['Terminallink']),
+        self.assertEqual(len(frames['Terminallink']),
             2,
             'two rows in table Terminallink')
 
-    def test_terminallink2(self):
+    def test_terminallink2_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
              '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['Terminallink']),
-            4,
-            'four rows in table Terminallink')
+            len(frames['Terminallink']), 4, 'four rows in table Terminallink')
 
     def test_wrong_class(self):
         objs = create_objects(
             ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
-        self.assertEqual(
-            len(frames['Message']),
-            1,
-            'one error message')
-        self.assertEqual(
-            len(frames['Terminallink']),
-            0,
-            'Terminallink is empty')
-        self.assertEqual(
-            len(frames['Injectionlink']),
-            0,
-            'Injectionlink is empty')
+        self.assertEqual(len(frames['Message']), 1, 'one error message')
+        self.assertTrue(frames['Terminallink'].empty)
+        self.assertTrue(frames['Injectionlink'].empty)
 
-    def test_defvl2(self):
-        objs = create_objects(
-            ['n      inj\n'
-             'Vlimit.min=.98\n'
-             'Vlimit.step=1'])
+    def test_defvl(self):
+        objs = create_objects('#.Defvl(id_of_node=n_0)')
         frames = make_data_frames(objs)
-        self.assertEqual(
-            len(frames['Message']),
-            0,
-            'one error message')
-        self.assertEqual(
-            len(frames['Vlimit']),
-            1,
-            'Vlimit has one row')
+        vlimit = frames['Vlimit'].loc[0]
+        self.assertEqual(vlimit.id_of_node, 'n_0')
+        self.assertAlmostEqual(vlimit['min'], 0.9)
+        self.assertAlmostEqual(vlimit['max'], 1.1)
+        self.assertEqual(vlimit.step, -1)
+
+    def test_defvl_in_footer(self):
+        objs = create_objects('#.Defvl(id_of_node(n0 n1) step(0 1 2))')
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 0, 'no error message')
+        self.assertEqual(len(frames['Vlimit']), 6, 'Vlimit has six row')
+
+    def test_vlimit_at_node(self):
+        """Vlimit at node"""
+        objs = create_objects(
+            'n      inj\n'
+            'Vlimit.min=.98\n'
+            'Vlimit.step=1')
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 0, 'no error message')
+        self.assertEqual(len(frames['Vlimit']), 1, 'Vlimit has one row')
         self.assertEqual(
             frames['Vlimit'].iloc[0][['id_of_node','min','step']].to_list(),
             ['n', 0.98, 1])
 
-    def test_vlimit3(self):
+    def test_vlimit_in_footer(self):
+        """Vlimit in footer"""
+        objs = create_objects('#.Vlimit')
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 0, 'no error message')
+        self.assertEqual(len(frames['Vlimit']), 1, 'Vlimit has one row')
+
+    def test_P_at_node(self):
+        """PValue at node"""
         objs = create_objects(
-            ['#. Vlimit'])
+            'n       inj\n'
+            '  P=10 P.direction=-1')
         frames = make_data_frames(objs)
         self.assertEqual(
-            len(frames['Message']),
-            0,
-            'no error message')
+            len(frames['Message']), 0, 'no error message')
+        self.assertEqual(len(frames['PValue']), 1, 'Pvalue has one row')
         self.assertEqual(
-            len(frames['Vlimit']),
-            1,
-            'Vlimit has one row')
+            frames['PValue'].iloc[0]
+            [['id_of_batch', 'P', 'direction', 'cost']].to_list(),
+            ['n_inj', 10.0, -1.0, 0.0])
 
-    def test_P(self):
+    def test_PValue_in_footer(self):
+        """PValue in footer"""
         objs = create_objects(
-            ['n       inj\n'
-             '  P=10 P.direction=-1'])
+            '#.PValue(id_of_batch=a P=12 direction=-1 cost=27)')
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Message']),
@@ -590,7 +602,7 @@ class Make_data_frames(unittest.TestCase):
         self.assertEqual(
             frames['PValue'].iloc[0]
             [['id_of_batch', 'P', 'direction', 'cost']].to_list(),
-            ['n_inj', 10.0, -1.0, 0.0])
+            ['a', 12.0, -1.0, 27.0])
 
 if __name__ == '__main__':
     unittest.main()
