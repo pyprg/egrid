@@ -537,6 +537,15 @@ class Make_data_frames2(unittest.TestCase):
         self.assertTrue(frames['Terminallink'].empty)
         self.assertTrue(frames['Injectionlink'].empty)
 
+    def test_vlimit(self):
+        objs = create_objects('#.Vlimit(id_of_node=n_0)')
+        frames = make_data_frames(objs)
+        vlimit = frames['Vlimit'].loc[0]
+        self.assertEqual(vlimit.id_of_node, 'n_0')
+        self.assertAlmostEqual(vlimit['min'], 0.9)
+        self.assertAlmostEqual(vlimit['max'], 1.1)
+        self.assertEqual(vlimit.step, -1)
+
     def test_defvl(self):
         objs = create_objects('#.Defvl(id_of_node=n_0)')
         frames = make_data_frames(objs)
