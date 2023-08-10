@@ -726,7 +726,7 @@ def _aggregate_vlimits(vlimits):
         pd.concat([grouped['min'].max(), grouped['max'].min()], axis=1)
         .reset_index())
 
-def _get_factors2(dataframes, branchterminals):
+def _get_factors2(dataframes, branchterminals, ids_of_injections):
     """Arranges data of factors for further processing.
 
     Parameters
@@ -740,6 +740,8 @@ def _get_factors2(dataframes, branchterminals):
         * .id_of_branch
         * .index_of_terminal
         * .index_of_other_terminal
+    ids_of_injections: pandas.Series
+        str, ids of injections
 
     Returns
     -------
@@ -757,7 +759,10 @@ def _get_factors2(dataframes, branchterminals):
     # links of injection
     injassoc_ = _getframe(dataframes, Injectionlink, INJLINKS)
     injassoc_ = (
-        injassoc_[injassoc_.part.isin(['p', 'q'])]
+        injassoc_[
+            # filter for existing injections
+            injassoc_.injid.isin(ids_of_injections)
+            & injassoc_.part.isin(['p', 'q'])]
         .set_index(['step', 'injid', 'part']))
     injassoc_.index.names = ['step', 'id_of_injection', 'part']
     injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
@@ -957,7 +962,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
-        factors=_get_factors2(dataframes, branchterminals),
+        factors=_get_factors2(dataframes, branchterminals, injections.id),
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))
