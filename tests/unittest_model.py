@@ -87,15 +87,15 @@ class Aggregate_vlimits(unittest.TestCase):
         model = make_model(
             create_objects(_test_net_string),
             Vlimit(),
-            Vlimit(max=2.),
+            Vlimit(max=1.05),
             Vlimit(id_of_node='n1', min=.5))
         order_of_ids = ['slack0', 'n1', 'n2']
         nodes = model.nodes
         idx_order = nodes.reindex(order_of_ids).index_of_node
         exp = array(
-            [[ 0.,   2. ],
-             [ 0.5,  inf], # n1
-             [ 0.,   2. ]])
+            [[ 0.9,  1.05 ],
+             [ 0.5,  1.1  ], # n1
+             [ 0.9,  1.05 ]])
         assert_array_equal(
             model
             .vlimits.set_index('index_of_node')
