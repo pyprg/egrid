@@ -177,7 +177,8 @@ def check_batch_links(frames, msg_cls=1):
     tuple
         str, int"""
     output_frame = frames.get('Output', OUTPUTS)
-    is_inj_output = output_frame.id_of_node.isna()
+    injections = frames.get('Injection', INJECTIONS)
+    is_inj_output = output_frame.id_of_device.isin(injections.id)
     inj_outputs = output_frame[is_inj_output]
     id_of_batch_inj = set(inj_outputs.id_of_batch)
     br_outputs = output_frame[~is_inj_output]
@@ -199,8 +200,8 @@ def check_batch_links(frames, msg_cls=1):
             f'QValue with invalid id_of_batch reference (\'{id_of_batch}\')',
             msg_cls)
     id_of_node_vv = set(frames.get('Vvalue', VVALUES).id_of_node)
-    branch_frames = frames.get('Branch', BRANCHES)
-    ids_of_nodes_AB = branch_frames[['id_of_node_A', 'id_of_node_B']].stack()
+    branch_frame = frames.get('Branch', BRANCHES)
+    ids_of_nodes_AB = branch_frame[['id_of_node_A', 'id_of_node_B']].stack()
     ids_of_nodes = (
         set(ids_of_nodes_AB)
         .union(frames.get('Slacknode', SLACKNODES).id_of_node))
@@ -221,7 +222,7 @@ def check_batch_links(frames, msg_cls=1):
             f'(\'{id_of_batch}\')',
             msg_cls)
     # Outputs with invalid references
-    bf = branch_frames[['id', 'id_of_node_A', 'id_of_node_B']]
+    bf = branch_frame[['id', 'id_of_node_A', 'id_of_node_B']]
     if len(bf):
         bf_stacked = bf.set_index('id').stack()
         bf_ids = bf_stacked.index.get_level_values(0)
@@ -238,7 +239,6 @@ def check_batch_links(frames, msg_cls=1):
             f'id_of_branch \'{row.id_of_device}\'), '
             f'id_of_batch \'{row.id_of_batch}\'',
             msg_cls)
-    injections = frames.get('Injection', INJECTIONS)
     for _, row in (
             inj_outputs[~inj_outputs.id_of_device.isin(injections.id)]
             .iterrows()):
@@ -339,8 +339,15 @@ def check_ids_of_vlimits(frames, msg_cls=1):
             f"invalid attribute of Vlimit id_of_node='{row.id_of_node}'",
             msg_cls)
 
+def _is_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
 def check_ids_of_terms(frames, msg_cls=1):
-    """Checks if Term rows reference existing factors.
+    """Checks if Term rows reference existing factors or are a float numbers.
 
     Parameters
     ----------
@@ -360,7 +367,8 @@ def check_ids_of_terms(frames, msg_cls=1):
             ids = set(factorids.get_group(row.step).id)
         except KeyError:
             ids = {}
-        return [arg for arg in row.args if arg not in ids]
+        return [
+            arg for arg in row.args if arg not in ids and not _is_float(arg)]
     terms = frames.get('Term', TERMS)
     invalid_args = terms[['args', 'step']].apply(get_invalid, axis=1)
     for idx, row in terms[invalid_args.astype(bool)].iterrows():
