@@ -476,6 +476,24 @@ class Make_data_frames(unittest.TestCase):
         self.assertAlmostEqual(vlimit['max'], 1.1)
         self.assertEqual(vlimit.step, -1)
 
+    def test_wrong_class(self):
+        objs = create_objects(
+            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
+              '#.      step=(1 2))'])
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 1, 'one error message')
+        self.assertTrue(frames['Terminallink'].empty)
+        self.assertTrue(frames['Injectionlink'].empty)
+
+    def test_defvl(self):
+        objs = create_objects('#.Defvl(id_of_node=n_0)')
+        frames = make_data_frames(objs)
+        vlimit = frames['Vlimit'].loc[0]
+        self.assertEqual(vlimit.id_of_node, 'n_0')
+        self.assertAlmostEqual(vlimit['min'], 0.9)
+        self.assertAlmostEqual(vlimit['max'], 1.1)
+        self.assertEqual(vlimit.step, -1)
+
 class Make_data_frames2(unittest.TestCase):
     """string input"""
 
@@ -494,7 +512,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_injlink_in_footer(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=p id_of_factor=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -504,7 +522,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_injlink2_in_footer(self):
         objs = create_objects(
             ['#. Klink(id_of_injection=hallo part=(p q) id_of_factor=(f0 f1)',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Injectionlink']),
@@ -514,7 +532,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_terminallink_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Terminallink']),
             2,
@@ -523,37 +541,10 @@ class Make_data_frames2(unittest.TestCase):
     def test_terminallink2_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
-             '#.       id_of_factor=f0 step=(1 2))'])
+              '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']), 4, 'four rows in table Terminallink')
-
-    def test_wrong_class(self):
-        objs = create_objects(
-            ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-             '#.      step=(1 2))'])
-        frames = make_data_frames(objs)
-        self.assertEqual(len(frames['Message']), 1, 'one error message')
-        self.assertTrue(frames['Terminallink'].empty)
-        self.assertTrue(frames['Injectionlink'].empty)
-
-    def test_vlimit(self):
-        objs = create_objects('#.Vlimit(id_of_node=n_0)')
-        frames = make_data_frames(objs)
-        vlimit = frames['Vlimit'].loc[0]
-        self.assertEqual(vlimit.id_of_node, 'n_0')
-        self.assertAlmostEqual(vlimit['min'], 0.9)
-        self.assertAlmostEqual(vlimit['max'], 1.1)
-        self.assertEqual(vlimit.step, -1)
-
-    def test_defvl(self):
-        objs = create_objects('#.Defvl(id_of_node=n_0)')
-        frames = make_data_frames(objs)
-        vlimit = frames['Vlimit'].loc[0]
-        self.assertEqual(vlimit.id_of_node, 'n_0')
-        self.assertAlmostEqual(vlimit['min'], 0.9)
-        self.assertAlmostEqual(vlimit['max'], 1.1)
-        self.assertEqual(vlimit.step, -1)
 
     def test_defvl_in_footer(self):
         objs = create_objects('#.Defvl(id_of_node(n0 n1) step(0 1 2))')
@@ -577,6 +568,13 @@ class Make_data_frames2(unittest.TestCase):
     def test_vlimit_in_footer(self):
         """Vlimit in footer"""
         objs = create_objects('#.Vlimit')
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 0, 'no error message')
+        self.assertEqual(len(frames['Vlimit']), 1, 'Vlimit has one row')
+
+    def test_vlimit_in_graphic(self):
+        """Vlimit in footer"""
+        objs = create_objects('n         inj\nVlimit.min=.98')
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Message']), 0, 'no error message')
         self.assertEqual(len(frames['Vlimit']), 1, 'Vlimit has one row')
@@ -612,6 +610,64 @@ class Make_data_frames2(unittest.TestCase):
             frames['PValue'].iloc[0]
             [['id_of_batch', 'P', 'direction', 'cost']].to_list(),
             ['a', 12.0, -1.0, 27.0])
+
+    def test_Slacknode_in_footer(self):
+        """Slacknode in footer"""
+        objs = create_objects(
+            '#.Slacknode(id_of_node=slack V=1.01+0.2j)')
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['Slacknode']),
+            1,
+            'Slacknode has one row')
+        self.assertEqual(
+            frames['Slacknode'].iloc[0]
+            [['id_of_node', 'V']]
+            .to_list(),
+            ['slack', (1.01+0.2j)])
+
+    def test_Branch_in_footer(self):
+        """Branch in footer"""
+        objs = create_objects(
+            '#.Branch(id=Branch id_of_node_A=n0 id_of_node_B=n1 y_lo=1+2j)')
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['Branch']),
+            1,
+            'Branch has one row')
+        self.assertEqual(
+            frames['Branch'].iloc[0]
+            [['id', 'id_of_node_A', 'id_of_node_B', 'y_lo', 'y_tr']]
+            .to_list(),
+            ['Branch', 'n0', 'n1', (1+2j), 0j])
+
+    def test_Injection_in_footer(self):
+        """Injection in footer"""
+        objs = create_objects(
+            '#.Injection(id=Injection id_of_node=n0 P10=23 Q10=12 Exp_v_p=0 '
+            'Exp_v_q=2)')
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['Injection']),
+            1,
+            'Injection has one row')
+        self.assertEqual(
+            frames['Injection'].iloc[0]
+            [['id', 'id_of_node', 'P10', 'Q10', 'Exp_v_p', 'Exp_v_q']]
+            .to_list(),
+            ['Injection', 'n0', 23.0, 12.0, 0.0, 2.0])
 
 if __name__ == '__main__':
     unittest.main()
