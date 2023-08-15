@@ -72,10 +72,11 @@ def e3(string):
     return re.sub(_e3_pattern, _replace_e3, string)
 
 # all device types of gridmodel.Model and taps and analog values with helper
+# types with dataframes
 MODEL_TYPES = (
     Branch, Slacknode, Injection,
     Output, PValue, QValue, IValue, Vvalue, Vlimit,
-    Term, Message)
+    Term, Factor, Message)
 SOURCE_TYPES = MODEL_TYPES + (Defk, Deft, Defvl, Defoterm, Klink, Tlink)
 _ARG_TYPES = SOURCE_TYPES + (str,)
 
@@ -511,7 +512,8 @@ def make_data_frames(devices=()):
     factor_framet = pd.DataFrame(
         chain.from_iterable(map(expand_def, sources[Deft.__name__])),
         columns=Factor._fields)
-    dataframes[Factor.__name__] = pd.concat([factor_framek, factor_framet])
+    dataframes[Factor.__name__] = pd.concat(
+        [dataframes[Factor.__name__], factor_framek, factor_framet])
     dataframes[Injectionlink.__name__] = pd.DataFrame(
         chain.from_iterable(
             expand_klink(*args) for args in sources[Klink.__name__]),

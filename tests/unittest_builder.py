@@ -669,5 +669,27 @@ class Make_data_frames2(unittest.TestCase):
             .to_list(),
             ['Injection', 'n0', 23.0, 12.0, 0.0, 2.0])
 
+    def test_Factor_in_footer(self):
+        """Injection in footer"""
+        objs = create_objects(
+            '#.Factor(id=Factor type=const value=42 min=27 max=83 '
+            'is_discrete=True m=.5 n=1 step=2 cost=17)')
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['Factor']),
+            1,
+            'Injection has one row')
+        self.assertEqual(
+            frames['Factor'].iloc[0]
+            [['id', 'type', 'id_of_source', 'value', 'min', 'max',
+              'is_discrete', 'm', 'n', 'step', 'cost']]
+            .to_list(),
+            ['Factor', 'const', '_default_', 42.0, 27.0, 83.0,
+             True, 0.5, 1.0, 2, 17.0])
+
 if __name__ == '__main__':
     unittest.main()

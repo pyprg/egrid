@@ -635,14 +635,14 @@ _attribute_types = {
          [_tostring, _tostring, np.float64, np.int32],
          [False, True, False, True]),
      #    id, type, id_of_source, value, min, max,
-     #    is_discrete, m, n, step
+     #    is_discrete, m, n, step, cost
      Factor:(
          [object, object, object, np.float64, np.float64, np.float64,
-          bool, np.float64, np.float64, np.int16],
+          bool, np.float64, np.float64, np.int16, np.float64],
          [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64,
-          _tobool, np.float64, np.float64, np.int16],
+          _tobool, np.float64, np.float64, np.int16, np.float64],
          [False, False, False, False, False, False,
-          False, False, False, False]),
+          False, False, False, False, False]),
      #    injid, part, id, step
      Injectionlink:(
          [object, object, object, np.int16],
