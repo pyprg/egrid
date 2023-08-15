@@ -273,7 +273,8 @@ def _create_vlimit(attname, id_of_node, attributes):
     except ValueError as e:
         return Message(
             f"Error in data of {attname} at node '{id_of_node}', "
-            f"following attributes are given: {str(attributes)} "
+            f"following attributes are given: {str(attributes)}, "
+            f"{attname} accepts: {str(Defvl._fields)}, "
             f"(error: {str(e)})")
 
 def _collect_attributes(attributes):
@@ -335,12 +336,25 @@ def _make_edge_objects(data):
             id_of_node=id_of_node,
             id_of_device=id_of_device)
     if has_Tl:
-        terminallink = collected['Tlink'].get('Tlink')
+        attributes = collected['Tlink']
+        terminallink = attributes.pop('Tlink', None)
         if terminallink:
-            yield Tlink(
+            atts = dict(
                 id_of_node=id_of_node,
                 id_of_branch=id_of_device,
                 id_of_factor=terminallink)
+            atts.update(
+                (k, (int if k=='step' else str)(v))
+                for k,v in attributes.items())
+            try:
+                yield Tlink(**atts)
+            except ValueError as e:
+                yield Message(
+                    f"Error in data of Tlink at node '{id_of_node}', "
+                    f"branch '{id_of_device}', "
+                    f"following attributes are given: {str(atts)}, "
+                    f"Tlink accepts: {str(Tlink._fields)}, "
+                    f"(error: {str(e)})")
 
 def _make_node_objects(data):
     _, e_id, neighbours, attributes = data

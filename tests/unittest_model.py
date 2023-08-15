@@ -28,7 +28,7 @@ from numpy.testing import assert_array_equal
 from egrid import make_model
 from egrid.builder import (
     Slacknode, Branch, Injection,
-    make_data_frames, create_objects, Factor, Vlimit)
+    make_data_frames, create_objects, Factor, Vlimit, Injectionlink)
 from egrid.model import (
     Model, model_from_frames, _aggregate_vlimits, get_vminmax_for_step)
 
@@ -244,7 +244,9 @@ class Model_messages(unittest.TestCase):
         Injection('load_0', 'n1')]
 
     def test_wrong_object(self):
-        model = make_model(self.elements, Factor(id='k'))
+        model = make_model(
+            self.elements,
+            Injectionlink(injid='inj0', part='p', id='k', step=0))
         self.assertIsNotNone(model, 'make_model shall return an object')
         self.assertEqual(len(model.messages), 1, 'one error')
 

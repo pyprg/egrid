@@ -287,7 +287,7 @@ Parameters
 ----------
 id_of_injection: str|iterable_of_str
     identifier of injection
-part: 'p'|'q'|iterable_of_two_char (default 'pq')
+part: 'p'|'q'|iterable_of_p_q
     identifies the attribute of the injection to multipy with
     ('p'/'q'- injected active/reactive power)
 id_of_factor: str|iterable_of_str

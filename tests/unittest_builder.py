@@ -479,7 +479,7 @@ class Make_data_frames(unittest.TestCase):
     def test_wrong_class(self):
         objs = create_objects(
             ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Message']), 1, 'one error message')
         self.assertTrue(frames['Terminallink'].empty)
@@ -529,10 +529,23 @@ class Make_data_frames2(unittest.TestCase):
             4,
             'four rows in table Injectionlink')
 
+    def test_tlink_in_graph(self):
+        objs = create_objects(
+            ['n       branch\n  Tlink=tap Tlink.step=1'])
+        frames = make_data_frames(objs)
+        self.assertEqual(len(frames['Message']), 0, 'no error message')
+        self.assertEqual(
+            len(frames['Terminallink']), 1, 'Terminallink has one row')
+        self.assertEqual(
+            frames['Terminallink'].iloc[0]
+            [['branchid', 'nodeid', 'id', 'step']]
+            .to_list(),
+            ['branch', 'n', 'tap', 1])
+
     def test_terminallink_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
-              '#.      step=(1 2))'])
+             '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Terminallink']),
             2,
@@ -541,7 +554,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_terminallink2_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
-              '#.       id_of_factor=f0 step=(1 2))'])
+             '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']), 4, 'four rows in table Terminallink')
