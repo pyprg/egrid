@@ -220,7 +220,7 @@ Factor.__doc__ = """Data of a factor.
 
 Parameters
 ----------
-id_: str
+id: str
     unique idendifier of factor
 type: 'var'|'const' (default value 'var')
     decision variable or parameter
@@ -229,7 +229,7 @@ id_of_source: str (default value DEFAULT_FACTOR_ID)
     default value ID of default factor
 value: float (default vaLue 1)
     used by initialization if no source factor in previous optimization step
-min: float (default value numpy.inf)
+min: float (default value -numpy.inf)
     smallest possible value
 max: float, (default value numpy.inf)
     greatest possible value
@@ -238,9 +238,10 @@ is_discrete: bool (default is False)
     by MINLP solvers
 m: float (default 1.)
     dy/dx, effective multiplier is a linear function f(x) = mx + n, m is the
-    increase of that linear function
+    increase of that linear function, value is applied for tap factors only
 n: float (default 0.)
-    effective multiplier is a linear function f(x) = mx + n, n is f(0)
+    effective multiplier is a linear function f(x) = mx + n, n is f(0),
+    value is applied for tap factors only
 step: int (default value -1)
     index of optimization step, defined for each step if set to -1
 cost: float (default 1.)
@@ -459,7 +460,7 @@ m: float (default 1.)
 n: float (default 0.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
     not used
-step: int (default value -1)
+step: int | iterable_of_int (default value -1)
     index of optimization step, for each step set to -1
 cost: float (default 0.)
     cost of change (for Volt-Var-Control)"""
@@ -494,7 +495,7 @@ m: float (default -.1/16)
     m is the increase of that linear function
 n: float (default 1.)
     effective multiplier is a linear function f(x) = mx + n, n is f(0)
-step: int (default value -1)
+step: int | iterable_of_int (default value -1)
     index of optimization step, for each step set to -1
 cost: float (default 0.)
     cost of change (for Volt-Var-Control)"""
