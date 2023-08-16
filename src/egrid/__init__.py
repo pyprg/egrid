@@ -23,7 +23,7 @@ Created on Mon Jan 31 08:00:31 2022
 import pandas as pd
 from egrid.model import model_from_frames
 from egrid.builder import make_data_frames, create_objects
-from egrid.check import check_frames, get_first_error
+from egrid.check import check_frames
 
 def make_model(*args):
     """Creates an instance of egrid.Model.

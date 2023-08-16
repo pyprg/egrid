@@ -50,66 +50,62 @@ Slacknode = namedtuple(
     'Slacknode',
     'id_of_node V',
     defaults=('slack', 1.+.0j,))
-Slacknode.__doc__ = """Tag for a slack node.
-
-Parameters
-----------
-id_of_node: str
-    optional, default 'slack'
-    identifier of the slack node
-V: complex
-    optional, default 1+0j
-    voltage at slack node"""
+Slacknode.__doc__ += ': Tag for a slack node'
+Slacknode.id_of_node.__doc__ = (
+    "str, optional, default 'slack' identifier of the slack node")
+Slacknode.V.__doc__ = (
+    "complex, optional, default 1+0j, voltage at slack node")
 
 Injection = namedtuple(
     'Injection',
     'id id_of_node P10 Q10 Exp_v_p Exp_v_q',
     defaults=(0.0, 0.0, 0.0, 0.0))
-Injection.__doc__ = """Model of an electrical one-terminal-device including
-consumers (positiv and negative loads), PQ- and PV-generators,
-batteries and shunt capacitors.
-
-Parameters
-----------
-id: str
-    unique identifier of injection
-id_of_node: str
-    id of connected node
-P10: float, (default value 0)
-    active power when magnitude of voltage is 1.0 pu,
-    the value is the sum for all three phases
-Q10: float, (default value 0)
-    reactive power when magnitude of voltage is 1.0 pu
-    the value is the sum for all three phases
-Exp_v_p: float, (default value 0)
-    exponent for voltage dependency of active power,
-    0.0 active power P is independent from voltage-magnitude e.g. generators
-    2.0 for constant conductance
-Exp_v_q: float, (default value 0)
-    exponent for voltage dependency of active power,
-    0.0 reactive power is independent from voltage-magnitude e.g. generators
-    2.0 for constant susceptance"""
+Injection.__doc__ += (
+    ": Model of an electrical one-terminal-device including "
+    "consumers (positiv and negative loads), PQ- and PV-generators, "
+    "batteries and shunt capacitors.")
+Injection.id.__doc__ = (
+    "str, unique identifier of injection")
+Injection.id_of_node.__doc__ = (
+    "str, id of connected node")
+Injection.P10.__doc__ = (
+    "float, (default value 0) "
+    "active power when magnitude of voltage is 1.0 pu, "
+    "the value is the sum for all three phases")
+Injection.Q10.__doc__ = (
+    "float, (default value 0) "
+    "reactive power when magnitude of voltage is 1.0 pu "
+    "the value is the sum for all three phases")
+Injection.Exp_v_p.__doc__ = (
+    "float, (default value 0) "
+    "exponent for voltage dependency of active power, "
+    "0.0 active power P is independent from voltage-magnitude e.g. generators "
+    "2.0 for constant conductance")
+Injection.Exp_v_q.__doc__ = (
+    "float, (default value 0) "
+    "exponent for voltage dependency of active power, "
+    "0.0 reactive power is independent from voltage-magnitude e.g. generators"
+    "2.0 for constant susceptance")
 
 Output = namedtuple(
     'Output',
     'id_of_batch id_of_device id_of_node', defaults=(None,))
-Output.__doc__ = """Measured terminal or terminal
-of a device which is part of a group of devices whose flow is measured.
-
-Parameters
-----------
-id_of_batch: str
-    unique identifier of the batch
-id_of_device: str
-    id referencing a branch or an injection
-id_of_node: str (default value None)
-    id of the connected node, 'None' if at injection"""
+Output.__doc__ += (
+    ": Measured terminal or terminal of a device which is part "
+    "of a group of devices whose flow is measured.")
+Output.id_of_batch.__doc__ = (
+    "str, unique identifier of the batch")
+Output.id_of_device.__doc__ = (
+    "str, id referencing a branch or an injection")
+Output.id_of_node.__doc__ = (
+    "str, (default value None) "
+    "id of the connected node, 'None' if at injection")
 
 PValue = namedtuple(
     'PValue',
     'id_of_batch P direction cost',
     defaults=(0., 1., 0.))
-PValue.__doc__ = """Value of (measured) active power.
+PValue.__doc__ += """: Value of (measured) active power.
 
 The optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
@@ -118,24 +114,21 @@ exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by PValue and Output instances
 sharing the same 'id_of_batch'-value.
 
-Attribute cost is introduced for Volt-Var-Control.
-
-Parameters
-----------
-id_of_batch: str
-    unique identifier of the point
-P: float
-    active power, sum of all three phases
-direction: float (default value 1)
-    -1 or 1
-cost: float (default value 0)
-    cost"""
+Attribute cost is introduced for Volt-Var-Control."""
+PValue.id_of_batch.__doc__ = (
+    "str, unique identifier of the point")
+PValue.P.__doc__ = (
+    "float, active power, sum of all three phases")
+PValue.direction.__doc__ = (
+    "float (default value 1) -1 or 1")
+PValue.cost.__doc__ = (
+    "float (default value 0) cost")
 
 QValue = namedtuple(
     'QValue',
     'id_of_batch Q direction cost',
     defaults=(0., 1., 0.))
-QValue.__doc__ = """Value of (measured) reactive power.
+QValue.__doc__ += """: Value of (measured) reactive power.
 
 The optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
@@ -144,70 +137,58 @@ must exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by QValue and Output instances
 sharing the same 'id_of_batch'-value.
 
-Attribute cost is introduced for Volt-Var-Control.
-
-Parameters
-----------
-id_of_batch: str
-    unique identifier of the point
-Q: float
-    reactive power, sum of all three phases
-direction: float (default value 1)
-    -1 or 1
-cost: float (default value 0)
-    cost"""
+Attribute cost is introduced for Volt-Var-Control."""
+QValue.id_of_batch.__doc__ = (
+    "str, unique identifier of the point")
+QValue.Q.__doc__ = (
+    "float, reactive power, sum of all three phases")
+QValue.direction.__doc__ = (
+    "float, (default value 1) -1 or 1")
+QValue.cost.__doc__ = (
+    "float, (default value 0) cost")
 
 IValue = namedtuple(
     'IValue',
     'id_of_batch I', defaults=(0.0,))
-IValue.__doc__ = """Value of (measured) electric current. The
+IValue.__doc__ += """: Value of (measured) electric current. The
 optimization (estimation) target is to meet those (and other given) values.
 When the measurement is placed at a terminal of a branch or injection a
 corresponding Output instance having the identical 'id_of_batch' value
 must exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by IValue and Output instances
-sharing the same 'id_of_batch'-value.
-
-Parameters
-----------
-id_of_batch: str
-    unique identifier of the point
-I: float
-    magnitude of electric current, value for one phase"""
+sharing the same 'id_of_batch'-value."""
+IValue.id_of_batch.__doc__ = (
+    "str, unique identifier of the point")
+IValue.I.__doc__ = (
+    "float, magnitude of electric current, value for one phase")
 
 Vvalue = namedtuple(
     'Vvalue',
     'id_of_node V', defaults=(1.,))
-Vvalue.__doc__ = """Values of (measured) electric voltage. The
-optimization (estimation) target is to meet those (and other given) values.
-
-Parameters
-----------
-id_of_node: str
-    unique identifier of node the voltage was measured at or the
-    setpoint is for
-Vvalue: float (default value 1.0)
-    magnitude of electric voltage"""
+Vvalue.__doc__ += """: Values of (measured) electric voltage. The
+optimization (estimation) target is to meet those (and other given) values."""
+Vvalue.id_of_node.__doc__ = (
+    "str, unique identifier of node the voltage was measured at or the "
+    "setpoint is for")
+Vvalue.V.__doc__ = (
+    "float, (default value 1.0) magnitude of electric voltage")
 
 Vlimit = namedtuple(
     'Vlimit',
     'id_of_node min max step', defaults=("", 0.9, 1.1, -1))
-Vlimit.__doc__ = """Limits of node voltage.
-
-Parameters
-----------
-id_of_node: str
-    optional, defaults to ""
-    identifier of connectivity node, empty string "" addresses all nodes
-min: float
-    optional, default 0.9
-    smallest possible magnitude of the voltage at node
-max: float
-    optional, default 1.1
-    greatest possible magnitude of the voltage at node
-step: int
-    optional, default -1
-    index of optimization step, -1 for all steps"""
+Vlimit.__doc__ += ": Limits of node voltage."
+Vlimit.id_of_node.__doc__ = (
+    "str, optional, empty string "
+    "identifier of connectivity node, empty string addresses all nodes")
+Vlimit.min.__doc__ = (
+    "float, optional, default 0.9 "
+    "smallest possible magnitude of the voltage at node")
+Vlimit.max.__doc__ = (
+    "float, optional, default 1.1 "
+    "greatest possible magnitude of the voltage at node")
+Vlimit.step.__doc__ = (
+    "int, optional, default -1 "
+    "index of optimization step, -1 for all steps")
 
 DEFAULT_FACTOR_ID = '_default_'
 
@@ -216,149 +197,140 @@ Factor = namedtuple(
     'id type id_of_source value min max is_discrete m n step cost',
     defaults=(
         'var', DEFAULT_FACTOR_ID, 1.0, -np.inf, np.inf, False, 1., 0., -1, 1.))
-Factor.__doc__ = """Data of a factor.
-
-Parameters
-----------
-id: str
-    unique idendifier of factor
-type: 'var'|'const' (default value 'var')
-    decision variable or parameter
-id_of_source: str (default value DEFAULT_FACTOR_ID)
-    id of scaling factor (previous optimization step) for initialization,
-    default value ID of default factor
-value: float (default vaLue 1)
-    used by initialization if no source factor in previous optimization step
-min: float (default value -numpy.inf)
-    smallest possible value
-max: float, (default value numpy.inf)
-    greatest possible value
-is_discrete: bool (default is False)
-    no values after decimal point if True, input for solver accepted
-    by MINLP solvers
-m: float (default 1.)
-    dy/dx, effective multiplier is a linear function f(x) = mx + n, m is the
-    increase of that linear function, value is applied for tap factors only
-n: float (default 0.)
-    effective multiplier is a linear function f(x) = mx + n, n is f(0),
-    value is applied for tap factors only
-step: int (default value -1)
-    index of optimization step, defined for each step if set to -1
-cost: float (default 1.)
-    cost of change (for Volt-Var-Control)"""
+Factor.__doc__ += ": Data of a factor."
+Factor.id.__doc__ = (
+    "str, unique idendifier of factor")
+Factor.type.__doc__ = (
+    "'var'|'const' (default value 'var'), "
+    "decision variable or parameter")
+Factor.id_of_source.__doc__ = (
+    "str (default value DEFAULT_FACTOR_ID) "
+    "id of scaling factor (previous optimization step) for initialization, "
+    "default value ID of default factor")
+Factor.value.__doc__ = (
+    "float (default vaLue 1), "
+    "used by initialization if no source factor in previous optimization step")
+Factor.min.__doc__ = (
+    "float (default value -numpy.inf), smallest possible value")
+Factor.max.__doc__ = (
+    "float, (default value numpy.inf), greatest possible value")
+Factor.is_discrete.__doc__ = (
+    "bool (default is False), "
+    "no values after decimal point if True, input for solver accepted "
+    "by MINLP solvers")
+Factor.m.__doc__ = (
+    "float (default 1.), "
+    "dy/dx, effective multiplier is a linear function f(x) = mx + n, m is the "
+    "increase of that linear function, value is applied for tap factors only")
+Factor.n.__doc__ = (
+    "float (default 0.), "
+    "effective multiplier is a linear function f(x) = mx + n, n is f(0), "
+    "value is applied for tap factors only")
+Factor.step.__doc__ = (
+    "int (default value -1), "
+    "index of optimization step, defined for each step if set to -1")
+Factor.cost.__doc__ = (
+    "float (default 1.), cost of change (for Volt-Var-Control)")
 
 Terminallink = namedtuple(
     'Terminallink', 'branchid nodeid id step', defaults=(-1,))
-Terminallink.__doc__ = """Links a branch terminal with a factor.
-
-Parameters
-----------
-branchid: str
-    ID of branch
-nodeid: str
-    ID of connectivity node
-id: str
-    unique identifier (for one step) of linked factor
-step: int (default value -1)
-    optimization step, defined for each step if -1"""
+Terminallink.__doc__ += ": Links a branch terminal with a factor."
+Terminallink.branchid.__doc__ = (
+    "str, ID of branch")
+Terminallink.nodeid.__doc__ = (
+    "str, ID of connectivity node")
+Terminallink.id.__doc__ = (
+    "str, unique identifier (for one step) of linked factor")
+Terminallink.step.__doc__ = (
+    "int (default value -1) "
+    "optimization step, defined for each step if -1")
 
 Injectionlink = namedtuple(
     'Injectionlink', 'injid part id step', defaults=(-1,))
-Injectionlink.__doc__ = """Links an injection with a factor.
-
-Parameters
-----------
-injid: str
-    ID of injection
-part: 'p'|'q'
-    marker for active or reactive power to be multiplied
-id: str
-    unique identifier (for one step) of linked factor
-step: int (default value -1)
-    optimization step, defined for each step if -1"""
+Injectionlink.__doc__ += ": Links an injection with a factor."
+Injectionlink.injid.__doc__ = (
+    "str, ID of injection")
+Injectionlink.part.__doc__ = (
+    "'p'|'q', marker for active or reactive power to be multiplied")
+Injectionlink.id.__doc__ = (
+    "str, unique identifier (for one step) of linked factor")
+Injectionlink.step.__doc__ = (
+    "int (default value -1) "
+    "optimization step, defined for each step if -1")
 
 Klink = namedtuple(
     'Klink',
     'id_of_injection part id_of_factor step',
     defaults=(-1,))
-Klink.__doc__ = """Logical connection between injection and a factor.
-
-Parameters
-----------
-id_of_injection: str|iterable_of_str
-    identifier of injection
-part: 'p'|'q'|iterable_of_p_q
-    identifies the attribute of the injection to multipy with
-    ('p'/'q'- injected active/reactive power)
-id_of_factor: str|iterable_of_str
-    identifier of scaling factor to connect to, one identifier for each
-    given value of argument 'part'
-step: int (default value -1)|iterable_of_int
-    addresses the optimization step, first optimization step has index 0,
-    defined for each step if -1"""
+Klink.__doc__ += ": Logical connection between injection and a factor."
+Klink.id_of_injection.__doc__ = (
+    "str|iterable_of_str, identifier of injection")
+Klink.part.__doc__ = (
+    "'p'|'q'|iterable_of_p_q "
+    "identifies the attribute of the injection to multipy with "
+    "('p'/'q'- injected active/reactive power)")
+Klink.id_of_factor.__doc__ = (
+    "str|iterable_of_str, "
+    "identifier of scaling factor to connect to, one identifier for each "
+    "given value of argument 'part'")
+Klink.step.__doc__ = (
+    "int|iterable_of_int (default value -1), "
+    "addresses the optimization step, first optimization step has index 0, "
+    "defined for each step if -1")
 
 Tlink = namedtuple(
     'Tlink',
     'id_of_node id_of_branch id_of_factor step',
     defaults=(-1,))
-Tlink.__doc__ = """Logical connection between a terminal of a branch
-and a factor.
-
-Parameters
-----------
-id_of_node: str|iterable_of_str
-    ID of connectivity node
-id_of_branch: str|iterable_of_str
-    identifier of branch
-id_of_factor: str|iterable_of_str
-    identifier of taps (terminal) factor to connect,
-    id_of_node, id_of_branch, id_of_factor shall have the same lenght
-    if iterable
-step: int (default value -1)|iterable_of_int
-    addresses the optimization step, first optimization step has index 0,
-    defined for each step if -1"""
+Tlink.__doc__ += (
+    ": Logical connection between a terminal of a branch and a factor.")
+Tlink.id_of_node.__doc__ = (
+    "str|iterable_of_str, ID of connectivity node")
+Tlink.id_of_branch.__doc__ = (
+    "str|iterable_of_str, identifier of branch")
+Tlink.id_of_factor.__doc__ = (
+    "str|iterable_of_str, "
+    "identifier of taps (terminal) factor to connect, "
+    "id_of_node, id_of_branch, id_of_factor shall have the same lenght "
+    "if iterable")
+Tlink.step.__doc__ = (
+    "int (default value -1)|iterable_of_int "
+    "addresses the optimization step, first optimization step has index 0, "
+    "defined for each step if -1")
 
 Term = namedtuple(
     'Term',
     'id args fn weight step',
     defaults=([''], 'diff', 1., -1))
-Term.__doc__ = """Data of an ojective-function-term.
-
-Parameters
-----------
-id: str
-    unique identifier of a term
-args: list
-    str,
-    references to an arguments of function fn
-fn: str
-    indentifier of function for calculating a term of the objective function
-weight: float
-    multiplier for term in objective function
-step: int
-    index of optimization step"""
+Term.__doc__ += ": Data of an ojective-function-term."
+Term.id.__doc__ = (
+    "str, unique identifier of a term")
+Term.args.__doc__ = (
+    "list, str, references to an arguments of function fn")
+Term.fn.__doc__ = (
+    "str, indentifier of function for calculating a term of the "
+    "objective function")
+Term.weight.__doc__ = (
+    "float, multiplier for term in objective function")
+Term.step.__doc__ = (
+    "int, index of optimization step")
 
 Defoterm = namedtuple(
     'Defoterm',
     'fn args weight step',
     defaults=('diff', '', 1., -1))
-Defoterm.__doc__ = """Definition for a mathematical term of the objective
-function.
-
-Parameters
-----------
-fn: str
-    optional, default 'diff'
-    name of function
-args: str | iterable_of_str
-    optional, default ''
-    name of argument or name of arguments
-weight: float
-    optional, default 1.0
-    multiplier for term in objective function
-step: int | iterable_of_int
-    optional, default -1
-    optimization step, -1 means all steps"""
+Defoterm.__doc__ += """: Definition for a mathematical term of the objective
+function."""
+Defoterm.fn.__doc__ = (
+    "str, optional, default 'diff', name of function")
+Defoterm.args.__doc__ = (
+    "str | iterable_of_str, optional, default '' "
+    "name of argument or name of arguments")
+Defoterm.weight.__doc__ = (
+    "float, optional, default 1.0 multiplier for term in objective function")
+Defoterm.step.__doc__ = (
+    "int | iterable_of_int, optional, default -1 "
+    "optimization step, -1 means all steps")
 
 def expand_defoterm(index,  defoterm):
     """Creates definitions of terms for objective function (Term).
@@ -390,16 +362,11 @@ def expand_defoterm(index,  defoterm):
         for step in iter_steps)
 
 Message = namedtuple('Message', 'message level', defaults=('', 2))
-Message.__doc__ = """Information, warning or error message.
-
-Parameters
-----------
-message: str
-    human readable text
-level: int
-    0 - information
-    1 - warning
-    2 - error"""
+Message.__doc__ += ": Information, warning or error message."
+Message.message.__doc__ = (
+    "str, human readable text")
+Message.level.__doc__ = (
+    "int, 0 - information, 1 - warning, 2 - error")
 
 # helper
 
@@ -432,73 +399,86 @@ Defk = namedtuple(
     'Defk',
     'id type id_of_source value min max is_discrete m n step cost',
     defaults=('var', None, 1.0, -np.inf, np.inf, False, 1., 0., -1, 0.))
-Defk.__doc__ = """Definition of a scaling factor.
-
-Parameters
-----------
-id: str|iterable_of_str
-    identifier of scaling factor, unique among factors of same step
-type: 'var'|'const' (default value 'var')
-    'var' - factor is a decision variable
-    'const' - factor is a parameter
-id_of_source: str (default value None)
-    identifies factor of previous estimation step whose value
-    will be used for initialization
-value: float (default value 1)
-    used for initialization if 'id_of_source' does not reference a
-    scaling factor (of previous optimization step)
-min: float (default value -numpy.inf)
-    smallest value allowed
-max: float (default value numpy.inf)
-    greatest value allowed
-is_discrete: bool (default values is False)
-    input for MINLP solver, indicates if factor shall be processed like int
-m: float (default 1.)
-    dy/dx, effective multiplier is a linear function f(x) = mx + n,
-    m is the increase of that linear function
-    not used
-n: float (default 0.)
-    effective multiplier is a linear function f(x) = mx + n, n is f(0)
-    not used
-step: int | iterable_of_int (default value -1)
-    index of optimization step, for each step set to -1
-cost: float (default 0.)
-    cost of change (for Volt-Var-Control)"""
+Defk.__doc__ += ": Definition of a scaling factor."
+Defk.id.__doc__ = (
+    "str|iterable_of_str, "
+    "identifier of scaling factor, unique among factors of same step")
+Defk.type.__doc__ = (
+    "'var'|'const' (default value 'var'), "
+    "'var' - factor is a decision variable "
+    "'const' - factor is a parameter")
+Defk.id_of_source.__doc__ = (
+    "str (default value None), "
+    "identifies factor of previous estimation step whose value "
+    "will be used for initialization")
+Defk.value.__doc__ = (
+    "float (default value 1), "
+    "used for initialization if 'id_of_source' does not reference a "
+    "scaling factor (of previous optimization step)")
+Defk.min.__doc__ = (
+    "float (default value -numpy.inf), "
+    "smallest value allowed")
+Defk.max.__doc__ = (
+    "float (default value numpy.inf), "
+    "greatest value allowed")
+Defk.is_discrete.__doc__ = (
+    "bool (default values is False), "
+    "input for MINLP solver, indicates if factor shall be processed like int")
+Defk.m.__doc__ = (
+    "float (default 1.), "
+    "dy/dx, effective multiplier is a linear function f(x) = mx + n, "
+    "m is the increase of that linear function "
+    "not used")
+Defk.n.__doc__ = (
+    "float (default 0.), "
+    "effective multiplier is a linear function f(x) = mx + n, n is f(0) "
+    "not used")
+Defk.step.__doc__ = (
+    "int | iterable_of_int (default value -1), "
+    "index of optimization step, for each step set to -1")
+Defk.cost.__doc__ = (
+    "float (default 0.), cost of change (for Volt-Var-Control)")
 
 Deft = namedtuple(
     'Deft',
     'id type id_of_source value min max is_discrete m n step cost',
     defaults=('const', None, 0., -16., 16., True, -.1/16, 1., -1, 0.))
-Deft.__doc__ = """Definition of a taps (terminal) factor.
-
-Parameters
-----------
-id: str|iterable_of_str
-    identifier of scaling factor, unique among factors of same step
-type: 'var'|'const' (default value 'const')
-    'var' - factor is a decision variable
-    'const' - factor is a parameter
-id_of_source: str (default value None)
-    identifies factor of previous estimation step whose value
-    will be used for initialization
-value: float (default value 0)
-    used for initialization if 'id_of_source' does not reference a
-    scaling factor (of previous optimization step)
-min: float (default value -16)
-    smallest value allowed
-max: float (default 16)
-    greatest value allowed
-is_discrete: bool (default values is True)
-    input for MINLP solver, indicates if factor shall be processed like int
-m: float (default -.1/16)
-    dy/dx, effective multiplier is a linear function f(x) = mx + n,
-    m is the increase of that linear function
-n: float (default 1.)
-    effective multiplier is a linear function f(x) = mx + n, n is f(0)
-step: int | iterable_of_int (default value -1)
-    index of optimization step, for each step set to -1
-cost: float (default 0.)
-    cost of change (for Volt-Var-Control)"""
+Deft.__doc__ += ": Definition of a taps (terminal) factor."
+Deft.id.__doc__ = (
+    " str|iterable_of_str, "
+    "identifier of scaling factor, unique among factors of same step")
+Deft.type.__doc__ = (
+    "'var'|'const' (default value 'const'), "
+    "'var' - factor is a decision variable "
+    "'const' - factor is a parameter")
+Deft.id_of_source.__doc__ = (
+    "str (default value None), "
+    "identifies factor of previous estimation step whose value "
+    "will be used for initialization")
+Deft.value.__doc__ = (
+    "float (default value 0), "
+    "used for initialization if 'id_of_source' does not reference a "
+    "scaling factor (of previous optimization step)")
+Deft.min.__doc__ = (
+    "float (default value -16), smallest value allowed")
+Deft.max.__doc__ = (
+    "float (default 16), greatest value allowed")
+Deft.is_discrete.__doc__ = (
+    "bool (default values is True); "
+    "input for MINLP solver, indicates if factor shall be processed like int")
+Deft.m.__doc__ = (
+    "float (default -.1/16), "
+    "dy/dx, effective multiplier is a linear function f(x) = mx + n, "
+    "m is the increase of that linear function")
+Deft.n.__doc__ = (
+    "float (default 1.), "
+    "effective multiplier is a linear function f(x) = mx + n, n is f(0)")
+Deft.step.__doc__ = (
+    "int | iterable_of_int (default value -1), "
+    "index of optimization step, for each step set to -1")
+Deft.cost.__doc__ = (
+    "float (default 0.), "
+    "cost of change (for Volt-Var-Control)")
 
 def _iterable(item):
     return item if isinstance(item, (list, tuple)) else[item]
@@ -557,22 +537,19 @@ def expand_tlink(id_of_node, id_of_branch, id_of_factor, steps):
 Defvl = namedtuple(
     'Defvl',
     'id_of_node min max step', defaults=('', 0.9, 1.1, -1))
-Defvl.__doc__ = """Define limit of node voltage.
-
-Parameters
-----------
-id_of_node: str|iterable_of_str
-    optional, default ''
-    identifier of connectivity node(s), addresses all nodes if empty string ''
-min: float
-    optional, default 0.9
-    smallest possible magnitude of the voltage at node
-max: float
-    optional, default 1.1
-    greatest possible magnitude of the voltage at node
-step: int|iterable_of_int
-    optional, default -1
-    index of optimization step, -1 for all steps"""
+Defvl.__doc__ = ": Define limit of node voltage."
+Defvl.id_of_node.__doc__ = (
+    "str|iterable_of_str, optional, default '' "
+    "identifier of connectivity node(s), addresses all nodes if empty string")
+Defvl.min.__doc__ = (
+    "float, optional, default 0.9, "
+    "smallest possible magnitude of the voltage at node")
+Defvl.max.__doc__ = (
+    "float, optional, default 1.1, "
+    "greatest possible magnitude of the voltage at node")
+Defvl.step.__doc__ = (
+    "int|iterable_of_int, optional, default -1, "
+    "index of optimization step, -1 for all steps")
 
 def expand_defvl(defvl):
     """Creates instances of Vlimit.
