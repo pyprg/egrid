@@ -22,8 +22,46 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import pandas as pd
 import numpy as np
+import re
 from collections import namedtuple
 from itertools import product
+
+_e3_pattern = re.compile(r'[nuµmkMG]')
+
+_replacement = {
+    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 'k':'e3', 'M':'e6', 'G':'e9'}
+
+def _replace_e3(match):
+    """Returns a replacement string for given match.
+
+    Parameters
+    ----------
+    match: re.match
+
+    Returns
+    -------
+    str"""
+    what = match.group(0)
+    return _replacement.get(what, what)
+
+def e3(string):
+    """Replaces some letters by e[+|-]n*3.
+    'n' -> 'e-9'
+    'u' -> 'e-6'
+    'µ' -> 'e-6'
+    'm' -> 'e-3'
+    'k' -> 'e3'
+    'M' -> 'e6'
+    'G' -> 'e9'
+
+    Parameters
+    ----------
+    string: str
+
+    Returns
+    -------
+    str"""
+    return re.sub(_e3_pattern, _replace_e3, string)
 
 Branch = namedtuple(
     'Branch',
@@ -578,6 +616,9 @@ def _tostring(string):
 def _tobool(string):
     return False if string.upper() == 'FALSE' else bool(string)
 
+def _tofloat(string):
+    return np.float64(e3(string))
+
 # class => (column_types, function_string_to_type, is_tuple?)
 _attribute_types = {
      #    message level
@@ -590,8 +631,8 @@ _attribute_types = {
      Defk:(
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16, np.float64],
-         [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, _tobool, np.float64, np.float64, np.int16, np.float64],
+         [_tostring, _tostring, _tostring, _tofloat, _tofloat,
+          _tofloat, _tobool, _tofloat, _tofloat, np.int16, _tofloat],
          [True, False, False, False, False, False, False, False, False, True,
           False]),
      #    id      type id_of_source value     min
@@ -599,8 +640,8 @@ _attribute_types = {
      Deft:(
          [object, object, object, np.float64, np.float64,
           np.float64, bool, np.float64, np.float64, np.int16, np.float64],
-         [_tostring, _tostring, _tostring, np.float64, np.float64,
-          np.float64, _tobool, np.float64, np.float64, np.int16, np.float64],
+         [_tostring, _tostring, _tostring, _tofloat, _tofloat,
+          _tofloat, _tobool, _tofloat, _tofloat, np.int16, _tofloat],
          [True, False, False, False, False, False, False, False, False, True,
           False]),
      #    id_of_node min max step
@@ -610,15 +651,15 @@ _attribute_types = {
      #    fn args step
      Defoterm:(
          [object, object, np.float64, np.int32],
-         [_tostring, _tostring, np.float64, np.int32],
+         [_tostring, _tostring, _tofloat, np.int32],
          [False, True, False, True]),
      #    id, type, id_of_source, value, min, max,
      #    is_discrete, m, n, step, cost
      Factor:(
          [object, object, object, np.float64, np.float64, np.float64,
           bool, np.float64, np.float64, np.int16, np.float64],
-         [_tostring, _tostring, _tostring, np.float64, np.float64, np.float64,
-          _tobool, np.float64, np.float64, np.int16, np.float64],
+         [_tostring, _tostring, _tostring, _tofloat, _tofloat, _tofloat,
+          _tobool, _tofloat, _tofloat, np.int16, _tofloat],
          [False, False, False, False, False, False,
           False, False, False, False, False]),
      #    injid, part, id, step
@@ -644,7 +685,7 @@ _attribute_types = {
      #    id       arg     fn  weight   step
      Term:(
          [object,  object, object, np.float64, np.int32],
-         [_tostring, _tostring, _tostring, np.float64, np.int32],
+         [_tostring, _tostring, _tostring, _tofloat, np.int32],
          [False, False, False, False, False]),
      #    id_of_batch id_of_device id_of_node
      Output:(
@@ -654,27 +695,27 @@ _attribute_types = {
      #    id_of_batch   P     direction
      PValue:(
          [object, np.float64, np.float64, np.float64],
-         [_tostring,  np.float64, np.float64, np.float64],
+         [_tostring,  _tofloat, _tofloat, _tofloat],
          [False, False, False, False]),
      #    id_of_batch   Q     direction
      QValue:(
          [object, np.float64, np.float64, np.float64],
-         [_tostring, np.float64, np.float64, np.float64],
+         [_tostring, _tofloat, _tofloat, _tofloat],
          [False, False, False, False]),
      #    id_of_batch   I
      IValue:(
          [object, np.float64],
-         [_tostring, np.float64],
+         [_tostring, _tofloat],
          [False, False]),
      #    id_of_node  V
      Vvalue:(
          [object, np.float64],
-         [_tostring, np.float64],
+         [_tostring, _tofloat],
          [False, False]),
      #     id_of_node min max step
      Vlimit:(
          [object, np.float64, np.float64, np.int16],
-         [_tostring, np.float64, np.float64, np.int16],
+         [_tostring, _tofloat, _tofloat, np.int16],
          [False, False, False, False]),
      #    id      id_of_node_A id_of_node_B y_lo   y_tr
      Branch:(
@@ -689,8 +730,7 @@ _attribute_types = {
      #    id     id_of_node  P10      Q10         Exp_v_p     Exp_v_q
      Injection:(
          [object, object, np.float64, np.float64, np.float64, np.float64],
-         [_tostring, _tostring, np.float64, np.float64, np.float64,
-          np.float64],
+         [_tostring, _tostring, _tofloat, _tofloat, _tofloat, _tofloat],
          [False, False, False, False, False, False])}
 
 meta_of_types = [

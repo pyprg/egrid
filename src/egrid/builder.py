@@ -32,44 +32,7 @@ from egrid._types import (
     expand_def, expand_defoterm,
     DEFAULT_FACTOR_ID,
     Klink, Tlink, expand_klink, expand_tlink, Injectionlink, Terminallink,
-    Term, Message, meta_of_types)
-
-_e3_pattern = re.compile(r'[nuµmkMG]')
-
-_replacement = {
-    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 'k':'e3', 'M':'e6', 'G':'e9'}
-
-def _replace_e3(match):
-    """Returns a replacement string for given match.
-
-    Parameters
-    ----------
-    match: re.match
-
-    Returns
-    -------
-    str"""
-    what = match.group(0)
-    return _replacement.get(what, what)
-
-def e3(string):
-    """Replaces some letters by e[+|-]n*3.
-    'n' -> 'e-9'
-    'u' -> 'e-6'
-    'µ' -> 'e-6'
-    'm' -> 'e-3'
-    'k' -> 'e3'
-    'M' -> 'e6'
-    'G' -> 'e9'
-
-    Parameters
-    ----------
-    string: str
-
-    Returns
-    -------
-    str"""
-    return re.sub(_e3_pattern, _replace_e3, string)
+    Term, Message, meta_of_types, e3)
 
 # all device types of gridmodel.Model and taps and analog values with helper
 # types with dataframes
