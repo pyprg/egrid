@@ -28,7 +28,7 @@ from numpy.testing import assert_array_equal
 from egrid import make_model
 from egrid.builder import (
     Slacknode, Branch, Injection,
-    make_data_frames, create_objects, Factor, Vlimit, Injectionlink)
+    make_data_frames, create_objects, Vlimit, Injectionlink)
 from egrid.model import (
     Model, model_from_frames, _aggregate_vlimits, get_vminmax_for_step)
 

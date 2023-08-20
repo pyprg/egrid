@@ -25,7 +25,7 @@ from numpy.testing import assert_array_equal
 import pandas as pd
 from egrid.builder import (make_objects, create_objects, make_data_frames,
     Slacknode, PValue, QValue, Output, IValue, Branch, Injection,
-    Message, Defk, Klink, Tlink, Vlimit, Defoterm)
+    Message, Defk, Klink, Tlink, Vlimit, Defoterm, split_parts, _is_head)
 
 _EMPTY_DICT = {}
 
@@ -388,7 +388,7 @@ class Create_objects(unittest.TestCase):
     def test_create_instruction(self):
         res = [*create_objects(
             ['#.   Message(message=hallo, level=0)',
-             '#.   Defk(id=kp)'])]
+              '#.   Defk(id=kp)'])]
         self.assertEqual(
             len(res), 2, 'create_objects returns two objects')
         self.assertEqual(
@@ -479,7 +479,7 @@ class Make_data_frames(unittest.TestCase):
     def test_wrong_class(self):
         objs = create_objects(
             ['#. Link(objid=(br0 br1) nodeid=(n0 n1) id=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Message']), 1, 'one error message')
         self.assertTrue(frames['Terminallink'].empty)
@@ -545,7 +545,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_terminallink_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=hallo id_of_node=node0 id_of_factor=f0',
-             '#.      step=(1 2))'])
+              '#.      step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(len(frames['Terminallink']),
             2,
@@ -554,7 +554,7 @@ class Make_data_frames2(unittest.TestCase):
     def test_terminallink2_in_footer(self):
         objs = create_objects(
             ['#. Tlink(id_of_branch=(br0 br1) id_of_node=(n0 n1)',
-             '#.       id_of_factor=f0 step=(1 2))'])
+              '#.       id_of_factor=f0 step=(1 2))'])
         frames = make_data_frames(objs)
         self.assertEqual(
             len(frames['Terminallink']), 4, 'four rows in table Terminallink')
@@ -683,7 +683,7 @@ class Make_data_frames2(unittest.TestCase):
             ['Injection', 'n0', 23.0, 12.0, 0.0, 2.0])
 
     def test_Factor_in_footer(self):
-        """Injection in footer"""
+        """Factor in footer"""
         objs = create_objects(
             '#.Factor(id=Factor type=const value=42 min=27 max=83 '
             'is_discrete=True m=.5 n=1 step=2 cost=17)')
@@ -702,7 +702,39 @@ class Make_data_frames2(unittest.TestCase):
               'is_discrete', 'm', 'n', 'step', 'cost']]
             .to_list(),
             ['Factor', 'const', '_default_', 42.0, 27.0, 83.0,
+              True, 0.5, 1.0, 2, 17.0])
+
+    def test_Factor_in_footer2(self):
+        """Factor after footer indicator"""
+        string = (
+            '#.\n'
+            'Factor(id=Factor type=const value=42 min=27 max=83 '
+            'is_discrete=True m=.5 n=1 step=2 cost=17)')
+        objs = create_objects(string.split('\n'))
+        frames = make_data_frames(objs)
+        self.assertEqual(
+            len(frames['Message']),
+            0,
+            'no error message')
+        self.assertEqual(
+            len(frames['Factor']),
+            1,
+            'Injection has one row')
+        self.assertEqual(
+            frames['Factor'].iloc[0]
+            [['id', 'type', 'id_of_source', 'value', 'min', 'max',
+              'is_discrete', 'm', 'n', 'step', 'cost']]
+            .to_list(),
+            ['Factor', 'const', '_default_', 42.0, 27.0, 83.0,
              True, 0.5, 1.0, 2, 17.0])
+
+class Split_parts(unittest.TestCase):
+
+    def test_split_parts(self):
+        head, tail = split_parts(_is_head,'1\n2\n3\n#.\n4\n5\n6'.split('\n'))
+        self.assertEqual(list(head), ['1', '2', '3'])
+        self.assertEqual(list(tail), ['4', '5', '6'])
+
 
 if __name__ == '__main__':
     unittest.main()
