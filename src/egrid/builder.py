@@ -526,11 +526,55 @@ def _flatten(args):
         except:
             yield Message(f'wrong type, ignored object: {str(args)}', 1)
 
+_footer_indicator = re.compile(r'^#\.\s*$')
+
+_is_head = lambda s: re.match(_footer_indicator, s) is None
+
+def split_parts(is_head, iterable, first_of_tail=False):
+    """Separates first items from rest.
+
+    Returned head must be completely consumed before returned tail.
+
+    Parameters
+    ----------
+    is_head: function
+        (item)->(bool)
+
+    iterable: iterable
+
+    first_of_tail: bool
+        whether tail shall include first item which is not in head or not
+
+    Returns
+    -------
+    tuple
+        * iterator, first items
+        * iterator, rest"""
+    myiter = iter(iterable)
+    myitem = None
+    def head():
+        for item in myiter:
+            if is_head(item):
+                yield item
+            else:
+                nonlocal myitem
+                myitem = item
+                return
+    def tail():
+        if myitem is not None:
+            if first_of_tail:
+                yield myitem
+            yield from myiter
+    return head(), tail()
+
 def _create_objects_from_strings(strings):
     import graphparser as gp
-    from graphparser import parse
+    from graphparser import parse_graph
+    head, tail = split_parts(
+        _is_head,
+        chain.from_iterable(string.split('\n') for string in strings))
     type_data = gp.make_type_data(meta_of_types)
-    t1, t2 = tee(parse(strings))
+    t1, t2 = tee(parse_graph(l for l in head))
     is_comment = lambda t: t[0]=='comment'
     is_instruction = lambda t: t[0]=='comment' and t[1].startswith('#.')
     return chain(
@@ -538,7 +582,14 @@ def _create_objects_from_strings(strings):
         gp.make_objects(
             type_data,
             Message,
-            ('  '+t[1][2:] for t in t2 if is_instruction(t))))
+            # replaces comment indicator '#.' with two spaces '  '
+            ('  '+t[1][2:] for t in t2 if is_instruction(t))),
+        # process footer
+        gp.make_objects(
+            type_data,
+            Message,
+            # replaces comment indicator '#.' with two spaces '  '
+            (('  '+t[2:] if t.startswith('#.') else t) for t in tail)))
 
 def create_objects(args=()):
     """Creates instances of network objects from strings. Supports
