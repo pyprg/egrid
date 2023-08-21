@@ -472,12 +472,15 @@ def make_data_frames(devices=()):
             * .level, int 0 - information, 1 - warning, 2 - error"""
     # collect objects per type
     sources = {src_type.__name__: [] for src_type in _ARG_TYPES}
-    for dev in devices:
-        if isinstance(dev, _ARG_TYPES):
-            sources[type(dev).__name__].append(dev)
-        else:
-            sources[Message.__name__].append(
-                Message(f'wrong type, ignored object: {str(dev)}', 1))
+    try:
+        for dev in devices:
+            if isinstance(dev, _ARG_TYPES):
+                sources[type(dev).__name__].append(dev)
+            else:
+                sources[Message.__name__].append(
+                    Message(f'wrong type, ignored object: {str(dev)}', 1))
+    except ValueError as e:
+        sources[Message.__name__].append(Message(str(e), 2))
     dataframes = {
         model_type.__name__: pd.DataFrame(
             sources[model_type.__name__],

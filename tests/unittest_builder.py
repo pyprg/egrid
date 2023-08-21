@@ -773,5 +773,15 @@ Vlimit(min=.95)
                    id_of_factor=('kcap',), step=-1),
              Vlimit(id_of_node='', min=0.95, max=1.1, step=-1)])
 
+
+    def test_bad_footer_marker(self):
+        schema = """
+#..
+Deft(id  = tap  , type=var,min=-16 max=16 value=0 is_discrete=True cost= .03 )
+Defk(id=kcap type=var min=0 max=5 value=0 is_discrete=True cost=.05)
+"""
+        frames = make_data_frames(create_objects(schema))
+        self.assertEqual(len(frames['Message']), 1)
+
 if __name__ == '__main__':
     unittest.main()
