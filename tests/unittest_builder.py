@@ -798,5 +798,13 @@ Defk(id=kcap type=var min=0 max=5 value=0 is_discrete=True cost=.05)
         frames = make_data_frames(create_objects(schema))
         self.assertEqual(len(frames['Message']), 1)
 
+class Split_parts(unittest.TestCase):
+
+    def test_split_parts(self):
+        head, tail = split_parts(_is_head,'1\n2\n3\n#.\n4\n5\n6'.split('\n'))
+        self.assertEqual(list(head), ['1', '2', '3'])
+        self.assertEqual(list(tail), ['4', '5', '6'])
+
+
 if __name__ == '__main__':
     unittest.main()
