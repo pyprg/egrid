@@ -592,7 +592,10 @@ def _create_objects_from_strings(strings):
             type_data,
             Message,
             # replaces comment indicator '#.' with two spaces '  '
-            (('  '+t[2:] if t.startswith('#.') else t) for t in tail)))
+            #   and filters out comments, does not filter out lines
+            #   with leading '#.'
+            (('  '+t[2:] if t.startswith('#.') else t)
+             for t in tail if (t[:1]!='#' or t[:2]=='#.'))))
 
 def create_objects(args=()):
     """Creates instances of network objects from strings. Supports

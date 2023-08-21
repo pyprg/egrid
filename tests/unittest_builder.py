@@ -745,14 +745,11 @@ Klink
 (
 id_of_injection
 =
+
 cap
+
 id_of_factor
-
-
-
 =
-
-
 kcap
 part
 =
@@ -760,9 +757,9 @@ q
 )
 Vlimit(min=.95)
 """
-        ab = list(create_objects(schema))
-        self.assertTrue(
-            ab,
+        objects = list(create_objects(schema))
+        self.assertEqual(
+            objects,
             [Deft(id=('tap',), type='var', id_of_source=None, value=0.0,
                   min=-16.0, max=16.0, is_discrete=True, m=-0.00625, n=1.0,
                   step=-1, cost=0.03),
@@ -773,6 +770,24 @@ Vlimit(min=.95)
                    id_of_factor=('kcap',), step=-1),
              Vlimit(id_of_node='', min=0.95, max=1.1, step=-1)])
 
+    def test_footer_no_space(self):
+        schema = (
+            '#.\n'
+            'Deft(id=tap)\nDefk(id=kcap)')
+        objects = list(create_objects(schema))
+        self.assertEqual(
+            objects,
+            [Deft(id=('tap',)), Defk(id=('kcap',))])
+
+    def test_comment_in_footer(self):
+        schema = (
+            '#.\n'
+            '#Deft(id=tap)\n'
+            'Defk(id=kcap)')
+        objects = list(create_objects(schema))
+        self.assertEqual(
+            objects,
+            [Defk(id=('kcap',))])
 
     def test_bad_footer_marker(self):
         schema = """
