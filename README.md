@@ -147,6 +147,30 @@ count_of_slacks: int
 
     count_of_slacks
 
+df_factors: pandas.DataFrame
+
+    * .id, str, unique identifier
+    * .type, 'var'|'const', decision variable or parameters
+    * .id_of_source, str, id of factor (previous optimization step)
+       for initialization
+    * .value, float, used by initialization if no source factor in previous
+       optimization step
+    * .min, float
+       smallest possible value
+    * .max, float
+       greatest possible value
+    * .is_discrete, bool
+       just 0 digits after decimal point if True, input for solver,
+       accepted by MINLP solvers
+    * .m, float
+       increase of multiplier with respect to change of var/const
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .n, float
+       multiplier when var/const is 0.
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .step, int, index of optimization step, -1 if all steps
+    * .cost, float, cost of change (multiplier for value)
+
 factors: egrid.factors.Factors (namedtuple)
 
     * .gen_factordata, pandas.DataFrame (index: ('step','id'))
@@ -227,6 +251,20 @@ factors: egrid.factors.Factors (namedtuple)
         pandas.DataFrame (index: ('step', 'id_of_injection', 'part'))
 
             * .id, str, ID of factor
+
+injectionlinks: pandas.DataFrame
+
+    * .injid, str, identifier of injection
+    * .part, 'p'|'q', addresses active P or reactive power Q
+    * .id, str, identifier of factor
+    * .step, int, index of optimization step
+
+terminallinks: pandas.DataFrame
+
+    * .branchid, str, identifier of branch
+    * .nodeid, str, identifier of connectivity node
+    * .id, str, identifier of factor
+    * .step, int, index of optimization step
 
 mnodeinj: scipy.sparse.csc_matrix
 

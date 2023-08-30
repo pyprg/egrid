@@ -24,6 +24,7 @@ import context
 import unittest
 import networkx as nx
 import egrid.builder as grid
+from numpy.testing import assert_array_equal
 from networkx.algorithms import bipartite
 from egrid import make_model
 from egrid.topo import (
@@ -80,37 +81,60 @@ class Get_node_branch_graph(unittest.TestCase):
         self.assertEqual(connectivity_nodes, na)
         self.assertEqual(branches, nb)
 
+
+_subgraph_model = make_model([
+    grid.Slacknode(id_of_node='n0'),
+    grid.Branch(
+        id='br00', id_of_node_A='n0', id_of_node_B='n1', y_lo=1e3+1e3j),
+    grid.Branch(
+        id='br01', id_of_node_A='n1', id_of_node_B='n2', y_lo=1e3+1e3j),
+    grid.Branch(
+        id='br02', id_of_node_A='n2', id_of_node_B='n3', y_lo=1e3+1e3j),
+    grid.Branch(
+        id='br02_2', id_of_node_A='n2', id_of_node_B='n3_2', y_lo=1e3+1e3j),
+    grid.Injection(id='inj02', id_of_node='n2', P10=1),
+    grid.Branch(
+        id='br03', id_of_node_A='n3', id_of_node_B='n4'),
+    grid.Branch(
+        id='br04', id_of_node_A='n4', id_of_node_B='n5', y_lo=1e3+1e3j),
+    grid.PValue(id_of_batch='n2_br02', P=5),
+    grid.QValue(id_of_batch='n2_br02', Q=3),
+    grid.Output(
+        id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02'),
+    grid.Output(
+        id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02_2'),
+    grid.Output(id_of_batch='n2_br02', id_of_device='inj02')])
+
 class Get_make_subgraphs(unittest.TestCase):
 
-    def test_make_subgraphs(self):
-        elements =[
-            grid.Slacknode(id_of_node='n0'),
-            grid.Branch(
-                id='br00', id_of_node_A='n0', id_of_node_B='n1', y_lo=1e3+1e3j),
-            grid.Branch(
-                id='br01', id_of_node_A='n1', id_of_node_B='n2', y_lo=1e3+1e3j),
-            grid.Branch(
-                id='br02', id_of_node_A='n2', id_of_node_B='n3', y_lo=1e3+1e3j),
-            grid.Branch(
-                id='br02_2', id_of_node_A='n2', id_of_node_B='n3_2', y_lo=1e3+1e3j),
-            grid.Injection(id='inj02', id_of_node='n2', P10=1),
-            grid.Branch(
-                id='br03', id_of_node_A='n3', id_of_node_B='n4'),
-            grid.Branch(
-                id='br04', id_of_node_A='n4', id_of_node_B='n5', y_lo=1e3+1e3j),
-            grid.PValue(id_of_batch='n2_br02', P=5),
-            grid.QValue(id_of_batch='n2_br02', Q=3),
-            grid.Output(
-                id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02'),
-            grid.Output(
-                id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02_2'),
-            grid.Output(id_of_batch='n2_br02', id_of_device='inj02')]
-        model = make_model(elements)
-        make_subgraphs = get_make_subgraphs(model)
+    def test_make_subgraphs_PQ(self):
+        make_subgraphs = get_make_subgraphs(_subgraph_model)
+        subgraphs = list(make_subgraphs(['P', 'Q']))
+        self.assertEqual(len(subgraphs), 2)
+        self.assertEqual(
+            set(subgraphs[0].nodes), {'n0', 'n2', 'br01', 'n1', 'br00'})
+        cns0, devs0 = bipartite.sets(subgraphs[0])
+        self.assertEqual(cns0,  {'n1', 'n0', 'n2'})
+        self.assertEqual(devs0,  {'br00', 'br01'})
+        self.assertEqual(
+            set(subgraphs[1].nodes),
+            {'n3', 'n4', 'n2_br02', 'n3_2', 'n5', 'inj02', 'br02', 'br03',
+             'br02_2', 'br04'})
+        cns1, devs1 = bipartite.sets(subgraphs[1])
+        self.assertEqual(cns1,  {'n3', 'n4', 'n3_2', 'n5', 'n2_br02'})
+        self.assertEqual(devs1,  {'inj02', 'br02', 'br03', 'br02_2', 'br04'})
 
+class Get_injection_groups(unittest.TestCase):
+
+    def test_get_injection_groups(self):
+        make_subgraphs = get_make_subgraphs(_subgraph_model)
         group_info, injection_info = get_injection_groups(
             make_subgraphs(['P', 'Q']))
-        pass
+        group_info.sort_values('index_of_group', inplace=True)
+        assert_array_equal(
+            group_info.to_numpy(), [[0, False, True], [1, True, False]])
+        self.assertEqual(injection_info.id_of_injection[0], 'inj02')
+        self.assertEqual(injection_info.index_of_group[0], 1)
 
 if __name__ == '__main__':
     unittest.main()

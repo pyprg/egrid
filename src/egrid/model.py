@@ -48,7 +48,7 @@ Model = namedtuple(
     'bridgeterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues vlimits '
     'shape_of_Y count_of_slacks y_max '
-    'factors '
+    'df_factors factors injectionlinks terminallinks '
     'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network.
@@ -149,6 +149,28 @@ y_max: float
       connectivity nodes of both terminals are aggregated into one
       power-flow-calculation node and the terminals of that branch are
       accessed through Model.bridgeterminals
+df_factors: pandas.DataFrame
+    * .id, str, unique identifier
+    * .type, 'var'|'const', decision variable or parameters
+    * .id_of_source, str, id of factor (previous optimization step)
+       for initialization 
+    * .value, float, used by initialization if no source factor in previous
+       optimization step
+    * .min, float
+       smallest possible value
+    * .max, float
+       greatest possible value
+    * .is_discrete, bool
+       just 0 digits after decimal point if True, input for solver,
+       accepted by MINLP solvers
+    * .m, float
+       increase of multiplier with respect to change of var/const
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .n, float
+       multiplier when var/const is 0.
+       the effective multiplier is a linear function of var/const (mx + n)
+    * .step, int, index of optimization step, -1 if all steps
+    * .cost, float, cost of change (multiplier for value)
 factors: factor.Factors
     * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
         * .step, -1
@@ -202,6 +224,16 @@ factors: factor.Factors
         (iterable_of_int)-> (pandas.DataFrame)
         ('step', 'id_of_injection', 'part') ->
             * .id, str, ID of factor
+injectionlinks: pandas.DataFrame
+    * .injid, str, identifier of injection
+    * .part, 'p'|'q', addresses active P or reactive power Q
+    * .id, str, identifier of factor
+    * .step, int, index of optimization step
+terminallinks: pandas.DataFrame
+    * .branchid, str, identifier of branch
+    * .nodeid, str, identifier of connectivity node
+    * .id, str, identifier of factor
+    * .step, int, index of optimization step
 mnodeinj: scipy.sparse.csc_matrix
     converts a vector ordered according to injection indices to a vector
     ordered according to power flow calculation nodes (adding entries of
@@ -726,7 +758,7 @@ def _aggregate_vlimits(vlimits):
         pd.concat([grouped['min'].max(), grouped['max'].min()], axis=1)
         .reset_index())
 
-def _get_factors2(dataframes, branchterminals, ids_of_injections):
+def get_factors(dataframes, branchterminals, ids_of_injections):
     """Arranges data of factors for further processing.
 
     Parameters
@@ -962,7 +994,10 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
-        factors=_get_factors2(dataframes, branchterminals, injections.id),
+        df_factors=_getframe(dataframes, Factor, FACTORS),
+        factors=get_factors(dataframes, branchterminals, injections.id),
+        injectionlinks=_getframe(dataframes, Injectionlink, INJLINKS),
+        terminallinks=_getframe(dataframes, Terminallink, TERMINALLINKS),
         mnodeinj=get_node_inj_matrix(node_count, injections),
         terms=terms, # data of math terms for objective function
         messages=_getframe(dataframes, Message, MESSAGES.copy()))

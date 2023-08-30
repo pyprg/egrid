@@ -90,7 +90,7 @@ def split(digraph, *, nodes=(), terminals=()):
     ----------
     digraph: networkx.DiGraph
         digraph is bipartite, one set of vertices are the connectivity nodes,
-        the other set of vertices are branches, edges are outgoing from 
+        the other set of vertices are branches, edges are outgoing from
         connectivity nodes and incoming at branches
 
     terminals: iterable
@@ -141,9 +141,9 @@ def get_make_subgraphs(model):
         selected_outputs[['id_of_batch', 'id_of_device']]
         .rename(columns={'id_of_batch':'id_of_node'}))
     # prepare splitting at terminals with flow measurements
-    #   if multiple outputs (having the same ID) are connected to one 
-    #   connectivity node it needs to be split for tracing in one node 
-    #   connecting the concerning terminals and one node connecting the 
+    #   if multiple outputs (having the same ID) are connected to one
+    #   connectivity node it needs to be split for tracing in one node
+    #   connecting the concerning terminals and one node connecting the
     #   rest of the terminals, this ensures that pathes starting
     #   at those terminals are part of the correct group
     extra_edges = selected_outputs.apply(
@@ -205,10 +205,31 @@ def _get_group_of_injections(idx_of_group, digraph):
     devnodes = digraph.subgraph(devices).nodes(data='is_injection')
     df = pd.DataFrame(
         {'id_of_injection': (n[0] for n in devnodes if n[1]),
-         'idx_of_group': idx_of_group})
+         'index_of_group': idx_of_group})
     return df, any(cn[1] for cn in connodes)
 
 def get_injection_groups(subgraphs):
+    """Collects injections subgraph.
+
+    Parameters
+    ----------
+    subgraphs: networkx.Digraph
+        the graph is bipartite, terminals of devices are the edges, the
+        graph has two sets of vertices
+            * connectivity nodes
+            * devices (electric branches and injections)
+
+    Returns
+    -------
+    tuple
+        pandas.DataFrame
+            * .index_of_group, int
+            * .has_injection, bool
+            * .has_slack, bool
+
+        pandas.DataFrame
+            * .id_of_injection, str
+            * .index_of_group, int"""
     dfs = []
     group_info = []
     for idx_of_group, digraph in enumerate(subgraphs):
@@ -218,8 +239,8 @@ def get_injection_groups(subgraphs):
         group_info.append((idx_of_group, not df.empty, has_slack))
     df_injections = (
         pd.concat(dfs) if dfs else
-        pd.DataFrame([], columns=['id_of_injecion', 'idx_of_group']))
+        pd.DataFrame([], columns=['id_of_injection', 'index_of_group']))
     df_group_info = pd.DataFrame(
-        group_info, columns=['idx_of_group', 'has_injection', 'has_slack'])
+        group_info, columns=['index_of_group', 'has_injection', 'has_slack'])
     return df_group_info, df_injections
 
