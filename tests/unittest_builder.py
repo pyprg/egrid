@@ -2,7 +2,7 @@
 """
 Created on Sun Feb 13 13:10:58 2022
 
-Copyright (C) 2022 pyprg
+Copyright (C) 2022, 2023 pyprg
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

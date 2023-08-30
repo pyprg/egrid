@@ -153,7 +153,7 @@ df_factors: pandas.DataFrame
     * .id, str, unique identifier
     * .type, 'var'|'const', decision variable or parameters
     * .id_of_source, str, id of factor (previous optimization step)
-       for initialization 
+       for initialization
     * .value, float, used by initialization if no source factor in previous
        optimization step
     * .min, float
@@ -758,7 +758,7 @@ def _aggregate_vlimits(vlimits):
         pd.concat([grouped['min'].max(), grouped['max'].min()], axis=1)
         .reset_index())
 
-def get_factors(dataframes, branchterminals, ids_of_injections):
+def _get_factors2(dataframes, branchterminals, ids_of_injections):
     """Arranges data of factors for further processing.
 
     Parameters
@@ -802,6 +802,56 @@ def get_factors(dataframes, branchterminals, ids_of_injections):
     # links of terminals
     #   filter for existing branchterminals
     termlinks = _getframe(dataframes, Terminallink, TERMINALLINKS)
+    at_term = (
+        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
+        .isin(
+            pd.MultiIndex.from_frame(
+                branchterminals[['id_of_branch', 'id_of_node']])))
+    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
+    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
+    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
+    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
+    # filter stepwise for intersection of injlinks+termlinks and factors
+    df_ = pd.concat(
+        [pd.DataFrame([], index=injindex_),
+         pd.DataFrame([], index=termindex_)])
+    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
+    return _get_factors(injassoc, termassoc, factor_frame, branchterminals)
+
+def get_factors(model):
+    """Arranges data of factors for further processing.
+
+    Parameters
+    ----------
+    model: Model
+
+    Returns
+    -------
+    Factors
+        * .gen_factordata, pandas.DataFrame
+        * .gen_injfactor, pandas.DataFrame
+        * .terminalfactors, pandas.DataFrame
+        * .get_groups: function
+            (iterable_of_int)-> (pandas.DataFrame)
+        * .get_injfactorgroups: function
+            (iterable_of_int)-> (pandas.DataFrame)"""
+    # factors
+    factors_ = model.df_factors.set_index(['step', 'id'])
+    # links of injection
+    injassoc_ = model.injections
+    injassoc_ = (
+        injassoc_[
+            # filter for existing injections
+            injassoc_.injid.isin(model.injections.id)
+            & injassoc_.part.isin(['p', 'q'])]
+        .set_index(['step', 'injid', 'part']))
+    injassoc_.index.names = ['step', 'id_of_injection', 'part']
+    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
+    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
+    # links of terminals
+    #   filter for existing branchterminals
+    termlinks = model.terminallinks
+    branchterminals = model.branchterminals
     at_term = (
         pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
         .isin(
@@ -995,7 +1045,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
         df_factors=_getframe(dataframes, Factor, FACTORS),
-        factors=get_factors(dataframes, branchterminals, injections.id),
+        factors=_get_factors2(dataframes, branchterminals, injections.id),
         injectionlinks=_getframe(dataframes, Injectionlink, INJLINKS),
         terminallinks=_getframe(dataframes, Terminallink, TERMINALLINKS),
         mnodeinj=get_node_inj_matrix(node_count, injections),
