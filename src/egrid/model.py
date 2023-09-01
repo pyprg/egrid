@@ -48,7 +48,7 @@ Model = namedtuple(
     'bridgeterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues vlimits '
     'shape_of_Y count_of_slacks y_max '
-    'df_factors factors injectionlinks terminallinks '
+    'df_factors injectionlinks terminallinks '
     'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network.
@@ -171,59 +171,6 @@ df_factors: pandas.DataFrame
        the effective multiplier is a linear function of var/const (mx + n)
     * .step, int, index of optimization step, -1 if all steps
     * .cost, float, cost of change (multiplier for value)
-factors: factor.Factors
-    * .gen_factordata, pandas.DataFrame (id (str, ID of factor)) ->
-        * .step, -1
-        * .type, 'var'|'const', type of factor decision variable or parameter
-        * .id_of_source, str, id of factor (previous optimization step)
-           for initialization
-        * .value, float, used by initialization if no source factor in previous
-           optimization step
-        * .min, float
-           smallest possible value
-        * .max, float
-           greatest possible value
-        * .is_discrete, bool
-           just 0 digits after decimal point if True, input for solver,
-           accepted by MINLP solvers
-        * .m, float
-           increase of multiplier with respect to change of var/const
-           the effective multiplier is a linear function of var/const (mx + n)
-        * .n, float
-           multiplier when var/const is 0.
-           the effective multiplier is a linear function of var/const (mx + n)
-        * .index_of_symbol, int
-    * .gen_injfactor, pandas.DataFrame (id_of_injection, part) ->
-        * .step, -1
-        * id, str, ID of factor
-    * .terminalfactors, pandas.DataFrame
-        * .id, str
-        * .index_of_terminal, int
-        * .index_of_other_terminal, int
-        * .type, 'var'|'const'
-        * .id_of_source, str
-        * .value, float
-        * .min, float
-        * .max, float
-        * .is_discrete, bool
-        * .m, float
-        * .n, float
-        * .index_of_symbol, int
-    * .get_groups: function
-        (iterable_of_int) -> (pandas.DataFrame)
-        ('step', 'id') ->
-            * .type, 'var'|'const', decision variable|parameter
-            * .id_of_source, str
-            * .value, float
-            * .min, float
-            * .max, float
-            * .is_discrete, bool
-            * .m, float
-            * .n, float
-    * .get_injfactorgroups: function
-        (iterable_of_int)-> (pandas.DataFrame)
-        ('step', 'id_of_injection', 'part') ->
-            * .id, str, ID of factor
 injectionlinks: pandas.DataFrame
     * .injid, str, identifier of injection
     * .part, 'p'|'q', addresses active P or reactive power Q
@@ -648,55 +595,6 @@ def _get_pfc_slacks(slacks):
     #     head_tail(slack_groups.id_of_node.get_group(group_name))
     #     for group_name in super_slack_idxs]
 
-def _get_factors(injassoc, termassoc, factor_frame, branchterminals):
-    """Arranges data of factors for further processing.
-
-    Parameters
-    ----------
-    injassoc: pandas.DataFrame
-
-    termassoc: pandas.DataFrame
-
-    factor_frame: pandas.DataFrame
-
-    branchterminals: pandas.DataFrame
-        * .id_of_node
-        * .id_of_branch
-        * .index_of_terminal
-        * .index_of_other_terminal
-
-    Returns
-    -------
-    Factors
-        * .gen_factordata, pandas.DataFrame
-        * .gen_injfactor, pandas.DataFrame
-        * .terminalfactors, pandas.DataFrame
-        * .get_groups: function
-            (iterable_of_int)-> (pandas.DataFrame)
-        * .get_injfactorgroups: function
-            (iterable_of_int)-> (pandas.DataFrame)"""
-    # injection links
-    is_valid_injassoc = (
-        injassoc
-        .reset_index(['step'])
-        .set_index(['step', 'id'])
-        .join(factor_frame.type, how='left')
-        .isin(('const', 'var')))
-    is_valid_injassoc.index = injassoc.index
-    # terminal links
-    is_valid_termassoc = (
-        termassoc
-        .reset_index(['step'])
-        .set_index(['step', 'id'])
-        .join(factor_frame.type, how='left')
-        .isin(('const', 'var')))
-    is_valid_termassoc.index = termassoc.index
-    return make_factordefs(
-        factor_frame,
-        termassoc[is_valid_termassoc.type],
-        injassoc[is_valid_injassoc.type],
-        branchterminals)
-
 def _get_vlimits(dataframes, pfc_nodes):
     # limits
     vlimits_ = _getframe(dataframes, Vlimit, VLIMITS)
@@ -757,116 +655,6 @@ def _aggregate_vlimits(vlimits):
     return (
         pd.concat([grouped['min'].max(), grouped['max'].min()], axis=1)
         .reset_index())
-
-def _get_factors2(dataframes, branchterminals, ids_of_injections):
-    """Arranges data of factors for further processing.
-
-    Parameters
-    ----------
-    dataframes: dict
-        * [Factor] => pandas.DataFrame
-        * [Injectionlink] => pandas.DataFrame
-        * [Terminallink] => pandas.DataFrame
-    branchterminals: pandas.DataFrame
-        * .id_of_node
-        * .id_of_branch
-        * .index_of_terminal
-        * .index_of_other_terminal
-    ids_of_injections: pandas.Series
-        str, ids of injections
-
-    Returns
-    -------
-    Factors
-        * .gen_factordata, pandas.DataFrame
-        * .gen_injfactor, pandas.DataFrame
-        * .terminalfactors, pandas.DataFrame
-        * .get_groups: function
-            (iterable_of_int)-> (pandas.DataFrame)
-        * .get_injfactorgroups: function
-            (iterable_of_int)-> (pandas.DataFrame)"""
-    # factors
-    factors_ = (
-        _getframe(dataframes, Factor, FACTORS).set_index(['step', 'id']))
-    # links of injection
-    injassoc_ = _getframe(dataframes, Injectionlink, INJLINKS)
-    injassoc_ = (
-        injassoc_[
-            # filter for existing injections
-            injassoc_.injid.isin(ids_of_injections)
-            & injassoc_.part.isin(['p', 'q'])]
-        .set_index(['step', 'injid', 'part']))
-    injassoc_.index.names = ['step', 'id_of_injection', 'part']
-    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
-    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
-    # links of terminals
-    #   filter for existing branchterminals
-    termlinks = _getframe(dataframes, Terminallink, TERMINALLINKS)
-    at_term = (
-        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
-        .isin(
-            pd.MultiIndex.from_frame(
-                branchterminals[['id_of_branch', 'id_of_node']])))
-    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
-    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
-    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
-    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
-    # filter stepwise for intersection of injlinks+termlinks and factors
-    df_ = pd.concat(
-        [pd.DataFrame([], index=injindex_),
-         pd.DataFrame([], index=termindex_)])
-    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
-    return _get_factors(injassoc, termassoc, factor_frame, branchterminals)
-
-def get_factors(model):
-    """Arranges data of factors for further processing.
-
-    Parameters
-    ----------
-    model: Model
-
-    Returns
-    -------
-    Factors
-        * .gen_factordata, pandas.DataFrame
-        * .gen_injfactor, pandas.DataFrame
-        * .terminalfactors, pandas.DataFrame
-        * .get_groups: function
-            (iterable_of_int)-> (pandas.DataFrame)
-        * .get_injfactorgroups: function
-            (iterable_of_int)-> (pandas.DataFrame)"""
-    # factors
-    factors_ = model.df_factors.set_index(['step', 'id'])
-    # links of injection
-    injassoc_ = model.injections
-    injassoc_ = (
-        injassoc_[
-            # filter for existing injections
-            injassoc_.injid.isin(model.injections.id)
-            & injassoc_.part.isin(['p', 'q'])]
-        .set_index(['step', 'injid', 'part']))
-    injassoc_.index.names = ['step', 'id_of_injection', 'part']
-    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
-    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
-    # links of terminals
-    #   filter for existing branchterminals
-    termlinks = model.terminallinks
-    branchterminals = model.branchterminals
-    at_term = (
-        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
-        .isin(
-            pd.MultiIndex.from_frame(
-                branchterminals[['id_of_branch', 'id_of_node']])))
-    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
-    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
-    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
-    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
-    # filter stepwise for intersection of injlinks+termlinks and factors
-    df_ = pd.concat(
-        [pd.DataFrame([], index=injindex_),
-         pd.DataFrame([], index=termindex_)])
-    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
-    return _get_factors(injassoc, termassoc, factor_frame, branchterminals)
 
 def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     """Creates a network model for power flow calculation.
@@ -1045,7 +833,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
         df_factors=_getframe(dataframes, Factor, FACTORS),
-        factors=_get_factors2(dataframes, branchterminals, injections.id),
+        # factors=_get_factors2(dataframes, branchterminals, injections.id),
         injectionlinks=_getframe(dataframes, Injectionlink, INJLINKS),
         terminallinks=_getframe(dataframes, Terminallink, TERMINALLINKS),
         mnodeinj=get_node_inj_matrix(node_count, injections),

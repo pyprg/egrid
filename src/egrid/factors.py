@@ -112,6 +112,105 @@ Parameters
         * .id, str, ID of factor
 """
 
+def _get_factors(injassoc, termassoc, factor_frame, branchterminals):
+    """Arranges data of factors for further processing.
+
+    Parameters
+    ----------
+    injassoc: pandas.DataFrame
+
+    termassoc: pandas.DataFrame
+
+    factor_frame: pandas.DataFrame
+
+    branchterminals: pandas.DataFrame
+        * .id_of_node
+        * .id_of_branch
+        * .index_of_terminal
+        * .index_of_other_terminal
+
+    Returns
+    -------
+    Factors
+        * .gen_factordata, pandas.DataFrame
+        * .gen_injfactor, pandas.DataFrame
+        * .terminalfactors, pandas.DataFrame
+        * .get_groups: function
+            (iterable_of_int)-> (pandas.DataFrame)
+        * .get_injfactorgroups: function
+            (iterable_of_int)-> (pandas.DataFrame)"""
+    # injection links
+    is_valid_injassoc = (
+        injassoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(factor_frame.type, how='left')
+        .isin(('const', 'var')))
+    is_valid_injassoc.index = injassoc.index
+    # terminal links
+    is_valid_termassoc = (
+        termassoc
+        .reset_index(['step'])
+        .set_index(['step', 'id'])
+        .join(factor_frame.type, how='left')
+        .isin(('const', 'var')))
+    is_valid_termassoc.index = termassoc.index
+    return make_factordefs(
+        factor_frame,
+        termassoc[is_valid_termassoc.type],
+        injassoc[is_valid_injassoc.type],
+        branchterminals)
+
+def get_factors(model):
+    """Arranges data of factors for further processing.
+
+    Parameters
+    ----------
+    model: Model
+
+    Returns
+    -------
+    Factors
+        * .gen_factordata, pandas.DataFrame
+        * .gen_injfactor, pandas.DataFrame
+        * .terminalfactors, pandas.DataFrame
+        * .get_groups: function
+            (iterable_of_int)-> (pandas.DataFrame)
+        * .get_injfactorgroups: function
+            (iterable_of_int)-> (pandas.DataFrame)"""
+    # factors
+    factors_ = model.df_factors.set_index(['step', 'id'])
+    # links of injection
+    injassoc_ = model.injectionlinks
+    injassoc_ = (
+        injassoc_[
+            # filter for existing injections
+            injassoc_.injid.isin(model.injections.id)
+            & injassoc_.part.isin(['p', 'q'])]
+        .set_index(['step', 'injid', 'part']))
+    injassoc_.index.names = ['step', 'id_of_injection', 'part']
+    injassoc = injassoc_[~injassoc_.index.duplicated(keep='first')]
+    injindex_ = injassoc.reset_index().groupby(['step', 'id']).any().index
+    # links of terminals
+    #   filter for existing branchterminals
+    termlinks = model.terminallinks
+    branchterminals = model.branchterminals
+    at_term = (
+        pd.MultiIndex.from_frame(termlinks[['branchid', 'nodeid']])
+        .isin(
+            pd.MultiIndex.from_frame(
+                branchterminals[['id_of_branch', 'id_of_node']])))
+    termassoc_ = termlinks[at_term].set_index(['step', 'branchid', 'nodeid'])
+    termassoc_.index.names=['step', 'id_of_branch', 'id_of_node']
+    termassoc = termassoc_[~termassoc_.index.duplicated(keep='first')]
+    termindex_ = termassoc.reset_index().groupby(['step', 'id']).any().index
+    # filter stepwise for intersection of injlinks+termlinks and factors
+    df_ = pd.concat(
+        [pd.DataFrame([], index=injindex_),
+         pd.DataFrame([], index=termindex_)])
+    factor_frame = factors_.join(df_[~df_.index.duplicated()], how='inner')
+    return _get_factors(injassoc, termassoc, factor_frame, branchterminals)
+
 def empty_like(df, droplevel=-1):
     """Creates an empty pandas.DataFrame from a template DataFrame.
 
@@ -748,13 +847,14 @@ def  _get_taps_factor_data(model_factors, steps):
         term_factordata.reset_index().set_index(['step', 'type', 'id']),
         terminalfactors)
 
-def get_factordata_for_step(model, step):
+def get_factordata_for_step(model, factors, step):
     """Returns data of decision variables and of parameters for a given step.
 
     Parameters
     ----------
     model: egrid.model.Model
         data of electric grid
+    factors: Factors
     step: int
         index of optimization step, first index is 0
 
@@ -804,15 +904,14 @@ def get_factordata_for_step(model, step):
     # index for requested step and the step before requested step,
     #   data of step before are needed for initialization
     steps = [step - 1, step] if 0 < step else [0]
-    model_factors = model.factors
     # factors assigned to terminals
     taps_factors, terminalfactor = _get_taps_factor_data(
-        model_factors, steps)
+        factors, steps)
     # scaling factors for injections
-    count_of_generic_factors = len(model_factors.gen_factordata)
+    count_of_generic_factors = len(factors.gen_factordata)
     start = repeat(count_of_generic_factors)
     scaling_factors, injection_factors = _get_scaling_factor_data(
-        model_factors, model.injections, steps, start)
+        factors, model.injections, steps, start)
     factors = pd.concat([scaling_factors, taps_factors])
     factors.sort_values('index_of_symbol', inplace=True)
     return (
@@ -991,7 +1090,7 @@ def _make_factor_meta(
             terminalfactors.index_of_symbol],
         id_to_idx=id_to_idx)
 
-def make_factor_meta(model, step, k_prev):
+def make_factor_meta(model, factors, step, k_prev):
     """Prepares data of decision variables and paramters for one step.
 
     Arguments for solver call:
@@ -1010,6 +1109,8 @@ def make_factor_meta(model, step, k_prev):
     ----------
     model: egrid.model.Model
         data of electric grid
+    factors: Factors
+
     step: int
         index of optimization step, first index is 0
     k_prev: casadi.DM optional
@@ -1060,4 +1161,5 @@ def make_factor_meta(model, step, k_prev):
             (selected) terminals (var_const[var_const_to_ftaps])
         id_to_idx: pandas.Series  (index: id_of_factor)
             int, index_of_symbol"""
-    return _make_factor_meta(*get_factordata_for_step(model, step), k_prev)
+    return _make_factor_meta(
+        *get_factordata_for_step(model, factors, step), k_prev)

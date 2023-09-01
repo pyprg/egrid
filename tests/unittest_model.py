@@ -31,6 +31,7 @@ from egrid.builder import (
     make_data_frames, create_objects, Vlimit, Injectionlink)
 from egrid.model import (
     Model, model_from_frames, _aggregate_vlimits, get_vminmax_for_step)
+from egrid.factors import get_factors
 
 
 _test_net_string = """
@@ -179,11 +180,12 @@ class Make_model(unittest.TestCase):
             model.mnodeinj.shape,
             (0,0),
             'shape of mnodeinj is 0,0')
+        model_factors = get_factors(model)
         self.assertTrue(
-            model.factors.get_groups([-1,0]).empty,
+            model_factors.get_groups([-1,0]).empty,
             "no generic factors, no factors for step 0")
         self.assertTrue(
-            model.factors.get_injfactorgroups([-1,0]).empty,
+            model_factors.get_injfactorgroups([-1,0]).empty,
             "no generic injection to factor relation, "
             "no injection to factor relation for step 0")
 
