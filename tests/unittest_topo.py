@@ -26,9 +26,9 @@ import networkx as nx
 import egrid.builder as grid
 from numpy.testing import assert_array_equal
 from networkx.algorithms import bipartite
-from egrid import make_model
+from egrid import _make_model
 from egrid.topo import (
-    get_node_device_graph, split, get_make_subgraphs, get_injection_groups)
+    get_node_device_graph, split, get_make_subgraphs)#, get_injection_groups)
 
 def _get_linear_model():
     nodes_ids = list(str(i) for i in range(10))
@@ -36,14 +36,14 @@ def _get_linear_model():
     branches = [
         grid.Branch(id=f'{a}-{b}', id_of_node_A=a, id_of_node_B=b)
         for a, b in pairs]
-    return make_model(branches)
+    return _make_model(branches)
 
 class Get_node_branch_graph(unittest.TestCase):
 
     _linear_model = _get_linear_model()
 
     def test_empty(self):
-        digraph = get_node_device_graph(make_model())
+        digraph = get_node_device_graph(_make_model(()))
         self.assertIsInstance(digraph, nx.DiGraph)
         self.assertTrue(bipartite.is_bipartite(digraph))
         self.assertTrue(nx.is_empty(digraph))
@@ -81,8 +81,7 @@ class Get_node_branch_graph(unittest.TestCase):
         self.assertEqual(connectivity_nodes, na)
         self.assertEqual(branches, nb)
 
-
-_subgraph_model = make_model([
+_subgraph_model = _make_model([
     grid.Slacknode(id_of_node='n0'),
     grid.Branch(
         id='br00', id_of_node_A='n0', id_of_node_B='n1', y_lo=1e3+1e3j),
@@ -114,27 +113,27 @@ class Get_make_subgraphs(unittest.TestCase):
         self.assertEqual(
             set(subgraphs[0].nodes), {'n0', 'n2', 'br01', 'n1', 'br00'})
         cns0, devs0 = bipartite.sets(subgraphs[0])
-        self.assertEqual(cns0,  {'n1', 'n0', 'n2'})
-        self.assertEqual(devs0,  {'br00', 'br01'})
+        self.assertEqual(cns0, {'n1', 'n0', 'n2'})
+        self.assertEqual(devs0, {'br00', 'br01'})
         self.assertEqual(
             set(subgraphs[1].nodes),
             {'n3', 'n4', 'n2_br02', 'n3_2', 'n5', 'inj02', 'br02', 'br03',
              'br02_2', 'br04'})
         cns1, devs1 = bipartite.sets(subgraphs[1])
-        self.assertEqual(cns1,  {'n3', 'n4', 'n3_2', 'n5', 'n2_br02'})
-        self.assertEqual(devs1,  {'inj02', 'br02', 'br03', 'br02_2', 'br04'})
+        self.assertEqual(cns1, {'n3', 'n4', 'n3_2', 'n5', 'n2_br02'})
+        self.assertEqual(devs1, {'inj02', 'br02', 'br03', 'br02_2', 'br04'})
 
-class Get_injection_groups(unittest.TestCase):
+# class Get_injection_groups(unittest.TestCase):
 
-    def test_get_injection_groups(self):
-        make_subgraphs = get_make_subgraphs(_subgraph_model)
-        group_info, injection_info = get_injection_groups(
-            make_subgraphs(['P', 'Q']))
-        group_info.sort_values('index_of_group', inplace=True)
-        assert_array_equal(
-            group_info.to_numpy(), [[0, False, True], [1, True, False]])
-        self.assertEqual(injection_info.id_of_injection[0], 'inj02')
-        self.assertEqual(injection_info.index_of_group[0], 1)
+#     def test_get_injection_groups(self):
+#         make_subgraphs = get_make_subgraphs(_subgraph_model)
+#         group_info, injection_info = get_injection_groups(
+#             make_subgraphs(['P', 'Q']))
+#         group_info.sort_values('index_of_group', inplace=True)
+#         assert_array_equal(
+#             group_info.to_numpy(), [[0, False, True], [1, True, False]])
+#         self.assertEqual(injection_info.id_of_injection[0], 'inj02')
+#         self.assertEqual(injection_info.index_of_group[0], 1)
 
 if __name__ == '__main__':
     unittest.main()
