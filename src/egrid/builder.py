@@ -492,8 +492,14 @@ def make_data_frames(devices=()):
     factor_framet = pd.DataFrame(
         chain.from_iterable(map(expand_def, sources[Deft.__name__])),
         columns=Factor._fields)
-    dataframes[Factor.__name__] = pd.concat(
-        [dataframes[Factor.__name__], factor_framek, factor_framet])
+    factorframes = [
+        df for df in
+        [dataframes[Factor.__name__], factor_framek, factor_framet]
+        if not df.empty]
+    dataframes[Factor.__name__] = (
+        pd.concat(factorframes)
+        if factorframes else
+        dataframes[Factor.__name__])
     dataframes[Injectionlink.__name__] = pd.DataFrame(
         chain.from_iterable(
             expand_klink(*args) for args in sources[Klink.__name__]),
@@ -507,14 +513,22 @@ def make_data_frames(devices=()):
         chain.from_iterable(
             expand_defvl(defvl) for defvl in sources[Defvl.__name__]),
         columns=Vlimit._fields)
-    dataframes[Vlimit.__name__] = pd.concat([vlimits, vlimits2])
+    vlimitframes = [df for df in [vlimits, vlimits2] if not df.empty]
+    dataframes[Vlimit.__name__] = (
+        pd.concat(vlimitframes)
+        if vlimitframes else
+        dataframes[Vlimit.__name__])
     terms = dataframes[Term.__name__]
     terms2 = pd.DataFrame(
         chain.from_iterable(
             expand_defoterm(idx, defoterm)
             for idx, defoterm in enumerate(sources[Defoterm.__name__])),
         columns=Term._fields)
-    dataframes[Term.__name__] = pd.concat([terms, terms2])
+    termsframe = [df for df in [terms, terms2] if not df.empty]
+    dataframes[Term.__name__] = (
+        pd.concat(termsframe)
+        if termsframe else
+        dataframes[Term.__name__])
     return dataframes
 
 def _flatten(args):

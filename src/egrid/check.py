@@ -399,12 +399,13 @@ def check_ids(frames, msg_cls=2):
         str, int"""
     branches = frames.get('Branch', BRANCHES)
     for idx, row in branches[branches.id.duplicated(keep='first')].iterrows():
-        yield f'duplicate branch id=\'{row[0]}\' '\
-            f'(id_of_node_A=\'{row[1]}\', id_of_node_B=\'{row[2]}\')'
+        yield f'duplicate branch id=\'{row.iloc[0]}\' '\
+            f'(id_of_node_A=\'{row.iloc[1]}\', id_of_node_B=\'{row.iloc[2]}\')'
     injs = frames.get('Injection', INJECTIONS)
     for idx, row in injs[injs.id.duplicated(keep='first')].iterrows():
         yield (
-            f'duplicate injection id=\'{row[0]}\' (id_of_node=\'{row[1]}\')',
+            f"duplicate injection id='{row.iloc[0]}' "
+            f"(id_of_node='{row.iloc[1]}')",
             msg_cls)
 
 def check_frames(frames):

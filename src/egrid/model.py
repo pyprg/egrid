@@ -786,17 +786,21 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
     terminals['at_slack'] = (
         terminals.id_of_node.isin(pfc_slacks.id_of_node))
     branchterminals = terminals[:count_of_branchterms]
-    termindex = pd.DataFrame(
+    branchtermindex = pd.DataFrame(
         {'index_of_terminal': branchterminals.index,
          'index_of_other_terminal':
              branchterminals.index_of_other_terminal.array},
         index=pd.MultiIndex.from_frame(
             branchterminals[['id_of_node', 'id_of_branch']]))
     # injections
-    injections = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
-    if not injections['id'].is_unique:
+    injections_ = add_idx_of_node(_getframe(dataframes, Injection, INJECTIONS))
+    if not injections_['id'].is_unique:
         msg = "Error: IDs of injections must be unique but are not."
         raise ValueError(msg)
+    first_injindex = 2 * len(branches_)
+    last_injindex = first_injindex + len(injections_)
+    injections = injections_.assign(
+        index_of_terminal=range(first_injindex, last_injindex))
     # limits
     vlimits = add_idx_of_node(_get_vlimits(dataframes, pfc_nodes))
     # measured terminals
@@ -807,7 +811,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         _prepare_branch_outputs(
             add_idx_of_node, branches, outputs[is_branch_output])
         .join(
-            termindex['index_of_terminal'],
+            branchtermindex['index_of_terminal'],
             on=['id_of_node', 'id_of_branch'],
             how='inner'))
     injectionoutputs = _prepare_injection_outputs(

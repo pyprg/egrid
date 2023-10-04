@@ -424,28 +424,11 @@ def _select_rows(vecs, row_index):
         * casadi.SX / casadi.DM"""
     return (v[row_index, 0] for v in vecs)
 
-def _empty_like(df, droplevel=-1):
-    """Creates an empty pandas.DataFrame from a template DataFrame.
-
-    Parameters
-    ----------
-    df: pandas.DataFrame
-
-    droplevel: int
-        function drops a level from index if value is greater -1
-
-    Returns
-    -------
-    pandas.DataFrame"""
-    idx_ = df.index.droplevel(droplevel) if -1 < droplevel else df.index
-    idx = idx_.delete(range(len(idx_)))
-    return pd.DataFrame([], columns=df.columns, index=idx).astype(df.dtypes)
-
 def _loc(df, key):
     try:
         return df.loc[key]
     except KeyError:
-        return _empty_like(df, 0)
+        return empty_like(df, 0)
 
 def _get_step_injection_part_to_factor(
         injectionids, assoc_frame, indices_of_steps):
@@ -1163,3 +1146,49 @@ def make_factor_meta(model, factors, step, k_prev):
             int, index_of_symbol"""
     return _make_factor_meta(
         *get_factordata_for_step(model, factors, step), k_prev)
+
+def update_id_with_step(df, injectionlinks, step):
+    """Update column 'id' of df.
+
+    Parameters
+    ----------
+    df: pandas.DataFrame (index: ['injid', 'part'])
+        * .id, str
+    injectionlinks: pandas.DataFrame (index: ['injid', 'part', 'step'])
+        * .id, str
+    step: int
+        index of step
+
+    Returns
+    -------
+    pandas.DataFrame (index: ['injid', 'part'])
+        * .id, str"""
+    try:
+        links_generic = injectionlinks.loc[pd.IndexSlice[:, :, step], :]
+        links_generic['step'] = step
+        df.update(links_generic.droplevel('step'))
+    except KeyError:
+        pass
+    return df
+
+def get_generic_factors(model, injectionlinks):
+    """Returns a scaling factor-ID for each part ('p', 'q') of each injection.
+
+    Returned factors
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric grid
+
+    Returns
+    -------
+    pandas.DataFrame (index: ['injid', 'part'])
+        * .id, str"""
+    midx = pd.MultiIndex.from_product(
+        [model.injections.id, ['p','q']], names=['injid', 'part'])
+    return update_id_with_step(
+        pd.DataFrame({'id': DEFAULT_FACTOR_ID, 'step': -1}, index=midx),
+        injectionlinks,
+        -1)
+

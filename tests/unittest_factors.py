@@ -854,7 +854,7 @@ class Get_taps_factor_data2(unittest.TestCase):
             1,
             "one factor for step 0")
         self.assertEqual(
-            factors.loc[0].index_of_symbol[0],
+            factors.loc[0].index_of_symbol.iloc[0],
             3,
             "step-0 symbol has index 3")
         self.assertEqual(
@@ -862,7 +862,7 @@ class Get_taps_factor_data2(unittest.TestCase):
             1,
             "one factor for step 1")
         self.assertEqual(
-            factors.loc[1].index_of_symbol[0],
+            factors.loc[1].index_of_symbol.iloc[0],
             5,
             "step-1 symbol has index 5")
 
