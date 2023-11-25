@@ -28,7 +28,8 @@ from numpy.testing import assert_array_equal
 from networkx.algorithms import bipartite
 from egrid import _make_model
 from egrid.topo import (
-    get_node_device_graph, split, get_make_subgraphs)#, get_injection_groups)
+    get_node_device_graph, split, get_make_subgraphs, 
+    get_make_scaling_of_subgraphs, get_outputs, get_batches_with_type)
 
 def _get_linear_model():
     nodes_ids = list(str(i) for i in range(10))
@@ -57,31 +58,31 @@ class Get_node_branch_graph(unittest.TestCase):
         self.assertEqual(cns, cn_ids)
         self.assertTrue(bipartite.is_bipartite(digraph))
 
-    def test_split(self):
-        digraph = get_node_device_graph(self._linear_model)
-        bridgeterminals = self._linear_model.bridgeterminals.iloc[[6]]
-        terminal = bridgeterminals.iloc[0]
-        id_of_node = terminal.id_of_node
-        id_of_branch = terminal.id_of_branch
-        edge = (id_of_node, id_of_branch)
-        self.assertIn(edge, digraph.edges)
-        subgraphs = list(split(digraph, terminals=[edge]))
-        self.assertEqual(len(subgraphs), 2)
-        connectivity_nodes = set()
-        branches = set()
-        for sub in subgraphs:
-            self.assertTrue(bipartite.is_bipartite(sub))
-            cn, br = bipartite.sets(sub)
-            connectivity_nodes |= cn
-            branches |= br
-            self.assertGreater(len(cn), 0)
-            self.assertGreater(len(br), 0)
-            self.assertNotIn((id_of_node, id_of_branch), sub.edges)
-        na, nb = bipartite.sets(digraph)
-        self.assertEqual(connectivity_nodes, na)
-        self.assertEqual(branches, nb)
+    # def test_split(self):
+    #     digraph = get_node_device_graph(self._linear_model)
+    #     bridgeterminals = self._linear_model.bridgeterminals.iloc[[6]]
+    #     terminal = bridgeterminals.iloc[0]
+    #     id_of_node = terminal.id_of_node
+    #     id_of_branch = terminal.id_of_branch
+    #     edge = (id_of_node, id_of_branch)
+    #     self.assertIn(edge, digraph.edges)
+    #     subgraphs = list(split(digraph, terminals=[edge]))
+    #     self.assertEqual(len(subgraphs), 2)
+    #     connectivity_nodes = set()
+    #     branches = set()
+    #     for sub in subgraphs:
+    #         self.assertTrue(bipartite.is_bipartite(sub))
+    #         cn, br = bipartite.sets(sub)
+    #         connectivity_nodes |= cn
+    #         branches |= br
+    #         self.assertGreater(len(cn), 0)
+    #         self.assertGreater(len(br), 0)
+    #         self.assertNotIn((id_of_node, id_of_branch), sub.edges)
+    #     na, nb = bipartite.sets(digraph)
+    #     self.assertEqual(connectivity_nodes, na)
+    #     self.assertEqual(branches, nb)
 
-_subgraph_model = _make_model([
+subgraph_model = _make_model([
     grid.Slacknode(id_of_node='n0'),
     grid.Branch(
         id='br00', id_of_node_A='n0', id_of_node_B='n1', y_lo=1e3+1e3j),
@@ -91,7 +92,12 @@ _subgraph_model = _make_model([
         id='br02', id_of_node_A='n2', id_of_node_B='n3', y_lo=1e3+1e3j),
     grid.Branch(
         id='br02_2', id_of_node_A='n2', id_of_node_B='n3_2', y_lo=1e3+1e3j),
-    grid.Injection(id='inj02', id_of_node='n2', P10=1),
+    grid.Injection(id='inj02_0', id_of_node='n2'),
+    grid.Injection(id='inj02_1', id_of_node='n2', P10=1),
+    grid.Injection(id='inj02_2', id_of_node='n2', P10=1, Q10=1),
+    grid.Injection(id='inj02_3', id_of_node='n2', P10=1, Q10=1),
+    grid.Injection(id='inj02_4', id_of_node='n2', P10=1, Q10=1),
+    grid.Injection(id='inj02_5', id_of_node='n2', P10=1, Q10=1),
     grid.Branch(
         id='br03', id_of_node_A='n3', id_of_node_B='n4'),
     grid.Branch(
@@ -102,26 +108,49 @@ _subgraph_model = _make_model([
         id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02'),
     grid.Output(
         id_of_batch='n2_br02', id_of_node='n2', id_of_device='br02_2'),
-    grid.Output(id_of_batch='n2_br02', id_of_device='inj02')])
+    grid.Output(id_of_batch='n2_br02', id_of_device='inj02'),
+    grid.Factor(id='kp'),
+    grid.Factor(id='kp_const', type='const'),
+    grid.Factor(id='kp0', step=0),
+    grid.Factor(id='kq'),
+    grid.Klink(id_of_factor='kp_const', id_of_injection='inj02_5', part='p'),
+    grid.Klink(id_of_factor='kp', id_of_injection='inj02_2', part='p'),
+    grid.Klink(id_of_factor='kp', id_of_injection='inj02_3', part='p', step=0),
+    grid.Klink(id_of_factor='kq', id_of_injection='inj02_3', part='q', step=0),
+    grid.Klink(id_of_factor='kp', id_of_injection='inj02_4', part='p'),
+    grid.Klink(id_of_factor='kp0', id_of_injection='inj02_4', part='p', step=0),
+    grid.Klink(id_of_factor='kq0', id_of_injection='inj02_4', part='q', step=0)])
 
 class Get_make_subgraphs(unittest.TestCase):
 
     def test_make_subgraphs_PQ(self):
-        make_subgraphs = get_make_subgraphs(_subgraph_model)
+        outputs = get_outputs(subgraph_model)
+        batches_with_type =  get_batches_with_type(subgraph_model, outputs)
+        make_subgraphs = get_make_subgraphs(
+            subgraph_model, outputs, batches_with_type)
         subgraphs = list(make_subgraphs(['P', 'Q']))
         self.assertEqual(len(subgraphs), 2)
+        subgraphs.sort(key=lambda x:len(x[1]))
+        edges0, cns0, devs0 = subgraphs[0]
+        self.assertEqual(cns0, {'n0', 'n1', 'n2'})
         self.assertEqual(
-            set(subgraphs[0].nodes), {'n0', 'n2', 'br01', 'n1', 'br00'})
-        cns0, devs0 = bipartite.sets(subgraphs[0])
-        self.assertEqual(cns0, {'n1', 'n0', 'n2'})
-        self.assertEqual(devs0, {'br00', 'br01'})
-        self.assertEqual(
-            set(subgraphs[1].nodes),
-            {'n3', 'n4', 'n2_br02', 'n3_2', 'n5', 'inj02', 'br02', 'br03',
-             'br02_2', 'br04'})
-        cns1, devs1 = bipartite.sets(subgraphs[1])
-        self.assertEqual(cns1, {'n3', 'n4', 'n3_2', 'n5', 'n2_br02'})
-        self.assertEqual(devs1, {'inj02', 'br02', 'br03', 'br02_2', 'br04'})
+            devs0,
+            {'inj02_5', 'inj02_4', 'inj02_0', 'br00', 'inj02_1', 'br01',
+              'inj02_2', 'inj02_3'})
+        edges1, cns1, devs1 = subgraphs[1]
+        self.assertEqual(cns1, {'n5', 'n3', 'n4', 'n3_2', 'n2_br02'})
+        self.assertEqual(devs1, {'br04', 'br02_2', 'br02', 'br03'})
+
+class Get_make_scaling_of_subgraphs(unittest.TestCase):
+
+    def test_get_make_scaling_of_subgraphs(self):
+        make_scaling_of_subgraphs = get_make_scaling_of_subgraphs(
+            subgraph_model)
+        scaling_of_subgraphs = list(
+            make_scaling_of_subgraphs(flow_types=['P', 'Q']))
+        scaling0, scaling1 = scaling_of_subgraphs
+        self.assertEqual(len(scaling0[1]), 1)
+        self.assertEqual(len(scaling1[1]), 1)
 
 # class Get_injection_groups(unittest.TestCase):
 

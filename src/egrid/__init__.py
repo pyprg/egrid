@@ -25,6 +25,21 @@ from egrid.model import model_from_frames
 from egrid.builder import make_data_frames, create_objects
 from egrid.check import check_frames
 
+def _make_model(args):
+    """Creates an instance of egrid.Model.
+
+    Parameters
+    ----------
+    args: iterable
+        Branch, Slacknode, Injection, Output, PValue, QValue, IValue, Vvalue,
+        Vlimit, Defk, Deft, Defoterm, Klink, Tlink
+
+    Returns
+    -------
+    egrid.Model"""
+    frames = make_data_frames(args)
+    return model_from_frames(frames)
+
 def make_model(*args):
     """Creates an instance of egrid.Model.
 
@@ -38,8 +53,7 @@ def make_model(*args):
     Returns
     -------
     egrid.Model"""
-    frames = make_data_frames(create_objects(args))
-    return model_from_frames(frames)
+    return _make_model(create_objects(args))
 
 def make_model_checked(*args):
     """Creates an instance of egrid.Model. Checks data.

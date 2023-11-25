@@ -48,7 +48,7 @@ Model = namedtuple(
     'bridgeterminals '
     'branchoutputs injectionoutputs pvalues qvalues ivalues vvalues vlimits '
     'shape_of_Y count_of_slacks y_max '
-    'df_factors injectionlinks terminallinks '
+    'factors injectionlinks terminallinks '
     'mnodeinj terms '
     'messages')
 Model.__doc__ = """Data of an electric distribution network.
@@ -149,7 +149,7 @@ y_max: float
       connectivity nodes of both terminals are aggregated into one
       power-flow-calculation node and the terminals of that branch are
       accessed through Model.bridgeterminals
-df_factors: pandas.DataFrame
+factors: pandas.DataFrame
     * .id, str, unique identifier
     * .type, 'var'|'const', decision variable or parameters
     * .id_of_source, str, id of factor (previous optimization step)
@@ -836,7 +836,7 @@ def model_from_frames(dataframes=None, y_lo_abs_max=_Y_LO_ABS_MAX):
         shape_of_Y=(node_count, node_count),
         count_of_slacks = pfc_slack_count,
         y_max=y_lo_abs_max,
-        df_factors=_getframe(dataframes, Factor, FACTORS),
+        factors=_getframe(dataframes, Factor, FACTORS),
         # factors=_get_factors2(dataframes, branchterminals, injections.id),
         injectionlinks=_getframe(dataframes, Injectionlink, INJLINKS),
         terminallinks=_getframe(dataframes, Terminallink, TERMINALLINKS),

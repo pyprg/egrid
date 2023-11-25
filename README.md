@@ -147,7 +147,7 @@ count_of_slacks: int
 
     count_of_slacks
 
-df_factors: pandas.DataFrame
+factors: pandas.DataFrame
 
     * .id, str, unique identifier
     * .type, 'var'|'const', decision variable or parameters

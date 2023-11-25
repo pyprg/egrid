@@ -24,6 +24,7 @@ import numpy as np
 from collections import namedtuple
 from itertools import chain, repeat
 from egrid.builder import DEFAULT_FACTOR_ID, Factor, Defk, expand_def
+from egrid.topo import get_make_scaling_of_subgraphs
 
 Stepgroups = namedtuple(
     'Stepgroups', 'groups template')
@@ -179,7 +180,7 @@ def get_factors(model):
         * .get_injfactorgroups: function
             (iterable_of_int)-> (pandas.DataFrame)"""
     # factors
-    factors_ = model.df_factors.set_index(['step', 'id'])
+    factors_ = model.factors.set_index(['step', 'id'])
     # links of injection
     injassoc_ = model.injectionlinks
     injassoc_ = (
@@ -1147,48 +1148,242 @@ def make_factor_meta(model, factors, step, k_prev):
     return _make_factor_meta(
         *get_factordata_for_step(model, factors, step), k_prev)
 
-def update_id_with_step(df, injectionlinks, step):
-    """Update column 'id' of df.
+# factor generation
+
+def get_factors_of_step(factors, step):
+    """Collects generic and step-specific data of factors.
 
     Parameters
     ----------
-    df: pandas.DataFrame (index: ['injid', 'part'])
+    factors: pandas.DataFrame
         * .id, str
-    injectionlinks: pandas.DataFrame (index: ['injid', 'part', 'step'])
-        * .id, str
+        * .step, int
     step: int
-        index of step
+        index of optimization step
 
     Returns
     -------
-    pandas.DataFrame (index: ['injid', 'part'])
-        * .id, str"""
-    try:
-        links_generic = injectionlinks.loc[pd.IndexSlice[:, :, step], :]
-        links_generic['step'] = step
-        df.update(links_generic.droplevel('step'))
-    except KeyError:
-        pass
-    return df
+    pandas.DataFrame"""
+    myfactors = factors.loc[factors.step.isin([-1, step])]
+    myfactors.sort_values(['step'], inplace=True)
+    return (
+        myfactors.drop('step', axis=1)
+        .loc[~myfactors.id.duplicated(keep='last')])
 
-def get_generic_factors(model, injectionlinks):
-    """Returns a scaling factor-ID for each part ('p', 'q') of each injection.
+def get_injectionlinks_of_step(injectionlinks, step):
+    """Collects generic and step-specific injectionlinks.
 
-    Returned factors
+    Parameters
+    ----------
+    factors: pandas.DataFrame
+        * .injid, str
+        * .part, 'p'|'q'
+        * .id, str
+        * .step, int
+    step: int
+        index of optimization step
+
+    Returns
+    -------
+    pandas.DataFrame"""
+    links = injectionlinks.loc[injectionlinks.step.isin([-1, step])]
+    links.sort_values(['step'])
+    return (
+        links.drop('step', axis=1)
+        .loc[~links.loc[:,['injid', 'part', 'id']].duplicated(keep='last')])
+
+def get_significant_parts(injections, PQlimit):
+    """
+
+    Evaluates P10 and Q10.
+
+    Parameterters
+    -------------
+    injections: pandas.DataFrame (index: id_of_injection, part)
+        * .P10, float, active power at V_abs = 1.0
+        * .Q10, float, reactive power at V_abs = 1.0
+
+    Returns
+    -------
+    pandas.DataFrame ('id_of_injection', 'part')
+        * .is_significant
+        * .value"""
+    if injections.empty:
+        return pd.DataFrame(
+            [],
+            columns=['value', 'is_significant'],
+            index=pd.MultiIndex.from_arrays(
+                [[], []],
+                names=['id_of_injection', 'part']))
+    injs = injections.set_index('id').loc[:,['P10', 'Q10']]
+    injs.rename(columns={'P10': 'p', 'Q10':'q'}, inplace=True)
+    parts_ = injs.stack(future_stack=True)
+    parts_.rename('value', inplace=True)
+    is_significant = PQlimit < parts_
+    is_significant.rename('is_significant', inplace=True)
+    parts = pd.concat([parts_, is_significant], axis=1)
+    parts.index.rename(['id_of_injection', 'part'], inplace=True)
+    return parts
+
+def get_parts_of_injections(model, *, step, PQlimit):
+    """Retrieves all parts of injections.
+
+    The function provides data on active and reactive power (parts)
+    for each injection of the given model.
 
     Parameters
     ----------
     model: egrid.model.Model
         data of electric grid
+    step: int
+        index of optimization step
+    PQlimit: float
+        minimum value of P and Q for scalable parts
 
     Returns
     -------
-    pandas.DataFrame (index: ['injid', 'part'])
-        * .id, str"""
-    midx = pd.MultiIndex.from_product(
-        [model.injections.id, ['p','q']], names=['injid', 'part'])
-    return update_id_with_step(
-        pd.DataFrame({'id': DEFAULT_FACTOR_ID, 'step': -1}, index=midx),
-        injectionlinks,
-        -1)
+    tuple
+        * pandas.DataFrame (index: index_of_injection, part)
+            * .is_significant, bool
+            * .var_type, 'var'|'const'
+            * .is_scalable, bool
+            * .value
+        * pandas.DataFrame
+            * .id, str, identifier of injection
+            * .type, 'var'|'const'
+            * .id_of_source, identifier of factor for initialization
+            * .value, float
+            * .min, float
+            * .max, float
+            * .is_discrete, bool
+            * .m, float
+            * .n, float
+            * .cost, float"""
+    injectionlinks_of_step = get_injectionlinks_of_step(
+        model.injectionlinks, step)
+    factors_of_step_ = get_factors_of_step(model.factors, step)
+    factors_of_step = factors_of_step_.loc[
+        factors_of_step_.id.isin(injectionlinks_of_step.id)]
+    var_type = (
+        pd.merge(
+            left=injectionlinks_of_step, 
+            right=factors_of_step[['id', 'type', 'min', 'max', 'is_discrete']],
+            left_on='id', right_on='id')
+        .set_index(['injid', 'part']))
+    var_type.rename(
+        columns={'type': 'var_type', 'id': 'id_of_factor'}, inplace=True)
+    var_type.index.rename(['id_of_injection', 'part'], inplace=True)
+    significant_parts = get_significant_parts(model.injections, PQlimit)
+    injection_parts = (
+        pd.merge(
+            left=significant_parts, right=var_type, how='left',
+            left_index=True, right_index=True)
+        .fillna('var'))
+    injection_parts['is_scalable'] = (
+        injection_parts.is_significant & (injection_parts.var_type == 'var'))
+    injection_parts['positive_value'] =  0 <= injection_parts.value
+    return injection_parts, factors_of_step
+
+def get_pq_subgraphs(model, consider_I=False):
+    """Splits graph at P/Q/I values. Collects data of subgraphs.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of an electric grid
+    consider_I: bool, optional
+        terminals with electric current values are subgraph borders, 
+        the default is false
+
+    Returns
+    -------
+    subgraphs: pandas.DataFrame
+        * .index_of_subgraph, int
+        * .has_slack, bool
+    subgraph_injections: pandas.DataFrame
+        * .index_of_subgraph, int
+        * .scaling_type, 'P'|'Q'
+        * .id_of_injection, str
+    subgraph_batches: pandas.DataFrame
+        * .id_of_batch, str
+        * .P, bool
+        * .Q, bool
+        * .I, bool
+        * .index_of_subgraph, int
+        * .scaling_type, 'P'|'Q'"""
+    index_of_subgraph = 0
+    injection_dfs = []
+    batches_dfs = []
+    has_slack_ = []
+    make_scaling_of_subgraphs = get_make_scaling_of_subgraphs(model)
+    for scaling_type in 'PQ':
+        barrier_types = (
+            [scaling_type] + ['I'] if consider_I else [scaling_type])
+        for injections_batches in (
+                make_scaling_of_subgraphs(barrier_types)):
+            injections, batches, has_slack = injections_batches
+            injection_dfs.append(pd.DataFrame(
+                {'index_of_subgraph': index_of_subgraph,
+                 'scaling_type': scaling_type,
+                 'id_of_injection': injections.index}))
+            batches['index_of_subgraph'] = index_of_subgraph
+            batches['scaling_type'] = scaling_type
+            batches_dfs.append(batches)
+            index_of_subgraph += 1
+            has_slack_.append((index_of_subgraph, has_slack))      
+    graph_injections = pd.concat(injection_dfs).reset_index(drop=True)       
+    graph_batches = pd.concat(batches_dfs).reset_index(drop=True)
+    graph_df = pd.DataFrame(
+        has_slack_, columns =['index_of_subgraph', 'has_slack'])
+    return graph_df, graph_injections, graph_batches
+
+def make_scaling_factors(model, *, step=0, PQlimit=.01, consider_I=False):
+    """Produces scaling factors.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of an electric grid
+    step: int, optional
+        index of optimization step, the default is 0
+    PQlimit: float, optional
+        minimum power for scaling, the default is .01
+    consider_I: bool, optional
+        the default is false
+
+    Returns
+    -------
+    pandas.DataFrame"""
+    injection_parts, factors = get_parts_of_injections(
+        model, step=step, PQlimit=PQlimit)
+    scalable_parts = injection_parts[injection_parts.is_scalable]
+    
+    
+    subgraphs, subgraph_injections, subgraph_batches = get_pq_subgraphs(
+        model, consider_I)
+    
+
+
+
+            # # scaling_type_fixed might be false if I is involved
+            # #   or there is no value for scaling_type at all,
+            # #   if scaling_type is not fixed the objective function needs
+            # #   a term to determin the scaling factor in case the 
+            # #   subgraph has scalable parts of scaling_type
+            # scaling_type_fixed = all(subgraph_batches[scaling_type])
+            # # scalable_subgraph_parts of correct scaling_type
+            # scalable_subgraph_parts = scalable_parts.loc[
+            #     pd.IndexSlice[
+            #         subgraph_injections.index, scaling_type.lower()],:]
+            # # has_scalable_part is true if the subgraph contains an injection
+            # #   having a scalable part of scaling_type (P/Q)
+            # has_scalable_part = not scalable_subgraph_parts.empty
+            # subgraph_batches.sort_values('id_of_batch', inplace=True)
+            # # table 0:
+            # #   scaling_type, index_of_subgraph, fixed
+            # # table 1:
+            # #   index_of_subgraph, part_of_injection 
+    pass
+
+
 
