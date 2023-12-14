@@ -341,9 +341,9 @@ def get_make_scaling_of_subgraphs(model):
             each row represents one batch
 
             * .id_of_batch
-            * .P, bool
-            * .Q, bool
-            * .I, bool"""
+            * .P, bool, has PValue instances?
+            * .Q, bool, has QValue instances?
+            * .I, bool, has IValue instances?"""
     injections = model.injections.set_index('id')
     outputs = get_outputs(model)
     batches_with_type_ = get_batches_with_type(model, outputs)
@@ -372,7 +372,7 @@ def get_make_scaling_of_subgraphs(model):
 
         Yields
         ------
-        tuple
+        tuple (for each subgraph)
 
             * injections, pandas.DataFrame (id)
 
