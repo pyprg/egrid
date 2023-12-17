@@ -926,7 +926,7 @@ def _make_factor_meta(
     vectors of minimum and of maximum values, vectors of initial values for
     decision variables and values for paramters.
 
-    Data to reorder the solver result:
+    Data for reordering of the solver result:
 
     Sequences of indices for converting the vector of var/const into the order
     of factors (symbols), into the order of active power scaling factors,
