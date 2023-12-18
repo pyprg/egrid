@@ -29,10 +29,8 @@ from egrid._types import (
     Branch, Injection, Slacknode, Defk, Deft, Klink, Tlink, PValue, QValue,
     Output, Factor)
 from egrid.factorgen import (
-    get_parts_of_injections, get_pq_subgraphs, make_scaling_factors)
-
-
-
+    get_parts_of_injections, _get_pq_subgraphs, get_pq_subgraphs,
+    make_scaling_factors)
 
 """
                         P=-5
@@ -45,9 +43,6 @@ n0<---br00--->n1<---br01--->n2<---br02--->n3<---br03--->n4<---br04--->n5
                             |
                             |
                             +-->inj02
-
-
-
 """
 MODEL = _make_model([
     Slacknode(id_of_node='n0'),
@@ -116,44 +111,36 @@ class Get_parts_of_injections(unittest.TestCase):
             ['var', 'var', 'var', 'var', 'var', 'var', 'var', 'var',
               'var', 'var', 'const', 'var'])
 
-class Get_initial_scaling_factors(unittest.TestCase):
+class Get_pq_subgraphs(unittest.TestCase):
 
-    def test_get_initial_scaling_factors(self):
-        # initial values
-        ini_values = (
-            .7 *
-            MODEL.injections
-            .loc[:,['id','P10','Q10']]
-            .rename(columns={'P10':'P', 'Q10':'Q'})
-            .set_index('id')
-            .stack(future_stack=True))
-        ini_values.index.names = 'id_of_injection', 'part'
-        ini_values.name = 'ini'
-        # subgraphs
-        parts_, factors = get_parts_of_injections(MODEL, step=0, PQlimit=.01)
-        parts = parts_.join(ini_values)
-        subgraphs_, subgraph_injection_parts, subgraph_batches = \
-            get_pq_subgraphs(MODEL, consider_I=False)
+    def test_empty(self):
+        """with empty model"""
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            _make_model([]))
+        self.assertTrue(subgraphs.empty)
+        self.assertTrue(subgraph_parts.empty)
+        self.assertTrue(subgraph_batches.empty)
 
+    def test_one_injection(self):
+        """one graph for active power and one graph for reactive power"""
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            _make_model([
+                Slacknode(id_of_node='n'),
+                Injection(id='inj', id_of_node='n')]))
+        #subgraphs
+        self.assertEqual(len(subgraphs.index_of_subgraph), 2)
+        self.assertEqual(set(subgraphs.scaling_type), {'P', 'Q'})
+        self.assertEqual(list(subgraphs.k_ini), [1, 1])
+        #subgraph_parts
+        self.assertEqual(list(subgraph_parts.value), [0, 0])
+        self.assertEqual(list(subgraph_parts.is_significant), [False, False])
+        self.assertEqual(list(subgraph_parts.is_scalable), [False, False])
+        self.assertEqual(list(subgraph_parts.positive_value), [True, True])
+        self.assertEqual(list(subgraph_parts.ini), [0, 0])
+        self.assertTrue(subgraph_batches.empty)
 
-        # add initial values for (scaling) factors to subgraph
-        subgraph_parts = (
-            subgraph_injection_parts
-            .join(parts, on=['id_of_injection', 'part']))
-        subgraph_part_groupby = (
-            subgraph_parts.groupby(['index_of_subgraph', 'part']))
-        subgraph_part_val_ini = subgraph_part_groupby[['value', 'ini']].sum()
-        not_zero = subgraph_part_val_ini[subgraph_part_val_ini.value != 0]
-        k_ini = not_zero.ini / not_zero.value
-        k_ini.name = 'k_ini'
-
-
-        subgraphs = (
-            pd.merge(
-                left=subgraphs_, right=k_ini.reset_index(['part'], drop=True),
-                left_on='index_of_subgraph', right_index=True, how='left')
-            .fillna(1.))
-
+    def test_get_pq_subgraphs(self):
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(MODEL)
         pass
 
 class Make_scaling_factors(unittest.TestCase):
@@ -171,7 +158,6 @@ class Make_scaling_factors(unittest.TestCase):
             n0  br00   n1  br01   n2    inj03_0
                                         P10=10
                                         Q10=10
-
         """
         model = _make_model([
             Slacknode(id_of_node='n0'),

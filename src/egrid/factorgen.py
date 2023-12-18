@@ -172,7 +172,7 @@ def get_parts_of_injections(model, *, step, PQlimit):
             ignore_index=True)
     return injection_parts, factors_of_step
 
-def get_pq_subgraphs(model, *, consider_I=False):
+def _get_pq_subgraphs(model, *, consider_I=False):
     """Splits graph at P/Q/I values. Collects data of subgraphs.
 
     Separate subgraphs are created for independent scaling of P and Q.
@@ -252,6 +252,91 @@ def get_pq_subgraphs(model, *, consider_I=False):
         .astype({'index_of_subgraph':np.int64, 'has_slack':bool}))
     return graph_df, graph_injections, graph_batches
 
+def get_pq_subgraphs(
+        model, *, ini_values=None, consider_I=False, PQlimit=.01):
+    """Creates P/Q-subgraphs for unique scaling factors.
+
+    The method is suitable for splitting a network graph in parts comprising
+    one active power and one reactive power scaling factor for all connected
+    injections. The function can be used for the first optimization step
+    as it accepts initial values for injections separately.
+
+    Batches for I/P/Q including the same branch terminals / injection terminals
+    shall have the same ID.
+
+    Parameters
+    ----------
+    model: egrid.model.Model
+        data of electric grid
+    ini_value: pandas.Series (index: ['id_of_injection', 'part']), optional
+        initial values of parts (P or Q). The default is None.
+    consider_I: bool, optional
+        terminals with electric current values are subgraph borders,
+        default is False
+    PQlimit: float, optional
+        minimum value of P and Q for scalable parts, default is .01.
+
+    Returns
+    -------
+    subgraphs: pandas.DataFrame
+        * .index_of_subgraph, int
+        * .has_slack, bool
+        * .scaling_type, 'P'|'Q'
+        * .k_ini, float, initial value of scaling factor
+    subgraph_parts: pandas.DataFrame
+        * .index_of_subgraph, int
+        * .part, 'P'|'Q'
+        * .id_of_injection, str, unique idendifier of injection
+        * .value, float, P10|Q10
+        * .is_significant, bool, true size exceeds PQlimit
+        * .id_of_factor, str, scaling factor
+        * .var_type, 'var'|'const'
+        * .min, float, smallest possible value
+        * .max, float, greatest possible value
+        * .is_discrete, bool, int value if true else float
+        * .is_scalable, bool, var_type=='var' and is_significant
+        * .positive_value, bool, 0 <= value
+        * .ini, float, initial value
+    subgraph_batches: pandas.DataFrame
+        * .id_of_batch, str
+        * .P, bool, has PValue
+        * .Q, bool, has QValue
+        * .I, bool, has IValue
+        * .index_of_subgraph, int
+        * .part, 'P'|'Q'"""
+    if ini_values is None:
+        # initial values (test)
+        ini_values = (
+            model.injections
+            .loc[:,['id','P10','Q10']]
+            .rename(columns={'P10':'P', 'Q10':'Q'})
+            .set_index('id')
+            .stack(future_stack=True))
+        ini_values.index.names = 'id_of_injection', 'part'
+        ini_values.name = 'ini'
+    # subgraphs
+    subgraphs_, subgraph_injection_parts, subgraph_batches = \
+        _get_pq_subgraphs(model, consider_I=False)
+    # enhance subgraph_injection_parts (factors is not used)
+    parts_, factors = get_parts_of_injections(model, step=0, PQlimit=.01)
+    parts = parts_.join(ini_values)
+    subgraph_parts = (
+        subgraph_injection_parts
+        .join(parts, on=['id_of_injection', 'part']))
+    # enhance subgraph with initial scaling factor
+    subgraph_part_groupby = (
+        subgraph_parts.groupby(['index_of_subgraph', 'part']))
+    subgraph_part_val_ini = subgraph_part_groupby[['value', 'ini']].sum()
+    not_zero = subgraph_part_val_ini[subgraph_part_val_ini.value != 0]
+    k_ini = not_zero.ini / not_zero.value
+    k_ini.name = 'k_ini'
+    subgraphs = (
+        pd.merge(
+            left=subgraphs_, right=k_ini.reset_index(['part'], drop=True),
+            left_on='index_of_subgraph', right_index=True, how='left')
+        .fillna(1.))
+    return subgraphs, subgraph_parts, subgraph_batches
+
 def make_scaling_factors(model, *, step=0, PQlimit=.01, consider_I=False):
     """Produces scaling factors.
 
@@ -270,7 +355,7 @@ def make_scaling_factors(model, *, step=0, PQlimit=.01, consider_I=False):
     -------
     pandas.DataFrame"""
 
-    subgraphs, subgraph_injection_parts, subgraph_batches = get_pq_subgraphs(
+    subgraphs, subgraph_injection_parts, subgraph_batches = _get_pq_subgraphs(
         model, consider_I=consider_I)
 
     injection_parts, factors = get_parts_of_injections(
