@@ -54,10 +54,16 @@ def get_terminals(model, additional_terminals):
     inj_terms = (
         model.injections[cols_inj].rename(columns={'id': 'id_of_device'}))
     inj_terms['devtype'] = 'injection'
-    terms = [bra_terms, bri_terms, inj_terms]
-    if additional_terminals is not None:
-        terms.append(additional_terminals.assign(devtype='batch'))
-    return pd.concat(terms, axis=0)
+    terms = [
+        df for df in (
+            bra_terms, bri_terms, inj_terms,
+            additional_terminals.assign(devtype='batch'))
+        if not df.empty]
+    return (
+        pd.concat(terms, axis=0)
+        if len(terms) else
+        pd.DataFrame(
+            [], columns=['id_of_node', 'id_of_device', 'devtype'], dtype=str))
 
 def get_node_device_graph(model):
     """Creates a bipartite directed graph of an electrical model.
@@ -393,7 +399,7 @@ def get_make_scaling_of_subgraphs(model):
                 * .P, bool
                 * .Q, bool
                 * .I, bool
-                
+
             * has_slack, bool"""
         for edges, nodes, devices in make_subgraphs(flow_types):
             injections_of_subgraph = injections[injections.index.isin(devices)]
