@@ -29,7 +29,7 @@ from itertools import product
 _e3_pattern = re.compile(r'[nuµmkMG]')
 
 _replacement = {
-    'n':'e-3', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 'k':'e3', 'M':'e6', 'G':'e9'}
+    'n':'e-9', 'u':'e-6', 'µ':'e-6', 'm':'e-3', 'k':'e3', 'M':'e6', 'G':'e9'}
 
 def _replace_e3(match):
     """Returns a replacement string for given match.
@@ -96,8 +96,9 @@ Slacknode.V.__doc__ = (
 
 Injection = namedtuple(
     'Injection',
-    'id id_of_node P10 Q10 Exp_v_p Exp_v_q',
-    defaults=(0.0, 0.0, 0.0, 0.0))
+    'id id_of_node P10 Q10 Exp_v_p Exp_v_q '
+    'count_of_steps Pmin Pmax Qmin Qmax cost_of_change',
+    defaults=(0., 0., 0., 0., np.inf, np.NINF, np.inf, np.NINF, np.inf, 0.))
 Injection.__doc__ += (
     ": Model of an electrical one-terminal-device including "
     "consumers (positiv and negative loads), PQ- and PV-generators, "
@@ -122,8 +123,26 @@ Injection.Exp_v_p.__doc__ = (
 Injection.Exp_v_q.__doc__ = (
     "float, (default value 0) "
     "exponent for voltage dependency of active power, "
-    "0.0 reactive power is independent from voltage-magnitude e.g. generators"
+    "0.0 reactive power is independent from voltage-magnitude e.g. generators "
     "2.0 for constant susceptance")
+Injection.count_of_steps.__doc__ = (
+    "float, (default infinity), property for automatic factor creation "
+    "number of discrete values for scaling, "
+    "0 - no scaling, constant value, "
+    "1..n - discrete, "
+    "numpy.infinity - continuous scaling")
+Injection.Pmin.__doc__ = (
+    "float, (default -infinity), property for automatic factor creation "
+    "smallest possible value of P10")
+Injection.Pmax.__doc__ = (
+    "float, (default infinity), property for automatic factor creation "
+    "greates possible value of P10")
+Injection.Qmin.__doc__ = (
+    "float, (default -infinity) "
+    "smallest possible value of Q10")
+Injection.Qmax.__doc__ = (
+    "float, (default infinity), property for automatic factor creation "
+    "greates possible value of Q10")
 
 Output = namedtuple(
     'Output',
@@ -152,7 +171,8 @@ exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by PValue and Output instances
 sharing the same 'id_of_batch'-value.
 
-Attribute cost is introduced for Volt-Var-Control."""
+Attribute cost is introduced for Volt-Var-Control. Cost of active power flow is
+value of P multiplied by value of attribute cost."""
 PValue.id_of_batch.__doc__ = (
     "str, unique identifier of the point")
 PValue.P.__doc__ = (
@@ -175,7 +195,8 @@ must exist. Placement of multiple measurements in switch fields combined with
 several branches or injections are modeled by QValue and Output instances
 sharing the same 'id_of_batch'-value.
 
-Attribute cost is introduced for Volt-Var-Control."""
+Attribute cost is introduced for Volt-Var-Control. Cost of reactive 
+power flow is value of Q multiplied by value of attribute cost."""
 QValue.id_of_batch.__doc__ = (
     "str, unique identifier of the point")
 QValue.Q.__doc__ = (
@@ -729,9 +750,16 @@ _attribute_types = {
          [False, False]),
      #    id     id_of_node  P10      Q10         Exp_v_p     Exp_v_q
      Injection:(
-         [object, object, np.float64, np.float64, np.float64, np.float64],
-         [_tostring, _tostring, _tofloat, _tofloat, _tofloat, _tofloat],
-         [False, False, False, False, False, False])}
+         [object, object, np.float64, np.float64, np.float64, np.float64,
+          #count_of_intervals Pmin Pmax   Qmin        Qmax, cost_of_change
+          np.float64, np.float64, np.float64, np.float64, np.float64, 
+          # cost_of_change
+          np.float64],
+         [_tostring, _tostring, _tofloat, _tofloat, _tofloat, _tofloat,
+          _tofloat, _tofloat, _tofloat, _tofloat,
+          _tofloat],
+         [False, False, False, False, False, False,
+          False, False, False, False, False])}
 
 meta_of_types = [
     (cls_, tuple(zip(*info[1:3]))) for cls_, info in _attribute_types.items()]

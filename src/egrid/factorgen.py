@@ -18,14 +18,31 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 Created on Sun Dec 10 16:38:56 2023
 
 @author: pyprg
-"""
+
+
+This module is about automatic generation of scaling factors for injections.
+The graph of the grid is split at flow measurements P/Q/I into subgraphs.
+Functions of this module will create scaling factors for active and reactive
+power per each subgraph if apropriate injection for scaling are part of a
+particular subgraph."""
 import pandas as pd
 import numpy as np
-from egrid.topo import get_make_scaling_of_subgraphs
+from egrid.topo import get_make_subgraphs_with_batches
 from egrid._types import DEFAULT_FACTOR_ID
 
 def get_factors_of_step(factors, step):
     """Collects generic and step-specific data of factors.
+
+    When functions of this model are used for generation of scaling factors,
+    injections are scaled by default in the range of 0...infinity. Other
+    options are:
+        * no scaling at all (constant)
+        * different range
+    None-default scaling factors can be defined and linked to parts (P/Q)
+    of injections explicitely. This function fetches explicitely defined
+    factors from the model. Returned factors are defined for each step
+    (value of step is -1) or for the step addressed by argument 'step'.
+    Generic factors are overruled by factors of 'step'.
 
     Parameters
     ----------
@@ -66,7 +83,10 @@ def get_injectionlinks_of_step(injectionlinks, step):
     return links.loc[~links.loc[:,['injid', 'part']].duplicated(keep='last')]
 
 def get_significant_parts(injections, PQlimit):
-    """
+    """The function returns all parts accompanied by property 'is_significant'.
+
+    Parts are active power and reactive power of injections. A part is
+    significant if its value is greater than PQlimit.
 
     Evaluates P10 and Q10.
 
@@ -103,6 +123,12 @@ def get_parts_of_injections(model, *, step, PQlimit):
 
     The function provides data on active and reactive power (parts)
     for each injection of the given model.
+
+    Default values used if no values given by a factor definitions for step:
+        * .var_type = 'var'
+        * .min = 0
+        * .max = inf
+        * .is_discrete = False
 
     Parameters
     ----------
@@ -152,22 +178,23 @@ def get_parts_of_injections(model, *, step, PQlimit):
             left_index=True, right_index=True)
     injection_parts.id_of_factor.fillna(DEFAULT_FACTOR_ID, inplace=True)
     injection_parts.var_type.fillna('var', inplace=True)
-    injection_parts['min'].fillna(-np.inf, inplace=True)
+    injection_parts['min'].fillna(0, inplace=True)
     injection_parts['max'].fillna(np.inf, inplace=True)
     injection_parts.is_discrete.fillna(False, inplace=True)
     injection_parts['is_scalable'] = (
         injection_parts.is_significant & (injection_parts.var_type == 'var'))
-    injection_parts['positive_value'] =  0 <= injection_parts.value
+    injection_parts['positive_value'] = 0 <= injection_parts.value
     if (any(injection_parts.id_of_factor == DEFAULT_FACTOR_ID) and
            not any(factors_of_step.id == DEFAULT_FACTOR_ID)):
         factors_of_step = pd.concat(
             [factors_of_step,
+             # default scaling, if not given explicitely
              pd.DataFrame(
                  dict(
                      id=[DEFAULT_FACTOR_ID],
                      type=['var'],
                      id_of_source=[DEFAULT_FACTOR_ID],
-                     value=[1.], min=[-np.inf], max=[np.inf],
+                     value=[1.], min=[0], max=[np.inf],
                      is_discrete=[False], m=[1.], n=[0.], cost=[1.]))],
             ignore_index=True)
     return injection_parts, factors_of_step
@@ -208,20 +235,22 @@ def _get_pq_subgraphs(model, *, consider_I=False):
     injection_dfs = []
     batches_dfs = []
     graph = []
-    make_scaling_of_subgraphs = get_make_scaling_of_subgraphs(model)
+    make_subgraphs_with_batches = get_make_subgraphs_with_batches(model)
     for scaling_type in 'PQ':
         barrier_types = (
             [scaling_type] + ['I'] if consider_I else [scaling_type])
-        for injections_batches in (
-                make_scaling_of_subgraphs(barrier_types)):
-            injections, batches, has_slack = injections_batches
+        for injections, batches, has_slack in (
+                make_subgraphs_with_batches(barrier_types)):
             injection_dfs.append(pd.DataFrame(
                 {'index_of_subgraph': index_of_subgraph,
                  'part': scaling_type,
                  'id_of_injection': injections.index}))
-            batches['index_of_subgraph'] = index_of_subgraph
-            batches['part'] = scaling_type
-            batches_dfs.append(batches)
+            # consider batches with suitable barrier type only
+            if not batches.empty and \
+                any(batches[bt][0] for bt in barrier_types):
+                batches['index_of_subgraph'] = index_of_subgraph
+                batches['part'] = scaling_type
+                batches_dfs.append(batches)
             graph.append((index_of_subgraph, has_slack, scaling_type))
             index_of_subgraph += 1
     graph_injections = (
@@ -316,7 +345,7 @@ def get_pq_subgraphs(
         ini_values.name = 'ini'
     # subgraphs
     subgraphs_, subgraph_injection_parts, subgraph_batches = \
-        _get_pq_subgraphs(model, consider_I=False)
+        _get_pq_subgraphs(model, consider_I=consider_I)
     # enhance subgraph_injection_parts (factors is not used)
     parts_, factors = get_parts_of_injections(model, step=0, PQlimit=.01)
     parts = parts_.join(ini_values)
@@ -337,8 +366,134 @@ def get_pq_subgraphs(
         .fillna(1.))
     return subgraphs, subgraph_parts, subgraph_batches
 
+def add_subgraph_properties(subgraphs, subgraph_parts, subgraph_batches):
+    """Enhances subgraphs with aggregated properties.
+
+    The properties control the generation of scaling factors.
+
+    'add_subgraph_properties' implements a heuristic approach.
+    'add_subgraph_properties' creates scaling factors for each distinct
+    combination of the load properties 'P/Q-part', 'index_of_subgraph',
+    'positive_value' and 'is_discrete'.
+
+    Minimum and Maximum of scaling factors consider the sums of minimum and
+    maximum of all load parts of the concerning group. Thus, it is possible
+    that the product of kmin and scheduled active power is smaller then
+    individual minimum multiplied by active power value for one specific load.
+    This applies accordingly to kmax.
+
+    Parameters
+    ----------
+    subgraphs: pandas.DataFrame
+        * .index_of_subgraph
+        * .has_slack
+        * .scaling_type
+        * .k_ini
+    subgraph_parts: pandas.DataFrame
+        * .index_of_subgraph
+        * .part
+        * .id_of_injection
+        * .value
+        * .is_significant
+        * .id_of_factor
+        * .var_type
+        * .min
+        * .max
+        * .is_discrete
+        * .is_scalable
+        * .positive_value
+        * .ini.
+    subgraph_batches: pandas.DataFrame
+        * .id_of_batch
+        * .P
+        * .Q
+        * .I
+        * .index_of_subgraph
+        * .part
+        * .has_part
+
+    Returns
+    -------
+    pandas.DataFrame
+        ['index_of_subgraph', 'positive_value ', 'is_discrete'] is unique
+
+        * .index_of_subgraph, int
+        * .positive_value, bool, injections have positive P/Q-value
+        * .min_value
+        * .max_value
+        * .sum_of_values
+        * .k_min
+        * .k_max
+        * .is_scalable, bool, scaling of P/Q is possible
+        * .fixed, bool, P/Q is given at all borders (not just I)
+        * .has_slack, bool, subgraph contains a slack node
+        * .scaling_type, 'P'|'Q', for scaling of active or reactive power
+        * .k_ini, float, initial scaling factor"""
+    scalable_parts = subgraph_parts[subgraph_parts.is_scalable]
+    # range of injection values calculated from range of scaling factors
+    # min(value*min, value*max), max(value*min, value*max)
+    scalable_parts[['min_value', 'max_value']] = np.apply_along_axis(
+        lambda x: (np.min(x), np.max(x)),
+        axis=1,
+        arr=scalable_parts['value'].to_numpy()
+            # minimum / maximum of scaling factors
+            * scalable_parts[['min', 'max']].to_numpy())
+    subgraph_parts_props = (
+        scalable_parts
+        .groupby(['index_of_subgraph', 'positive_value', 'is_discrete'])
+        .agg(
+            min_value=('min_value', 'sum'),
+            max_value=('max_value', 'sum'),
+            sum_of_values=('value', 'sum')))
+    subgraph_parts_props[['k_min', 'k_max']] = (
+        subgraph_parts_props[['min_value', 'max_value']].to_numpy()
+        / subgraph_parts_props.sum_of_values.to_numpy())
+    subgraph_parts_props['is_scalable'] = True
+    subgraph_parts_props.reset_index(inplace=True)
+    # properties of measured flow values / flow setpoint
+    #   select P or Q depending of 'part'
+    subgraph_batches['has_part'] = subgraph_batches.apply(
+        lambda row:row[row.part], axis=1)
+    subgraph_properties = (
+        subgraph_batches
+        .groupby('index_of_subgraph')
+        # fixed might be false if I is involved
+        #   or there is no value for scaling_type at all,
+        #   if scaling_type is not fixed the OBJECTIVE function needs
+        #   a term to determin the scaling factor in case the
+        #   subgraph has scalable parts of scaling_type
+        .agg(fixed=('has_part', all)))
+    properties = pd.merge(
+        left=subgraph_parts_props,
+        right=subgraph_properties,
+        left_on='index_of_subgraph',
+        right_index=True)
+    fill = dict(
+        min_value=0, max_value=np.inf, sum_of_values=0, k_min=0, k_max=np.inf,
+        is_discrete=False, fixed=False, positive_value=False,
+        negative_value=False, is_scalable=False)
+    sg = (
+        pd.merge(
+            left=properties,
+            right=subgraphs,
+            left_on='index_of_subgraph',
+            right_on='index_of_subgraph',
+            how='outer')
+        .fillna(fill))
+    sg.loc[sg.has_slack, ['is_scalable']] = False
+    return sg
+
 def make_scaling_factors(model, *, step=0, PQlimit=.01, consider_I=False):
-    """Produces scaling factors.
+    """Produces scaling factors for one step.
+
+    Splits graph at flow measurements (or setpoints, which is at locations of
+    known P/Q/I-values). Makes scaling factors for subgraphs. Creates
+    separate subgraphs for P/Q. Creates scaling factors if there are
+    appropriate parts for P/Q-scaling in the subgraph only. Injections
+    are scaled by default in the range of 0...inifinity. Scaling can be
+    overruled by explicitely defined and linked factors for the purpose
+    of a modified scaling range or for avoiding scaling at all if  parts of
+    injections are constant.
 
     Parameters
     ----------
@@ -349,61 +504,46 @@ def make_scaling_factors(model, *, step=0, PQlimit=.01, consider_I=False):
     PQlimit: float, optional
         minimum power for scaling, the default is .01
     consider_I: bool, optional
+        splits P/Q-graphs additionally at location of I values,
         the default is false
 
     Returns
     -------
-    pandas.DataFrame"""
-
-    subgraphs, subgraph_injection_parts, subgraph_batches = _get_pq_subgraphs(
-        model, consider_I=consider_I)
-
-    injection_parts, factors = get_parts_of_injections(
-        model, step=step, PQlimit=PQlimit)
-
-    subgraph_parts = subgraph_injection_parts.join(
-        injection_parts[injection_parts.is_scalable],
-        on=['id_of_injection', 'part'])
-    subgraph_parts['min_value'] = subgraph_parts['value'] * subgraph_parts['min']
-    subgraph_parts['max_value'] = subgraph_parts['value'] * subgraph_parts['max']
-    sg_props = (
-        subgraph_parts
-        .groupby('index_of_subgraph')
-        .agg(
-            min_value=('min_value', 'min'),
-            max_value=('max_value', 'max'),
-            positive_value=('positive_value', any),
-            negative_value=('positive_value', lambda series: any(~series)))
-        )
-
-    # properties of measured flow values / flow setpoint
-    #   select P or Q depending of 'part'
-    subgraph_batches['has_part'] = subgraph_batches.apply(
-        lambda row:row[row.part],axis=1)
-    subgraph_properties = (
-        subgraph_batches
-        .groupby('index_of_subgraph')
-        .agg(fixed=('has_part', all), part=('part', 'first')))
-
-            # # scaling_type_fixed might be false if I is involved
-            # #   or there is no value for scaling_type at all,
-            # #   if scaling_type is not fixed the objective function needs
-            # #   a term to determin the scaling factor in case the
-            # #   subgraph has scalable parts of scaling_type
-            # scaling_type_fixed = all(subgraph_batches[scaling_type])
-            # # scalable_subgraph_parts of correct scaling_type
-            # scalable_subgraph_parts = scalable_parts.loc[
-            #     pd.IndexSlice[
-            #         subgraph_injections.index, scaling_type.lower()],:]
-            # # has_scalable_part is true if the subgraph contains an injection
-            # #   having a scalable part of scaling_type (P/Q)
-            # has_scalable_part = not scalable_subgraph_parts.empty
-            # subgraph_batches.sort_values('id_of_batch', inplace=True)
-            # # table 0:
-            # #   scaling_type, index_of_subgraph, fixed
-            # # table 1:
-            # #   index_of_subgraph, part_of_injection
-    pass
-
-
+    tuple
+        * pandas.DataFrame, scaling_factors (index_of_scalingfactor)
+            * .is_discrete
+            * .k_min
+            * .k_max
+            * .k_ini
+            * .name_of_scaling_factor
+        * scalable_parts
+            * .id_of_injection
+            * .part
+            * .index_of_scalingfactor"""
+    subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+        model, consider_I=consider_I, PQlimit=PQlimit)
+    sg = add_subgraph_properties(subgraphs, subgraph_parts, subgraph_batches)
+    sg['name_of_scaling_factor'] = '-'
+    scalable_sg = sg[sg.is_scalable]
+    scalable_sg.loc[:, ['name_of_scaling_factor']] = (
+        'k' + scalable_sg.scaling_type.str.lower()
+        + sg.index[sg.is_scalable].to_series().apply(str)
+        + scalable_sg.positive_value.apply(lambda b: 'p' if b else 'n')
+        + scalable_sg.is_discrete.apply(lambda b: 'd' if b else 'c'))
+    scalable_sg.reset_index(inplace=True, names='index_of_scalingfactor')
+    sg_parts = pd.merge(
+        right=subgraph_parts,
+        left=scalable_sg[
+            ['index_of_subgraph', 'scaling_type', 'name_of_scaling_factor',
+             'index_of_scalingfactor']],
+        right_on=['index_of_subgraph', 'part'],
+        left_on=['index_of_subgraph', 'scaling_type'],
+        how='inner')
+    return (
+        scalable_sg.loc[
+            :,
+            ['is_discrete',  'k_min', 'k_max', 'k_ini',
+             'name_of_scaling_factor', 'index_of_scalingfactor']]
+        .set_index('index_of_scalingfactor'),
+        sg_parts.loc[:, ['id_of_injection', 'part', 'index_of_scalingfactor']])
 

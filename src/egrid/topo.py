@@ -21,7 +21,6 @@ Created on Fri Aug 25 20:26:34 2023
 """
 import pandas as pd
 import networkx as nx
-from networkx.algorithms import bipartite
 
 def get_terminals(model, additional_terminals):
     """Creates a pandas.DataFrame of terminals.
@@ -54,11 +53,10 @@ def get_terminals(model, additional_terminals):
     inj_terms = (
         model.injections[cols_inj].rename(columns={'id': 'id_of_device'}))
     inj_terms['devtype'] = 'injection'
-    terms = [
-        df for df in (
-            bra_terms, bri_terms, inj_terms,
-            additional_terminals.assign(devtype='batch'))
-        if not df.empty]
+    terminals = [bra_terms, bri_terms, inj_terms]
+    if additional_terminals is not None:
+        terminals.append(additional_terminals.assign(devtype='batch'))
+    terms = [df for df in terminals if not df.empty]
     return (
         pd.concat(terms, axis=0)
         if len(terms) else
@@ -138,38 +136,6 @@ def get_batches_with_type(model, outputs):
          'Q': id_of_batch.isin(model.qvalues.id_of_batch),
          'I': id_of_batch.isin(model.ivalues.id_of_batch)})
 
-# def split(digraph, *, nodes=(), terminals=()):
-#     """Removes terminals and nodes from digraph. Returns subgraphs.
-
-#     Filtered out nodes also filter out any of their edges.
-
-#     Parameters
-#     ----------
-#     digraph: networkx.DiGraph
-#         digraph is bipartite, one set of vertices are the connectivity nodes,
-#         the other set of vertices are branches, edges are outgoing from
-#         connectivity nodes and incoming at branches
-
-#     terminals: iterable
-#         optional,
-#         tuple
-
-#         * .id_of_node, str
-#         * .id_of_branch, str
-
-#     nodes: iterable
-#         optional,
-#         str, id of node
-
-#     Returns
-#     -------
-#     iterator
-#         networkx.DiGraph"""
-#     view = nx.restricted_view(digraph, nodes=nodes, edges=terminals)
-#     return (
-#         view.subgraph(c)
-#         for c in nx.weakly_connected_components(view))
-
 def split(digraph, edges, *, nodes=(), terminals=()):
     """Removes terminals and nodes from digraph. Returns subgraphs.
 
@@ -221,6 +187,8 @@ def get_make_subgraphs(model, outputs, batches_with_type):
     """Creates a function which returns graphs of the grid splitted at
     terminals with specified flow measurements.
 
+    Injections are part of the subgraphs.
+
     Parameters
     ----------
     model: egrid.model.Model
@@ -238,7 +206,7 @@ def get_make_subgraphs(model, outputs, batches_with_type):
     -------
     function
         (list of 'P', 'Q', 'I') -> (iterator over networkx.Graph)"""
-    # enhancement of graph, new nodes are given the ids of the batch
+    # enhancement of graph, new nodes are given the ids of the batches
     additional_edges = (
         outputs[['id_of_batch', 'id_of_device']]
         .rename(columns={'id_of_batch': 'id_of_node'}))
@@ -257,7 +225,8 @@ def get_make_subgraphs(model, outputs, batches_with_type):
         at locations where the original graph was splitted.
 
         There are two sets of nodes. First set contains connectivity nodes.
-        The second set contains the devices.
+        The second set contains the devices. Injections are included in the
+        collections of devices.
 
         Parameters
         ----------
@@ -319,7 +288,7 @@ def get_outputs_of_graph(output_index, edges_of_graph):
         .get_level_values(0)
         .drop_duplicates(keep='first'))
 
-def get_make_scaling_of_subgraphs(model):
+def get_make_subgraphs_with_batches(model):
     """
 
     Parameters
@@ -329,27 +298,29 @@ def get_make_scaling_of_subgraphs(model):
 
     Yields
     ------
-    tuple
+    function (list_of_elements 'P'|'Q'|'I') -> (generator_of_tuples)
+        tuple
 
-        * injections, pandas.DataFrame (id)
+            * injections, pandas.DataFrame (id)
 
-            * .id_of_node, str
-            * .P10, float
-            * .Q10, float
-            * .Exp_v_p, float
-            * .Exp_v_q, float
-            * .index_of_node, int
-            * .switch_flow_index, int
-            * .in_super_node, bool
-            * .index_of_terminal, int
+                * .id_of_node, str
+                * .P10, float
+                * .Q10, float
+                * .Exp_v_p, float
+                * .Exp_v_q, float
+                * .index_of_node, int
+                * .switch_flow_index, int
+                * .in_super_node, bool
+                * .index_of_terminal, int
 
-        * batches: pandas.DataFrame
-            each row represents one batch
+            * batches: pandas.DataFrame
+                each row represents one batch, returns batches even if without
+                any of flow_types
 
-            * .id_of_batch
-            * .P, bool, has PValue instances?
-            * .Q, bool, has QValue instances?
-            * .I, bool, has IValue instances?"""
+                * .id_of_batch
+                * .P, bool, has PValue instances?
+                * .Q, bool, has QValue instances?
+                * .I, bool, has IValue instances?"""
     injections = model.injections.set_index('id')
     outputs = get_outputs(model)
     batches_with_type_ = get_batches_with_type(model, outputs)
@@ -393,7 +364,8 @@ def get_make_scaling_of_subgraphs(model):
                 * .index_of_terminal, int
 
             * batches: pandas.DataFrame
-                each row represents one batch
+                each row represents one batch, returns batches even if without
+                any of flow_types
 
                 * .id_of_batch
                 * .P, bool

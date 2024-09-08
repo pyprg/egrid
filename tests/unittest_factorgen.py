@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Created on Sun Dec 10 16:39:23 2023
 
-@author: live
+@author: pyprg
 """
 
 import unittest
@@ -25,12 +25,12 @@ import context
 import pandas as pd
 from egrid import _make_model
 from egrid._types import (
-    FACTORS, TERMINALLINKS, INJLINKS, BRANCHES, Injection, DEFAULT_FACTOR_ID,
+    FACTORS, TERMINALLINKS, INJLINKS, BRANCHES, DEFAULT_FACTOR_ID,
     Branch, Injection, Slacknode, Defk, Deft, Klink, Tlink, PValue, QValue,
-    Output, Factor)
+    IValue, Output, Factor)
 from egrid.factorgen import (
-    get_parts_of_injections, _get_pq_subgraphs, get_pq_subgraphs,
-    make_scaling_factors)
+    get_factors_of_step, get_significant_parts, get_parts_of_injections,
+    get_pq_subgraphs, make_scaling_factors)
 
 """
                         P=-5
@@ -91,6 +91,79 @@ MODEL = _make_model([
     Klink(
         id_of_factor='kq0', id_of_injection='inj03_4', part='q', step=0)])
 
+
+class Get_factors_of_step(unittest.TestCase):
+
+    def test_no_factors_at_all(self):
+        factors = pd.DataFrame([], columns=['id', 'step'])
+        factors_of_step = get_factors_of_step(factors, 0)
+        self.assertTrue(factors_of_step.empty)
+
+    def test_factor_step0(self):
+        factors = pd.DataFrame({'id': ['f0'], 'step':[0]})
+        factors_of_step = get_factors_of_step(factors, 0)
+        self.assertFalse(factors_of_step.empty)
+
+    def test_factor_all_steps(self):
+        factors = pd.DataFrame({'id': ['f0'], 'step':[-1]})
+        factors_of_step = get_factors_of_step(factors, 0)
+        self.assertFalse(factors_of_step.empty)
+
+    def test_factor_all_steps_step0(self):
+        # 1st
+        factors = pd.DataFrame(
+            {'id': ['f0', 'f0'], 'step':[-1, 0], 'value':[2,3]})
+        factors_of_step = get_factors_of_step(factors, 0)
+        self.assertEqual(len(factors_of_step), 1)
+        self.assertEqual(factors_of_step.iloc[0].value, 3)
+        # 2nd
+        factors = pd.DataFrame(
+            {'id': ['f0', 'f0'], 'step':[0, -1], 'value':[2,3]})
+        factors_of_step = get_factors_of_step(factors, 0)
+        self.assertEqual(len(factors_of_step), 1)
+        self.assertEqual(factors_of_step.iloc[0].value, 2)
+
+class Get_significant_parts(unittest.TestCase):
+
+    def test_no_injection(self):
+        empty_model = _make_model([])
+        parts = get_significant_parts(empty_model.injections, PQlimit=.01)
+        self.assertTrue(parts.empty)
+
+    def test_one_injection_neither_P_nor_Q(self):
+        mymodel = _make_model([
+            Injection(id='inj', id_of_node='n')])
+        parts = get_significant_parts(mymodel.injections, PQlimit=.01)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(set(parts.index.get_level_values('part')), {'P', 'Q'})
+        self.assertEqual(parts.is_significant.to_list(), [False, False])
+
+    def test_one_injection_P_and_Q(self):
+        mymodel = _make_model([
+            Injection(id='inj', id_of_node='n', P10=1., Q10=1.)])
+        parts = get_significant_parts(mymodel.injections, PQlimit=.01)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(set(parts.index.get_level_values('part')), {'P', 'Q'})
+        self.assertEqual(parts.is_significant.to_list(), [True, True])
+
+    def test_one_injection_P_no_Q(self):
+        mymodel = _make_model([
+            Injection(id='inj', id_of_node='n', P10=1., Q10=.005)])
+        parts = get_significant_parts(mymodel.injections, PQlimit=.01)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(set(parts.index.get_level_values('part')), {'P', 'Q'})
+        self.assertTrue(parts.loc['inj','P'].is_significant)
+        self.assertFalse(parts.loc['inj','Q'].is_significant)
+
+    def test_one_injection_no_P_Q(self):
+        mymodel = _make_model([
+            Injection(id='inj', id_of_node='n', P10=.005, Q10=.011)])
+        parts = get_significant_parts(mymodel.injections, PQlimit=.01)
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(set(parts.index.get_level_values('part')), {'P', 'Q'})
+        self.assertFalse(parts.loc['inj','P'].is_significant)
+        self.assertTrue(parts.loc['inj','Q'].is_significant)
+
 class Get_parts_of_injections(unittest.TestCase):
 
     def test_get_parts_of_injections(self):
@@ -98,14 +171,14 @@ class Get_parts_of_injections(unittest.TestCase):
         self.assertEqual(
             parts.index.get_level_values(0).to_list(),
             ['inj03_0', 'inj03_0', 'inj04_0', 'inj04_0', 'inj02', 'inj02',
-             'inj02_3', 'inj02_3', 'inj03_4', 'inj03_4', 'inj03_5', 'inj03_5'])
+              'inj02_3', 'inj02_3', 'inj03_4', 'inj03_4', 'inj03_5', 'inj03_5'])
         self.assertEqual(
             parts.index.get_level_values(1).to_list(),
             ['P', 'Q', 'P', 'Q', 'P', 'Q', 'P', 'Q', 'P', 'Q', 'P', 'Q'])
         self.assertEqual(
             parts.is_scalable.to_list(),
             [False, False, True, False, True, True, True, True, True, True,
-             False, True])
+              False, True])
         self.assertEqual(
             parts.var_type.to_list(),
             ['var', 'var', 'var', 'var', 'var', 'var', 'var', 'var',
@@ -121,8 +194,9 @@ class Get_pq_subgraphs(unittest.TestCase):
         self.assertTrue(subgraph_parts.empty)
         self.assertTrue(subgraph_batches.empty)
 
-    def test_one_injection(self):
-        """one graph for active power and one graph for reactive power"""
+    def test_one_injection_no_values(self):
+        """one graph for active power and one graph for reactive power,
+        no values (no measurements, no setpoints)"""
         subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
             _make_model([
                 Slacknode(id_of_node='n'),
@@ -139,9 +213,137 @@ class Get_pq_subgraphs(unittest.TestCase):
         self.assertEqual(list(subgraph_parts.ini), [0, 0])
         self.assertTrue(subgraph_batches.empty)
 
-    def test_get_pq_subgraphs(self):
-        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(MODEL)
-        pass
+    def test_one_injection_pvalue(self):
+        """two graphs for active power and one graph for reactive power,
+        PValue (P-measurement or setpoint)"""
+        mymodel = _make_model([
+                Slacknode(id_of_node='n'),
+                Injection(id='inj', id_of_node='n'),
+                PValue(id_of_batch='n_inj', P=5),
+                Output(id_of_batch='n_inj', id_of_device='inj'),
+                ])
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            mymodel)
+        #subgraphs
+        self.assertEqual(len(subgraphs.index_of_subgraph), 3)
+        self.assertEqual(
+            subgraphs
+            .groupby('scaling_type')
+            .count()
+            .index_of_subgraph
+            .to_dict(),
+            {'P': 2, 'Q': 1})
+        self.assertEqual(list(subgraphs.k_ini), [1., 1., 1.])
+        #subgraph_parts
+        self.assertEqual(list(subgraph_parts.value), [0, 0])
+        self.assertEqual(list(subgraph_parts.is_significant), [False, False])
+        self.assertEqual(list(subgraph_parts.is_scalable), [False, False])
+        self.assertEqual(list(subgraph_parts.positive_value), [True, True])
+        self.assertEqual(list(subgraph_parts.ini), [0, 0])
+        self.assertEqual(len(subgraph_batches), 2)
+        self.assertEqual(subgraph_batches.P.to_list(),[True, True])
+        self.assertEqual(subgraph_batches.Q.to_list(),[False, False])
+        self.assertEqual(subgraph_batches.I.to_list(),[False, False])
+
+    def test_one_injection_qvalue(self):
+        """one graph for active power and two graphs for reactive power,
+        QValue (Q-measurement or setpoint)"""
+        mymodel = _make_model([
+            Slacknode(id_of_node='n'),
+            Injection(id='inj', id_of_node='n'),
+            QValue(id_of_batch='n_inj', Q=5),
+            Output(id_of_batch='n_inj', id_of_device='inj'),
+            ])
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            mymodel)
+        #subgraphs
+        self.assertEqual(len(subgraphs.index_of_subgraph), 3)
+        self.assertEqual(
+            subgraphs
+            .groupby('scaling_type')
+            .count()
+            .index_of_subgraph
+            .to_dict(),
+            {'P': 1, 'Q': 2})
+        self.assertEqual(list(subgraphs.k_ini), [1., 1., 1.])
+        #subgraph_parts
+        self.assertEqual(list(subgraph_parts.value), [0, 0])
+        self.assertEqual(list(subgraph_parts.is_significant), [False, False])
+        self.assertEqual(list(subgraph_parts.is_scalable), [False, False])
+        self.assertEqual(list(subgraph_parts.positive_value), [True, True])
+        self.assertEqual(list(subgraph_parts.ini), [0, 0])
+        self.assertEqual(len(subgraph_batches), 2)
+        self.assertEqual(subgraph_batches.P.to_list(),[False, False])
+        self.assertEqual(subgraph_batches.Q.to_list(),[True, True])
+        self.assertEqual(subgraph_batches.I.to_list(),[False, False])
+
+    def test_one_injection_p_and_qvalue(self):
+        """two graphs for active power and two graphs for reactive power,
+        P- and QValues (P- and Q-measurements or setpoints)"""
+        mymodel = _make_model([
+            Slacknode(id_of_node='n'),
+            Injection(id='inj', id_of_node='n'),
+            PValue(id_of_batch='n_inj', P=5),
+            QValue(id_of_batch='n_inj', Q=3),
+            Output(id_of_batch='n_inj', id_of_device='inj'),
+            ])
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            mymodel)
+        #subgraphs
+        self.assertEqual(len(subgraphs.index_of_subgraph), 4)
+        self.assertEqual(
+            subgraphs
+            .groupby('scaling_type')
+            .count()
+            .index_of_subgraph
+            .to_dict(),
+            {'P': 2, 'Q': 2})
+        self.assertEqual(list(subgraphs.k_ini), [1., 1., 1., 1.])
+        #subgraph_parts
+        self.assertEqual(list(subgraph_parts.value), [0, 0])
+        self.assertEqual(list(subgraph_parts.is_significant), [False, False])
+        self.assertEqual(list(subgraph_parts.is_scalable), [False, False])
+        self.assertEqual(list(subgraph_parts.positive_value), [True, True])
+        self.assertEqual(list(subgraph_parts.ini), [0, 0])
+        self.assertEqual(len(subgraph_batches), 4)
+        self.assertEqual(subgraph_batches.P.to_list(),[True, True, True, True])
+        self.assertEqual(subgraph_batches.Q.to_list(),[True, True, True, True])
+        self.assertEqual(
+            subgraph_batches.I.to_list(),[False, False, False, False])
+
+    def test_one_injection_ivalue(self):
+        """two graphs for active power and two graphs for reactive power,
+        IValue (I-measurements or setpoints)"""
+        mymodel = _make_model([
+            Slacknode(id_of_node='n'),
+            Injection(id='inj', id_of_node='n'),
+            IValue(id_of_batch='n_inj', I=5.83),
+            Output(id_of_batch='n_inj', id_of_device='inj'),
+            ])
+        subgraphs, subgraph_parts, subgraph_batches = get_pq_subgraphs(
+            mymodel, consider_I=True)
+        #subgraphs
+        self.assertEqual(len(subgraphs.index_of_subgraph), 4)
+        self.assertEqual(
+            subgraphs
+            .groupby('scaling_type')
+            .count()
+            .index_of_subgraph
+            .to_dict(),
+            {'P': 2, 'Q': 2})
+        self.assertEqual(list(subgraphs.k_ini), [1., 1., 1., 1.])
+        #subgraph_parts
+        self.assertEqual(list(subgraph_parts.value), [0, 0])
+        self.assertEqual(list(subgraph_parts.is_significant), [False, False])
+        self.assertEqual(list(subgraph_parts.is_scalable), [False, False])
+        self.assertEqual(list(subgraph_parts.positive_value), [True, True])
+        self.assertEqual(list(subgraph_parts.ini), [0, 0])
+        self.assertEqual(len(subgraph_batches), 4)
+        self.assertEqual(
+            subgraph_batches.P.to_list(), [False, False, False, False])
+        self.assertEqual(
+            subgraph_batches.Q.to_list(), [False, False, False, False])
+        self.assertEqual(subgraph_batches.I.to_list(),[True, True, True, True])
 
 class Make_scaling_factors(unittest.TestCase):
 
@@ -152,12 +354,12 @@ class Make_scaling_factors(unittest.TestCase):
     def test_make_scaling_factors(self):
         """Linear, two branches, one injection, one subgraph
         ::
-             P=5
-             Q=3
+              P=5
+              Q=3
             +<-------->+<-------->+----->>
             n0  br00   n1  br01   n2    inj03_0
-                                        P10=10
-                                        Q10=10
+                                        P10=11
+                                        Q10=7
         """
         model = _make_model([
             Slacknode(id_of_node='n0'),
@@ -167,66 +369,66 @@ class Make_scaling_factors(unittest.TestCase):
             Branch(
                 id='br01', id_of_node_A='n1', id_of_node_B='n2',
                 y_lo=1e3+1e3j),
-            Injection(id='inj03_0', id_of_node='n2', P10=10, Q10=10),
+            Injection(id='inj03_0', id_of_node='n2', P10=11, Q10=7),
             #
             PValue(id_of_batch='n0_br00', P=5),
             QValue(id_of_batch='n0_br00', Q=3),
             Output(
-                id_of_batch='n0_br00', id_of_node='n0', id_of_device='br00'),
-            Factor(id='k'),
-            Klink(id_of_factor=('k', 'k'), id_of_injection='inj03_0',
-                  part=('p', 'q'))])
-        res = make_scaling_factors(model)
-        pass
-
-
-class MultiIndex_slice_test(unittest.TestCase):
-
-    def test_slicing(self):
-        """Tests slicing of pandas DataFrame with MultiIndex.
-
-        >>>src
-            col
-        0 p   a
-          q   b
-        1 p   c
-          q   d
-        2 p   e
-          q   f
-
-        #slice('0','1'), slice('p')
-
-        >>>expected
-            col
-        0 p   a
-        1 p   c
-        """
-        src = pd.DataFrame(
-            ['a', 'b', 'c', 'd', 'e', 'f'],
-            columns=['col'],
-            index=pd.MultiIndex.from_product([('0', '1', '2'), ('p', 'q')]))
-        expected = pd.DataFrame(
-            ['a', 'c'],
-            columns=['col'],
-            index=pd.MultiIndex.from_product([('0', '1'), ['p']]))
-        idx = pd.IndexSlice
+                id_of_batch='n0_br00', id_of_node='n0', id_of_device='br00')])
+        scaling_factors, parts = make_scaling_factors(model)
+        self.assertEqual(len(scaling_factors), 2, msg='two scaling factors')
+        self.assertEqual(set(parts.part), {'P', 'Q'}, 'has P and Q parts')
         self.assertTrue(
-            (src.loc[idx[['0', '1'], ['p']],:] == expected).all().all())
+            all(id_=='inj03_0' for id_ in parts.id_of_injection))
 
-class Scaling_test(unittest.TestCase):
 
-    def test_scaling(self):
+# class MultiIndex_slice_test(unittest.TestCase):
 
-        df = pd.DataFrame(
-            {'minimal': [25, 0],
-             'actual': [50, 60],
-             'maximal':[110, 90]})
-        df['range'] = df.maximal - df.minimal
-        df['actual_normalized'] = (df.actual - df.minimal) / df.range
-        k = df.actual_normalized.mean()
-        df['offset_k'] = k - df.actual_normalized
+#     def test_slicing(self):
+#         """Tests slicing of pandas DataFrame with MultiIndex.
 
-        pass
+#         >>>src
+#             col
+#         0 p   a
+#           q   b
+#         1 p   c
+#           q   d
+#         2 p   e
+#           q   f
+
+#         #slice('0','1'), slice('p')
+
+#         >>>expected
+#             col
+#         0 p   a
+#         1 p   c
+#         """
+#         src = pd.DataFrame(
+#             ['a', 'b', 'c', 'd', 'e', 'f'],
+#             columns=['col'],
+#             index=pd.MultiIndex.from_product([('0', '1', '2'), ('p', 'q')]))
+#         expected = pd.DataFrame(
+#             ['a', 'c'],
+#             columns=['col'],
+#             index=pd.MultiIndex.from_product([('0', '1'), ['p']]))
+#         idx = pd.IndexSlice
+#         self.assertTrue(
+#             (src.loc[idx[['0', '1'], ['p']],:] == expected).all().all())
+
+# class Scaling_test(unittest.TestCase):
+
+#     def test_scaling(self):
+
+#         df = pd.DataFrame(
+#             {'minimal': [25, 0],
+#              'actual': [50, 60],
+#              'maximal':[110, 90]})
+#         df['range'] = df.maximal - df.minimal
+#         df['actual_normalized'] = (df.actual - df.minimal) / df.range
+#         k = df.actual_normalized.mean()
+#         df['offset_k'] = k - df.actual_normalized
+
+#         pass
 
 
 

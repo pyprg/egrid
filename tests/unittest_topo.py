@@ -29,7 +29,7 @@ from networkx.algorithms import bipartite
 from egrid import _make_model
 from egrid.topo import (
     get_node_device_graph, split, get_make_subgraphs, 
-    get_make_scaling_of_subgraphs, get_outputs, get_batches_with_type)
+    get_make_subgraphs_with_batches, get_outputs, get_batches_with_type)
 
 def _get_linear_model():
     nodes_ids = list(str(i) for i in range(10))
@@ -143,11 +143,11 @@ class Get_make_subgraphs(unittest.TestCase):
 
 class Get_make_scaling_of_subgraphs(unittest.TestCase):
 
-    def test_get_make_scaling_of_subgraphs(self):
-        make_scaling_of_subgraphs = get_make_scaling_of_subgraphs(
+    def test_get_make_subgraphs_with_batches(self):
+        make_subgraphs_with_batches = get_make_subgraphs_with_batches(
             subgraph_model)
         scaling_of_subgraphs = list(
-            make_scaling_of_subgraphs(flow_types=['P', 'Q']))
+            make_subgraphs_with_batches(flow_types=['P', 'Q']))
         scaling0, scaling1 = scaling_of_subgraphs
         self.assertEqual(len(scaling0[1]), 1)
         self.assertEqual(len(scaling1[1]), 1)
